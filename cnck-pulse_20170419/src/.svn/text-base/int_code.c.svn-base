@@ -1,0 +1,286 @@
+/****************************************************************/
+/* Name :                                                                   				*/
+/*       main_cycle		                      								*/
+/* Function:                                                               				*/
+/*       main_cycle     INT4-INT6                                 					*/
+/*  Copyright 2008 by LOKSHUN CNC  Equipment LTD.                           	*/
+/*  All rights reserved  LOKSHUN CNC  Equipment LTD.                   		*/ 
+/*	Designed by: DAVID SHEN										*/
+/*   Modified by : ENJOY LU		                                                            */
+/****************************************************************/
+
+#include "..\\include\\dec6713_main.h"
+
+union DSP_CORE_LED_REG 	DSP_CORE_LED_Register;
+
+//脉冲插补控制输出
+void interrupt4()
+{  
+	NCArea_PulseToServo();		
+}
+
+//高速同步总线位置输出
+void interrupt6()
+{
+	;
+}
+
+
+void main_cycle(void)
+{
+
+	INT8U i;
+    /*while(1)
+    {
+        key_com();
+        Task_sleep(1);
+        LEDflash(0);
+    }*/
+	//sysStateInit();
+    while(1) {
+		Timer0.GenericCounter++;
+		{
+			static INT32U ledtimerstart;
+			INT32U ledtimernow;
+			ledtimernow=Clock_getTicks();// Time in Clock ticks();
+			if((ledtimernow-ledtimerstart)>=1000)
+			{
+				LEDflash(0);
+				ledtimerstart=ledtimernow;
+			}
+		}
+		//此处需要优化
+        /*
+		if(Led3FlashCounter > 3000)
+		{
+			LEDflash(0);
+			Led3FlashCounter = 0;
+		}else{
+			Led3FlashCounter++;
+		}
+        */
+		OverallSign.Int4IdleSign++;
+	
+		// 测试程序区域
+		//test_all();
+		//test_cache_a();
+		CPLD_ReadIOIn1();
+		CPLD_ReadIOIn2();
+		//CH0903 避免与中断冲突
+		//CPLD_ReadIOIn3();
+		//
+		GPIOinput_all();
+        CPLD_ReadIOIn4();
+
+    
+
+    	if( System.FeedAxisBusStyle == 0 )	
+    	{
+    		NCRun_SPCRef();
+    		get_ABS_coordinate();	
+    		CPLD_EncoderJudge();	//判断编码器有无报警
+    	}	
+    
+    	if(Error.MainErrorSign==0)
+    	{
+             
+    		//if( (OverallSign.NCSign ==NCSIGN_STD) || (OverallSign.NCSign==NCSIGN_SPC) )
+            if(OverallSign.NCSign !=NCSIGN_NONE)
+            {
+                NCRun_Gcode();	
+            }
+                
+            if(OverallSign.NCSign ==NCSIGN_STD)
+            {
+                NCRun_CheckTrackOver();
+            }
+
+    	}
+    	else
+    	{
+    		//有错误时清插补缓冲区
+    		InterpolationBuffer[0] = InterpolationBuffer[OverallSign.InterpolationRunCnt%INTERPOLATIONBUFLENGTH];
+    		OverallSign.InterpolationSendCnt = 0;
+    		OverallSign.InterpolationRunCnt = 0;
+    	}
+    			
+    	NCRun_ATC();
+    
+    	if(System.RunState == SimulateRun)
+    	{
+    		S_Spindle.SpindleControlStyle = 3;
+    	}
+    	if(S_Spindle.SpindleControlStyle == 0)
+    	{	
+    		//VT 变频器总线控制
+    		NCRun_SpinVT();			
+    		SCIB_ComVT();
+    	}
+    	else if(S_Spindle.SpindleControlStyle == 3)
+    	{	
+    		
+    		//功阳头主轴运行
+    		NCRun_SpinGongYang();
+    	}
+    	
+    	//DSP<->ARM通讯
+    	SCIA_ComARM();        
+    	key_com();
+        // keyHandle();
+    	Task_sleep(2);
+    	{
+    		static INT8U lcdon=0;
+    		static INT8U lcdgrade=3;
+    		lcdon=~lcdon;
+    		SetLCDBackLight(lcdon,lcdgrade);
+    	}
+#if 0
+    	static int Led3FlashCounter=0;
+
+
+    	static INT8U lcdon=0;
+    	for(i=0;i<10;i++)
+    	{
+			Task_sleep(2);
+			lcdon=~lcdon;
+			//fkey=getFkey();
+			//fkey=~fkey;
+			SetLCDBackLight(lcdon,lcdgrade);
+    	}
+    	Task_sleep(10);
+    	SetLCDBackLight(0,lcdgrade);
+#endif
+    }
+}
+
+
+void delay(int period)
+{
+	int i,j;
+	for (i=0;i<period;i++)
+	{
+		for (j=0;j<period;j++);
+ 	}				
+}
+
+
+//此程序暂时测试用
+//定时中断用于插补输出
+void PRD_20us_interpolation(void)
+{
+	static int APA_Led1FlashCounter=0;  
+
+	DSP_CORE_LED_Register.bit.LED2=0;
+	*DSPLED_value = DSP_CORE_LED_Register.all;
+
+    delay(5);	
+
+	if(APA_Led1FlashCounter)
+	{
+		NCArea_PulseToServo();
+	}
+
+	DSP_CORE_LED_Register.bit.LED2=1;
+	*DSPLED_value = DSP_CORE_LED_Register.all;
+}
+
+
+void get_ABS_coordinate(void)
+{
+	// 尽量保证 XYZ  坐标同步锁定
+	OverallSign.GetMachCoordinateRight = 1;
+
+	if(System.RunState == SimulateRun)
+	{
+		if(System.SystemSimulationRunSign == 1)
+		{
+			OverallSign.ABS_Coordinate.X = NC_AREAControl.NowValue.X;
+			OverallSign.ABS_Coordinate.Y = NC_AREAControl.NowValue.Y;
+			OverallSign.ABS_Coordinate.Z = NC_AREAControl.NowValue.Z;
+												  
+			X_Encoder.MACH_PositionValue = NC_AREAControl.NowPointMACHPulseOut.X;
+			Y_Encoder.MACH_PositionValue = NC_AREAControl.NowPointMACHPulseOut.Y;
+			Z_Encoder.MACH_PositionValue = NC_AREAControl.NowPointMACHPulseOut.Z;
+		}
+		else
+		{
+			OverallSign.ABS_Coordinate.X = 0;
+			OverallSign.ABS_Coordinate.Y = 0;
+			OverallSign.ABS_Coordinate.Z = 0;
+			X_Encoder.MACH_PositionValue = 0;
+			Y_Encoder.MACH_PositionValue = 0;
+			Z_Encoder.MACH_PositionValue = 0;
+		}
+		return;
+	}
+
+	if(System.FeedAxisBusStyle == 0)	//脉冲控制型
+	{
+		if(CPLD_EncoderValue(&X_Encoder))
+		{
+			NCCoord_MACValue(&X_Encoder , &X_Servo);			
+		}
+		if(CPLD_EncoderValue(&Y_Encoder))
+		{
+			NCCoord_MACValue(&Y_Encoder , &Y_Servo);
+		}
+		if(CPLD_EncoderValue(&Z_Encoder))
+		{
+			NCCoord_MACValue(&Z_Encoder , &Z_Servo);
+		}
+		if(CPLD_EncoderValue(&U_Encoder))
+		{
+			NCCoord_MACValue(&U_Encoder , &U_Servo);
+		}
+	}
+    CPLD_EncoderValue(&W_Encoder);
+    NCCoord_MACValueWheel();
+	NCCoord_ABSValue();
+}
+	
+INT16U Read_M2_Complete(void)
+{
+//	OverallSign.EveryAxisCoinValid = 0;
+	return TRUE;
+}
+
+
+void LEDDisplayStatus( int a, int b, int c, int d )
+{
+	if( ( a == 0 ) || ( a == 1 ) )
+	{
+		DSP_CORE_LED_Register.bit.LED3 = a;
+	}
+	/*
+	if( ( b == 0 ) || ( b == 1 ) )
+	{
+		DSP_CORE_LED_Register.bit.LED2 = b;
+	}
+	
+	if( c == 0 )
+	{
+		sCPLD_IO_Out2Register.bit.APA_LED1 = 1;		//为1时灯灭
+	}
+	else if( c == 1 )
+	{
+		sCPLD_IO_Out2Register.bit.APA_LED1 = 0;	
+	}
+	
+	if( d == 0 ) 
+	{
+		sCPLD_IO_Out2Register.bit.APA_LED2 = 1;		//为1时灯灭
+	}
+	else if( d == 1 )
+	{
+		sCPLD_IO_Out2Register.bit.APA_LED2 = 0;		
+	}
+	*/
+	
+	//rCPLD_IO_OUT2= sCPLD_IO_Out2Register.all;
+	//GPIOoutput_all();
+	*DSPLED_value = DSP_CORE_LED_Register.all;		
+}
+
+
+
+

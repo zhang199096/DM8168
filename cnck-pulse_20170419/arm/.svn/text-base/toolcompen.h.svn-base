@@ -1,0 +1,83 @@
+
+#ifndef __TOOL_COMP_H__
+#define __TOOL_COMP_H__
+#include "taskglobal.h"
+#include "../include/common.h"
+/*typedef struct
+{
+	IntXX X;
+	IntXX Y;
+	IntXX Z;
+	IntXX A;
+	IntXX B;
+	IntXX U;
+	IntXX V;
+}INT40AXIS;     
+*/
+typedef struct 
+   {
+	Uint32 		SendCount;		//DSP当前运行原代码位置指针，返回给ARM用于显示及其它用途
+	Uint16 		CMD1;		    //命令字,确定G代码类型
+	U32         srcLine;     //add by vinge
+	U32         srcCode;
+    INT40AXIS	StartPoint,EndPoint,CenterPoint;     //起点,终点,圆心点  单位：线性轴最小输入单位
+    FLOAT64 	StartAngle,EndAngle; 	//起始角度,终止角度，单位:度(注意传给DSP时需要转最小单位
+	Int32		Radius;			        //园弧半径 单位：线性轴最小输入单位
+	U8 		    CutDirection;		    //0 G40 1 G41 2 G42	
+	U8          Full_sign;              //0 无代码，1，有代码
+	U8          Send_sign;
+   }PRE_G_CODE;
+
+
+//用于计算过程中保存坐标的结构体
+ typedef struct  
+ {
+	S32 X;
+	S32 Z;
+	S32 X1;
+	S32 Z1;  
+	S32 X2;
+	S32 Z2;
+	S32 X3;
+	S32 Z3;
+	}delt_Compen_AXIS  ; 
+
+ extern PRE_G_CODE Finished_G; 
+ extern PRE_G_CODE Current_code;
+ extern PRE_G_CODE Next_code;
+ extern PRE_G_CODE Former_code;
+
+
+ extern void Deal_TCGbuf(void);
+ void ToolDirInit(void);
+  void Force_Send_M_code(void);
+  void Send_M_code(void);
+  TDGBarc Send_DGbuf(PRE_G_CODE SEND_DATE);
+  void SendMFST(PTCGarc ptcgArc);
+  void Cal_Cir_Center(PRE_G_CODE *Cal_Point);
+  void Send_short_point(PRE_G_CODE Point_date,delt_Compen_AXIS del_value);
+  void Send_Elongate_point(PRE_G_CODE Point_date,delt_Compen_AXIS del_value);
+  void Send_Cut_in_point(PRE_G_CODE Point_date,delt_Compen_AXIS del_value);
+  FLOAT64 Cal_line_angle(INT40AXIS St_Point,INT40AXIS End_Point);
+  U8 Judge_move_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  U8 Juge_connection_type(U16 CMD1,U16 CMD2);
+  delt_Compen_AXIS Shorten_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Elongate_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Cut_in_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Cal_vector(FLOAT64 Angle,U8 CutDirection);
+  delt_Compen_AXIS Shorten_build_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Elongate_build_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Cut_in_build_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Shorten_cancle_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Elongate_cancle_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  delt_Compen_AXIS Cut_in_cancle_type(PRE_G_CODE Current,PRE_G_CODE Next);
+  extern void Tool_Compensation(void);
+  extern void Init_Toolcompen(void);
+  extern void Read_DG(void);
+  #endif
+
+
+
+
+
+

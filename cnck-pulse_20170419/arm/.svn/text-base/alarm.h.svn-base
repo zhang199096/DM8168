@@ -1,0 +1,129 @@
+/**********************************************************************
+*   file name: alarm.h
+*   author : vinge
+*   create date: 20090709
+*   version: 0: 20090709--init version,  ;
+***********************************************************************
+*/
+
+#ifndef __ALARM_H__
+#define __ALARM_H__
+#include "taskglobal.h"
+
+//MACH AND SYSTEM HARD WARE ALARM
+#define ALM_GRP0_NONE               (0)
+#define ALM_GRP0_XSERVO			    (1<<0)
+#define ALM_GRP0_YSERVO			    (1<<1)
+#define ALM_GRP0_ZSERVO			    (1<<2)
+#define ALM_GRP0_SSERVO             (1<<3)  //no run as we wish
+#define ALM_GRP0_XPOS_HLIMIT		(1<<4)
+#define ALM_GRP0_XNEG_HLIMIT		(1<<5)
+#define ALM_GRP0_ZPOS_HLIMIT		(1<<6)
+#define ALM_GRP0_ZNEG_HLIMIT		(1<<7)
+#define ALM_GRP0_XPOS_SLIMIT		(1<<8)
+#define ALM_GRP0_XNEG_SLIMIT		(1<<9)
+#define ALM_GRP0_ZPOS_SLIMIT		(1<<10)
+#define ALM_GRP0_ZNEG_SLIMIT		(1<<11)
+#define ALM_GRP0_YPOS_HLIMIT		(1<<12)
+#define ALM_GRP0_YNEG_HLIMIT		(1<<13)
+#define ALM_GRP0_YPOS_SLIMIT		(1<<14)
+#define ALM_GRP0_YNEG_SLIMIT		(1<<15)
+#define ALM_GRP0_XENCODER		    (1<<16)
+#define ALM_GRP0_YENCODER		    (1<<17)
+#define ALM_GRP0_ZENCODER		    (1<<18)
+#define ALM_GRP0_S_ENCODER          (1<<19)
+#define ALM_GRP0_X_NOREFER		    (1<<20)
+#define ALM_GRP0_Y_NOREFER		    (1<<21)
+#define ALM_GRP0_Z_NOREFER		    (1<<22)
+#define ALM_GRP0_CSERVO             (1<<23)
+#define ALM_GRP0_CENCODER		    (1<<24)
+#define ALM_GRP0_C_NOREFER		    (1<<25)
+
+//#define ALM_GRP0_DSP_COM         (1<<17)
+//#define ALM_GRP0_KEY_COM         (1<<23)
+//#define ALM_GRP0_IO_COM          (1<<24)
+//#define ALM_GRP0_IO_FAIL         (1<<25) //COMMON IO STATE ERROR
+//#define ALM_GRP0_EEPROM          (1<<21) 
+#define ALM_GRP0_SPIN_COM            (1<<26) //21-31 is reserved now
+
+#define ALM_GRP0_ORT_FAIL        (1<<27)
+#define ALM_GRP0_PLC_NOFILE      (1<<28)
+#define ALM_GRP0_PLC_CHKERR      (1<<29)
+#define ALM_GRP0_PLC_RUNERR      (1<<30)
+
+#define ALM_GRP0_EMG_STOP        (unsigned)(1<<31)
+
+#define ALM_GRP0_LIMITS        (0XFFF0)
+//GCODE runing errors
+//32-39
+#define ALM_GRP1_GCODE_UNDEF		(1<<0)
+#define ALM_GRP1_MCODE_RUN          (1<<1) // MCODE EXEC ERROR 
+#define ALM_GRP1_TOOL_FAIL          (1<<2) //tool change fail
+#define ALM_GRP1_SPIN_FAIL          (1<<3) //spindle control fail,speed err
+#define ALM_GRP1_NOFEED_G1          (1<<4) //G1 whel feed=0
+#define ALM_GRP1_NOSS_M0304         (1<<5) //m0304 when s=0
+#define ALM_GRP1_TLOSE_IN_SRUN      (1<<6) //lose chuck when spindle turning
+#define ALM_GRP1_SRUN_IN_TLOSE      (1<<7) //turn spind when CHUCK IS LOSE 
+
+//40-47
+#define ALM_GRP1_S_REVERSE           (1<<8) //spindle turn direct reverst
+#define ALM_GRP1_SCREW_NOF           (1<<9) //SCREW GCODE without f
+#define ALM_GRP1_ARC_RERR            (1<<10) //arc with wrong r or ik
+#define ALM_GRP1_NO_TAG              (1<<11) //not such sub program
+#define ALM_GRP1_SCREW_NOS           (1<<12) //spindle not run before screw 
+#define ALM_GRP1_PARAM_VALERR        (1<<13) //parameter vale set error
+#define ALM_GRP1_SPIN_SPEED          (1<<14) //spindle speed exict limit
+#define ALM_GRP1_G1_SPEED            (1<<15) //G1 speed excit limit
+//48
+#define ALM_GRP1_DSP_PULSE           (1<<16) //dsp gen too mush pulse in a time
+#define ALM_GRP1_MACRO_RUNERR        (1<<17) //macro run error
+#define ALM_GRP1_G7X_START           (1<<18) //G7X with err start code
+#define ALM_GRP1_G71G72G73_N         (1<<19) //G7X start and end seg number error
+#define ALM_GRP1_G71G72_ARC          (1<<20) //G7X X Z IS NOT single inc or dec
+#define ALM_GRP1_DSP_TRACK_OUT       (1<<21) //DSP track over error 
+#define ALM_GRP1_RSAREA              (1<<22) //run into restrect area 
+#define ALM_GRP1_ALINE_NOCROSS       (1<<23) //角度直线无交点
+#define ALM_GRP1_CHAMFER_TOOBIG      (1<<24) //倒角太长
+
+
+
+#define ALM_GRP2_SAFEDOOR_OPEN      (1<<0)  //safe door is open at runing
+
+
+#define ALM_GRP2_OUTDATE             ((unsigned)1<<31) //pass word out date
+//96 plc
+#define ALM_GRP3_NOTZERO           (1<<0)
+
+#define ALM_IS_LIMITS  ((ALARM_GRP0|0XFFF0)&&((ALARM_GRP0&0XFFFF000F)==0)&&(ALARM_GRP1==0)&&(ALARM_GRP2==0)&&(ALARM_GRP3==0))    
+typedef struct _talarm{
+    U32 alarm;          //alarm number;
+    U32 time;           //data and time 
+}Talarm,*Palarm;
+
+#define ALARM_GROUP_MAX 4
+#define ALARM_RECORD_MAX 128
+extern U32 sysalarm[ALARM_GROUP_MAX];
+extern U32 inAlarm;
+extern Talarm alarmInfo[ALARM_RECORD_MAX];
+extern U8 alarming[ALARM_RECORD_MAX];
+extern U8 alarmPtr;
+extern U8 alarmOffset;
+extern U8 alarmHelpOffset;
+extern U8 alarmShow; // if 0,show alarm msg ,if 1 show alarm time;
+extern U8 alarmRedraw;
+
+extern U8 alarmDSPclr;
+
+#define ALARM_GRP0  sysalarm[0]   //dsp and mach alarms , hightest priority   
+#define ALARM_GRP1  sysalarm[1]   //g code exec and runing related alarm 
+#define ALARM_GRP2  sysalarm[2]
+#define ALARM_GRP3  sysalarm[3]
+//#define ALARM_GRP2  alarms[2]   //arm hard ware and error alarm
+void alarmHardLimitCheck(void);
+void alarmSoftLimitCheck(void);
+void alarmRecord(void);
+void alarmClear(void);
+void alarmWriteErrorInfo(void);
+void alarmLimitClear(void);
+#endif
+

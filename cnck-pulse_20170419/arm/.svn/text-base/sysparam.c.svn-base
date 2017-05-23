@@ -1,0 +1,2384 @@
+/*----------------------------------------------------------------------
+file: SYSPARM.C
+version: 0.01.0
+author : vinge
+date   :20080920
+description : define the system parmeters used in L system
+
+------------------------------------------------------------------------
+*/
+#include "def.h"
+#include "sysparam.h"
+#include "../include/sharemem.h"
+//****************************************************************************
+//system vars for interpolation
+//************************IMPORTENT NOTE:***********************************
+//since that should be no a4 in lathe ,we use a5 encoder test to enable hwlimit
+// interrupt protection ,
+// only when a5 is set to 1 ,auto mode can be run.
+// if this field is 0, only jog or whell can run and it will run in the slowest speed,
+// this is set for it hit the limit and want to recover mannually
+// programer should notice this change, change by vinge 20090323
+//***************************************************************************
+
+TDSPparam DSPparamDefault=
+{
+    {
+    //参数值      序号       设置说明    
+    1        , //0000        驱动参数修改权限[0~3]
+    1        , //0001        进给轴控制类型(0-脉冲;1-M2;2-M3)
+    0        , //0002        主轴控制类型(0-VT;1-M2;2-M3)
+    3        , //0003        伺服总线从站数量
+    0        , //0004        自动上下料控制电机数量
+    0        , //0005        IV轴类型选择(0-关闭;1-A;2-B;3-C)
+    0        , //0006        V轴类型选择(0-关闭;1-A;2-B;3-C)
+    0        , //0007        IV轴硬限位功能设置
+    0        , //0008        V轴硬限位功能设置
+    0        , //0009        四轴加工类型(0-M200~201切换;1-3+1强制)
+    0        , //0010        五轴加工类型(0-M200~203切换;1-4+1强制)
+    0        , //0011        双驱同步轴模型选择(0-无效;1-X轴;2-Y轴;3-Z轴)
+    0        , //0012        双驱同步轴调试功能(0-无效;1-主动轴 ;2-从动轴)
+    0        , //0013        伺服刀库控制类型(0-VT;1-M2;2-M3)
+    0        , //0014        伺服刀库调试功能
+    0        , //0015        卡盘调试功能
+    0        , //0016        主轴配置类型
+    10       , //0017        主轴连续不通讯次数[2~10]
+    10       , //0018        主轴连续欠电压误报警次数[10~40]
+    20       , //0019        运动轴硬限位检测时间(单位:ms)
+    10       , //0020        插补周期[1~100](单位:0.1ms)
+    80       , //0021        轨迹超程设置(单位:mm)
+    6        , //0022        曲线平滑允许误差[0~20] (单位:um)
+    10       , //0023        转角不减速最大角度(单位:度)
+    25       , //0024        最小速度设定值(单位:0.1mm/s)
+    1        , //0025        精准最小速度设定值(单位:0.1mm/s)
+    35       , //0026        转向过程时间常数(单位:ms)
+    1        , //0027        精准转向过程时间常数(单位:ms)
+    0        , //0028        圆弧减速比(G61有效)(单位:0.1)
+    5        , //0029        圆弧定速计算比例系数[3~12]
+    40       , //0030        拟合曲线弓高误差[5,50](单位:um)
+    40       , //0031        拟合曲线公差长度比例因子[10,100]
+    20       , //0032        软启动最大速度[15~30]
+    4        , //0033        软启动比率系数[0~9]
+    10       , //0034        手动模态速度柔和比例系数[6~10]
+    10       , //0035        自动模态速度柔和比例系数[6~10]
+    0        , //0036        电子手轮响应系数[0~10]
+    0        , //0037        手动功能响应系数[0~10]
+    1        , //0038        手动功能补偿系数[0~10]
+    1        , //0039        区域速度计算模式
+    1        , //0040        功能选择开关1
+    0        , //0041        功能选择开关2
+    0        , //0042        功能选择开关3
+    0        , //0043        功能选择开关4
+    0        , //0044        功能选择开关5
+    0        , //0045        功能选择开关6
+    0        , //0046        功能选择开关7
+    0        , //0047        功能选择开关8
+    0        , //0048        功能选择开关9
+    0        , //0049        功能选择开关10
+    0        , //0050        功能选择开关11
+    0        , //0051        功能选择开关12
+    0        , //0052        功能选择开关13
+    0        , //0053        功能选择开关14
+    0        , //0054        功能选择开关15
+    0        , //0055        功能选择开关16
+    0        , //0056        功能选择开关17
+    0        , //0057        功能选择开关18
+    0        , //0058        功能选择开关19
+    0        , //0059        功能选择开关20
+    1        , //0060        X轴编码器检测标志
+    1        , //0061        Y轴编码器检测标志
+    1        , //0062        Z轴编码器检测标志
+    1        , //0063        IV轴编码器检测标志
+    1        , //0064        V轴编码器检测标志
+    1        , //0065        S轴编码器检测标志
+    1        , //0066        X轴编码器读数方向
+    0        , //0067        Y轴编码器读数方向
+    1        , //0068        Z轴编码器读数方向
+    0        , //0069        IV轴编码器读数方向
+    0        , //0070        V轴编码器读数方向
+    0        , //0071        S轴编码器读数方向
+    0        , //0072        电子手轮读数方向
+    0        , //0073        对刀锁定信号电平设置
+    0        , //0074        对刀超行程信号电平设置*
+    0        , //0075        未定义
+    0        , //0076        未定义
+    0        , //0077        运动轴负载比例设置
+    0        , //0078        旋转轴负载比例设置
+    0        , //0079        主轴负载比例设置
+    0        , //0080        未定义
+    0        , //0081        未定义
+    0        , //0082        未定义
+    0        , //0083        未定义
+    0        , //0084        未定义
+    0        , //0085        未定义
+    0        , //0086        未定义
+    0        , //0087        未定义
+    0        , //0088        未定义
+    0        , //0089        未定义
+    0        , //0090        未定义
+    0        , //0091        未定义
+    0        , //0092        未定义
+    0        , //0093        未定义
+    0        , //0094        未定义
+    0        , //0095        未定义
+    0        , //0096        未定义
+    0        , //0097        未定义
+    0        , //0098        未定义
+    0        , //0099        未定义
+    10       , //0100        DSP轨迹超程报警序号
+    2        , //0101        DSP插补量过大报警序号
+    1        , //0102        未定义
+    0        , //0103        未定义
+    0        , //0104        未定义
+    0        , //0105        未定义
+    0        , //0106        未定义
+    0        , //0107        未定义
+    0        , //0108        未定义
+    0        , //0109        未定义
+    0        , //0110        未定义
+    0        , //0111        未定义
+    0        , //0112        未定义
+    0        , //0113        未定义
+    0        , //0114        未定义
+    0        , //0115        未定义
+    0        , //0116        未定义
+    0        , //0117        未定义
+    0        , //0118        未定义
+    0        , //0119        未定义
+},
+    {
+    1000     , //0120        线性轴输入单位(单位:nm)
+    1000     , //0121        旋转轴输入单位(单位:nd)
+    1000     , //0122        主轴输入单位(单位:nd)
+    1000     , //0123        线性轴输出单位(单位:nm/指令单位)
+    1000     , //0124        旋转轴输出单位(单位:nd/指令单位)
+    100000   , //0125        主轴输出单位(单位:nd/指令单位)
+    0        , //0126        线性轴换向抵消脉冲[0~1000](单位:线性轴输出指令单位)
+    0        , //0127        旋转轴换向抵消脉冲[0~1000](单位:旋转轴输出指令单位)
+    1000     , //0128        X轴反馈编码器分辨率设置(单位:nm/pulse)
+    1000     , //0129        Y轴反馈编码器分辨率设置(单位:nm/pulse)
+    1000     , //0130        Z轴反馈编码器分辨率设置(单位:nm/pulse)
+    0        , //0131        IV轴反馈编码器每转脉冲数(单位:pulse/r)
+    0        , //0132        V轴反馈编码器每转脉冲数(单位:pulse/r)
+    1        , //0133        S轴反馈编码器每转脉冲数(单位:pulse/r)
+    0        , //0134        X轴间隙补偿(单位:nm)
+    0        , //0135        Y轴间隙补偿(单位:nm)
+    0        , //0136        Z轴间隙补偿(单位:nm)
+    0        , //0137        IV轴间隙补偿(单位:nd)
+    0        , //0138        V轴间隙补偿(单位:nd)
+    0        , //0139        S轴间隙补偿(单位:nd)
+    1000     , //0140        线性轴手动一档进给速度设定[100~1000](单位:mm/min)
+    2000     , //0141        线性轴手动二档进给速度设定[1000~5000](单位:mm/min)
+    5000     , //0142        线性轴手动三档进给速度设定[5000~150000](单位:mm/min)
+    0        , //0143        IV轴手动一档进给速度设置(单位:degree/s)
+    0        , //0144        IV轴手动二档进给速度设置(单位:degree/s)
+    0        , //0145        IV轴手动三档进给速度设置(单位:degree/s)
+    0        , //0146        V轴手动一档进给速度设置(单位:degree/s)
+    0        , //0147        V轴手动二档进给速度设置(单位:degree/s)
+    0        , //0148        V轴手动三档进给速度设置(单位:degree/s)
+    1800     , //0149        线性轴正向搜索参考点速度设定[10~10000](单位:mm/min)
+    200      , //0150        线性轴负向搜索参考点速度设定[10~2000](单位:mm/min)
+    20       , //0151        线性轴负向搜索参考点距离设定[10~200](单位:mm)
+    0        , //0152        IV轴参考点快进速度设置(单位:degree/s)
+    0        , //0153        IV轴参考点搜索速度设置(单位:degree/s)
+    0        , //0154        IV轴参考点搜索距离设置(单位:degree)
+    0        , //0155        V轴参考点快进速度设置(单位:degree/s)
+    0        , //0156        V轴参考点搜索速度设置(单位:degree/s)
+    0        , //0157        V轴参考点搜索距离设置(单位:degree)
+    0        , //0158        系统最大进给速度设置(单位:mm/min
+    0        , //0159        系统限速标志
+    12000    , //0160        X轴最大移动速度设置(单位:mm/min)
+    12000    , //0161        Y轴最大移动速度设置(单位:mm/min)
+    12000    , //0162        Z轴最大移动速度设置(单位:mm/min)
+    0        , //0163        IV轴最大移动速度设置(单位:degree/s)
+    0        , //0164        V轴最大移动速度设置(单位:degree/s)
+    10000    , //0165        线性轴快进速度设置[0~200000](单位:mm/min)
+    0        , //0166        IV轴快进速度设置(单位:degree/s)
+    0        , //0167        V轴快进速度设置(单位:degree/s)
+    3000     , //0168        线性轴运动平台加速度[0~200000](单位:mm/s2)
+    0        , //0169        IV轴运动平台加速度设置(单位:degree/s2)
+    0        , //0170        V轴运动平台加速度设置(单位:degree/s2)
+    500      , //0171        精准运动平台加速度[0~200000](单位:mm/s2)
+    5000     , //0172        快进运动平台加速度[0~20000] (单位:mm/ s2)
+    5000     , //0173        精准模态机电时间常数(单位0.1ms)
+    400      , //0174        指数型加速机电时间常数(单位0.1ms)
+    300      , //0175        指数型减速机电时间常数(单位0.1ms)
+    12000    , //0176        切削加工最大钳制速度(单位:mm/min)
+    8000     , //0177        通用型加速时间常数(单位:0.1ms)
+    8000     , //0178        通用型减速时间常数(单位:0.1ms)
+    30       , //0179        第二转角不减速最大角度[0~180](单位:度)
+    100      , //0180        二次转角向后搜索距离[0~1000000](单位:um)
+    1000     , //0181        转角指定加速度[1~50000](单位:mm/s2)
+    120      , //0182        区域速度差值[0~24000](单位:mm/min)
+    100      , //0183        短区域长度[1~100000](单位:um)
+    300      , //0184        短区域加减速度[1~50000](单位:mm/s2)
+    100000   , //0185        长代码长度[1~1000000](单位:um)
+    90       , //0186        长代码指定角度[0~180](单位:d)
+    120      , //0187        长代码指定终点速度[0~24000](单位:mm/min)
+    150      , //0188        长代码指定加速度[1~50000](单位:mm/s2)
+    6        , //0189        小线段忽略长度值[1~10000](单位:um)
+    6        , //0190        矢量插补最小线段长度[1~8000](单位:um)
+    400      , //0191        矢量插补最大线段长度[1~8000](单位:um)
+    0        , //0192        伺服主轴钳制转速1(单位:r/min)
+    0        , //0193        伺服主轴钳制转速2(单位:r/min)
+    0        , //0194        伺服主轴钳制转速3(单位:r/min)
+    0        , //0195        伺服主轴钳制转速4(单位:r/min)
+    0        , //0196        伺服主轴第1段加减速时间常数(单位:0.1ms)
+    0        , //0197        伺服主轴第2段加减速时间常数(单位:0.1ms)
+    0        , //0198        伺服主轴第3段加减速时间常数(单位:0.1ms)
+    0        , //0199        伺服主轴第4段加减速时间常数(单位:0.1ms)
+    300      , //0200        主轴减速加速度(单位:r/s2)
+    10000    , //0201        主轴转速设置[0~1000000](单位:r/min)
+    15       , //0202        主轴定位最低转速[0~100](单位:r/min)
+    300      , //0203        主轴定位转速(单位:r/min)
+    300      , //0204        主轴10Hz对应转速当量(r/min)
+    1500     , //0205        刚性攻丝最高主轴转速(单位:r/min)
+    0        , //0206        刚性攻丝主轴速度采集模式(0-VT总线;1-编码器)
+    5        , //0207        刚性攻丝主轴停止提前量[0~100](单位:度)
+    18       , //0208        刚性攻丝前馈增益Kp[0~225]
+    17       , //0209        刚性攻丝前馈增益Kv[0~225]
+    200      , //0210        啄式钻孔返回距离(单位:um)
+    100      , //0211        深孔钻孔安全距离(单位:um)
+    300      , //0212        镗孔设定角度[0~359999](单位:0.001度)
+    200      , //0213        钻孔底部暂停时间(单位:ms)
+    200      , //0214        双速齿轮箱换挡转速(单位:r/min)
+    100      , //0215        双速齿轮箱低档最高转速(单位:r/min)
+    300      , //0216        双速齿轮箱高档最高转速(单位:r/min)
+    250      , //0217        双速齿轮箱高低档切换转速(单位:r/min)
+    0        , //0218        伺服刀库第一工位角度值(单位:0.001度)
+    0        , //0219        伺服刀库调试完成标志位
+    2        , //0220        X轴非线性补偿组数设置[0~280]
+    2        , //0221        Y轴非线性补偿组数设置[0~280]
+    2        , //0222        Z轴非线性补偿组数设置[0~280]
+    2        , //0223        IV轴非线性补偿组数设置[0~280]
+    2        , //0224        V轴非线性补偿组数设置[0~280]
+    0        , //0225        名义坐标系X轴原点机床坐标(单位:线性轴输入单位)
+    0        , //0226        名义坐标系Y轴原点机床坐标(单位:线性轴输入单位)
+    0        , //0227        名义坐标系Z轴原点机床坐标(单位:线性轴输入单位)
+    0        , //0228        名义坐标系IV轴原点机床坐标(单位:旋转轴输入单位)
+    0        , //0229        名义坐标系V轴原点机床坐标(单位:旋转轴输入单位)
+    0        , //0230        名义坐标系S轴原点机床坐标(单位:旋转轴输入单位)
+    0        , //0231        双驱同步允许误差设置(单位:最小输入单位)
+    180      , //0232        X轴转向速度差限制值[1~24000](单位:mm/min)
+    180      , //0233        Y轴转向速度差限制值[1~24000](单位:mm/min)
+    180      , //0234        Z轴转向速度差限制值[1~24000](单位:mm/min)
+    0        , //0235        IV轴转向速度差限制值[1~24000](单位:d/min)
+    0        , //0236        未定义
+    0        , //0237        未定义
+    0        , //0238        未定义
+    4000     , //0239        直线群圆弧近似速度[1~24000](单位:mm/min)
+}
+};
+TDSPparam DSPparam;
+//*****************************************************************************
+//TsysParameter SYSPARAM;
+//first 240 is the shadow array of sysdsp param, other 60 is for other use
+Tparameter SYSparam[SYS_PARAM_MAX]=
+{
+   {0,0,0,0,0,    PARAM_TYPE_BOOL}, //PARAM write back or not
+
+   {1,0,0,1,0,    PARAM_TYPE_BOOL}, // 1-6 xYZ A4 A5 s encoder test
+   {0,0,0,1,10,    PARAM_TYPE_BOOL},
+   {1,0,0,1,5,    PARAM_TYPE_BOOL},
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL},
+   {1,0,0,0,-1,   PARAM_TYPE_BOOL}, //THIS IS USE FOR HARD WARE LIMIT INTERRUPT
+   {1,0,0,2,1,    PARAM_TYPE_BOOL},
+
+   {0,0,0,1,1,    PARAM_TYPE_BOOL}, //7-12 xYZ A4 A5 s encoder direction
+   {0,0,0,1,11,    PARAM_TYPE_BOOL},
+   {0,0,0,1,6,    PARAM_TYPE_BOOL},
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL},
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL},
+   {0,0,0,2,2,    PARAM_TYPE_BOOL},
+
+   {1,0,0,1,2,    PARAM_TYPE_BOOL}, //13-18 XYZ A4A5 S motor direction
+   {0,0,0,1,12,    PARAM_TYPE_BOOL},
+   {1,0,0,1,7,    PARAM_TYPE_BOOL},
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL},
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL},
+   {1,0,0,2,3,    PARAM_TYPE_BOOL},
+
+   //{20,10,30,3, PARAM_TYPE_INTS},// 19 whell cycle time setting
+   //{20,10,30,3,132, PARAM_TYPE_INTS},// 19 whell cycle time setting , modified by du
+   {20,1,30,4,25, PARAM_TYPE_INTS},// 19 whell cycle time setting , modified by du
+   {10,5,100,4,0,   PARAM_TYPE_INTS},// 20 interprolation  cycle time 10 ==1ms
+   {30,1,255,1,4,    PARAM_TYPE_INTS}, // 21-33 xyz max speed m/min can be 0-255;
+   {30,1,255,1,14,    PARAM_TYPE_INTS},
+   {30,1,255,1,9,    PARAM_TYPE_INTS},
+
+   {0,0,1,3,0,    PARAM_TYPE_BOOL},  // 24  X jog move sign
+   {0,0,1,3,1,    PARAM_TYPE_BOOL},  // 25 y jog move sing
+   {1,0,0,3,2,    PARAM_TYPE_BOOL},  // 26 z jog move sign
+   {0,0,1,3,3,    PARAM_TYPE_BOOL},  //27 x ref dir
+   {0,0,1,3,4,    PARAM_TYPE_BOOL},  //28 y ref dir
+   {0,0,1,3,5,    PARAM_TYPE_BOOL},  //29 z ref dir
+   {80,1,127,4,7, PARAM_TYPE_INTS},  // 30 speed decrease seperation limit speed  mm/s
+   {2,0,9,4,8,    PARAM_TYPE_INTS},  // 31 speed decrease min unit
+   {30,1,127,4,9, PARAM_TYPE_INTS},  // 32 direction turning  changeing speed, unit 0.1mm/s
+   {20,1,127,4,10, PARAM_TYPE_INTS},  // 33 acculate direction turning change speed , unit 0.1 mm/s
+   {30,1,127,4,11, PARAM_TYPE_INTS},  // 34 dsp trace over setting mm
+   {2,1,4,4,12,    PARAM_TYPE_INTS},  // 35 corrner speed rate
+   {8,0,20,4,13,   PARAM_TYPE_INTS},  // 36 trace smooth allowed error
+   {10,0,127,4,14, PARAM_TYPE_INTS},  // 37 circle speed dicrease rate unit 0.1 10
+   {3,1,127,4,15,  PARAM_TYPE_INTS},  // 38 corrnet turning time const    unit ms
+   {1,1,127,4,16,  PARAM_TYPE_INTS},  // 39 acculate corrnet turning time const    unit ms
+   {3,0,5,2,0,        PARAM_TYPE_INTS},  // 40 spindle type
+   {10,1,100,2,6,       PARAM_TYPE_INTS},  // 41 spindle min speed round/min
+   {100,1,100,2,26,      PARAM_TYPE_INTS},  // 42 forward stop rate in screwing
+   {17,10,20,4,17, PARAM_TYPE_INTS},  // 43 forward rate in screwing kp
+   {19,10,20,4,18, PARAM_TYPE_INTS},  // 44 forward rate in screwing kv
+
+   {20,0,100,2,10,     PARAM_TYPE_INTU},  // 45-49 ,reserve, not use yet
+   {95,0,255,2,7,      PARAM_TYPE_INTU},
+   {50,10,200,2,8,  PARAM_TYPE_INTU},  //Spindle COM err alarm time
+   {0,0,2,2,25,    PARAM_TYPE_INTU},  //48 spindle pos type;0 vt 1 encoder
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0,0,0,0,-1,    PARAM_TYPE_RESV}, //50-120
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0,0,0,0,-1,    PARAM_TYPE_RESV}, //60
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0,0,0,0,-1,    PARAM_TYPE_RESV}, //70
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0,0,0,5,0,    PARAM_TYPE_BOOL},  //80 code unit type 0  meter 1 inch
+   {1,0,0,5,1,    PARAM_TYPE_BOOL},  //81code radius type 0 rad 1d
+   //{0,0,0,5,100,    PARAM_TYPE_BOOL},  //82 TOOL POST
+   //{0,0,0,5,135,    PARAM_TYPE_BOOL},  //82 TOOL POST
+   {0,0,0,5,28,    PARAM_TYPE_BOOL},  //82 TOOL POST modied by du
+   {0,0,0,3,14,    PARAM_TYPE_BOOL},  //83soft ware limit enable 0 disabel 1 enable
+   {0,0,0,5,2,    PARAM_TYPE_BOOL},  // 84 KEY SOUND
+
+   {0,0,0,5,3,    PARAM_TYPE_BOOL}, // 85 operation password enable
+   {1,0,0,5,4,    PARAM_TYPE_BOOL},  //86 coord DEBUG
+   {0,0,0,5,5,    PARAM_TYPE_BOOL},  // 87 go zero after ref found
+   {0,0,3,5,29,    PARAM_TYPE_INTU},  //88 char ratio
+   {0,0,2,5,6,    PARAM_TYPE_INTU},  // 89 AXIS START FIRST IN zero find
+
+   {0,0,2,5,7,    PARAM_TYPE_INTU}, // 90 save door check
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL}, //91 //POS LIMIT
+   {0,0,0,5,8,    PARAM_TYPE_BOOL}, //92
+   {0,0,0,5,9,    PARAM_TYPE_BOOL}, // 93 coord record
+   {0,0,1,2,9,    PARAM_TYPE_BOOL},  //94
+   {0,0,2,0,-1,    PARAM_TYPE_INTU}, //95
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL}, //96
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL}, //97 jump seg style
+   {0,0,10,0,-1,    PARAM_TYPE_INTU},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0,0,0,0,-1,    PARAM_TYPE_BOOL}, //100
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0,0,0,0,-1,    PARAM_TYPE_RESV}, //110
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   //------------------------------------------------------------------
+   //start of this in sysparam is 120 mach to dsp param is 120
+   //the dword parameter of system
+   {1000,1,10000,4,1, PARAM_TYPE_INTS}, // 0 linear axis input unit , unit nm
+   {1000,1,10000,4,2, PARAM_TYPE_INTS}, // 1 rotate axis input unit , unit nd
+   {1000,1,10000,4,3, PARAM_TYPE_INTS}, // 2 spindle input unit  ,unit nd
+   {1000, 1,10000,4,4, PARAM_TYPE_INTS}, // 3 linear axis output unit , unit nm
+   {1000,1,10000,4,5, PARAM_TYPE_INTS}, // 4 rotate axis output unit , unit nd
+   {1000,1,10000,4,6, PARAM_TYPE_INTS}, // 5 spindle output unit  ,unit nd
+   {0,0,280,3,9,      PARAM_TYPE_INTS},      //678 910   xyz a4a5 nonelinear compensation array count
+   {0,0,280,3,18,      PARAM_TYPE_INTS},   //modied by du
+   {0,0,280,3,19,      PARAM_TYPE_INTS},
+   {0,0,280,0,-1,      PARAM_TYPE_INTS},
+
+   {0,0,280,0,-1,      PARAM_TYPE_INTS},
+   {1000,1,10000,1,3,  PARAM_TYPE_INTS}, // 11-13 xyz encoder unit  ,unit nm/pulse
+   {1000,1,10000,1,13, PARAM_TYPE_INTS},
+   {1000,1,10000,1,8,  PARAM_TYPE_INTS},
+
+   {0,0,0,0,-1,         PARAM_TYPE_RESV}, // 14-16 a4a5 s encoder unit , unit  pulse /r
+   {0,0,0,0,-1,         PARAM_TYPE_RESV},
+    {4096,1,100000,2,4, PARAM_TYPE_INTS}, //spindle encoder line pre cycle
+
+
+   {0,0,1000000,3,6,   PARAM_TYPE_INTS}, //17-19 xyz DIR compensation unit  ,unit MINUNIT
+   {0,0,1000000,3,7,   PARAM_TYPE_INTS},
+   {0,0,1000000,3,8,   PARAM_TYPE_INTS},
+
+   {0,0,1000000,0,-1,   PARAM_TYPE_INTS}, // 20,21,22  A4 A5 S DIR  compensation unit unit nd
+   {0,0,1000000,0,-1,   PARAM_TYPE_INTS},
+   {0,0,1000000,0,-1,   PARAM_TYPE_INTS},
+
+   {0,0,0,3,10,        PARAM_TYPE_INTS},   // 23 -27  xyz a4a5 s abs coordinate zero point in mach coordinate vale
+   {0,0,0,3,11,        PARAM_TYPE_INTS},
+   {0,0,0,3,12,        PARAM_TYPE_INTS},
+   {0,0,0,0,-1,        PARAM_TYPE_INTS},
+   {300,10,1000,3,13,   PARAM_TYPE_INTU},  //max allow different
+
+   {6000,0,50000,3,20,       PARAM_TYPE_INTS},//28 g0 speed unit mm/min
+   {2000,0,20000,4,19,        PARAM_TYPE_INTS},//29 machine acclerationg //NOT EQU RECOMMAND
+   {500,100,3000,5,10,      PARAM_TYPE_INTS},//30-32 jog mode baddish  1-3 speed mm/min
+   {2000,1000,10000,5,11,     PARAM_TYPE_INTS},
+   {6000,2000,50000,5,12,   PARAM_TYPE_INTS},
+   {20,5,200,3,15,           PARAM_TYPE_INTS},  // 33 reference search area mm
+   {1000,100,5000,3,16,      PARAM_TYPE_INTS},  // 34 reference search speed in positive dir mm/min
+   {100, 100,500,3,17,       PARAM_TYPE_INTS},  // 35 reference search speed in negertive dir  //2u/ms
+   {1,1,5000,4,20  ,          PARAM_TYPE_INTS},  // 36z go down speed mm/min
+   {0,0,10000,4,21,           PARAM_TYPE_INTS}, // 37 38 linear and rotate axis direction change compations pulse
+   {0,0,10000,4,22,           PARAM_TYPE_INTS},
+   {1000,0,100000,2,5 ,       PARAM_TYPE_INTS},  // 39 spindle speed
+   {0,0,360000,2,11 ,         PARAM_TYPE_INTS},  // 40 spindle position angle
+   {0,0,0,0,-1,              PARAM_TYPE_RESV},  // 41
+   {300,10,5000,2,12,       PARAM_TYPE_INTS},  // 42 spindle speed pre voltage
+   {10,5,15,2,13,            PARAM_TYPE_INTS},  //43 spindle deaccleration speed  r/s2
+   {2000,100,10000,4,23 ,     PARAM_TYPE_INTS},  //44 max spindle speed in screwing
+   {1,1,100000,2,14,         PARAM_TYPE_INTU}, //45   spindle/motor rate fenzi
+   {1,1,100000,2,15,         PARAM_TYPE_INTU},  //46 spindle/motor rate fenzi
+   {0,-10000,10000,2,24 ,    PARAM_TYPE_INTS},  //spindle encoder speed trim
+   {5000,1000,100000,2,16,  PARAM_TYPE_INTU},  //max spindle speed
+   {2000,100,20000,4,24,    PARAM_TYPE_INTU},  //MAX G1 SPEED LIMIT
+
+   {1,1,32,7,0,              PARAM_TYPE_INTS},//50 TOOL NUMBER MAX
+   {1000,10,1800000,7,1,     PARAM_TYPE_INTS},//mcode toolcde MAX TIME
+   {0,0,7,7,2,               PARAM_TYPE_INTS}, //chuck state bit0 tire state bit 1 init state
+   //{300,1,1000,2,17,          PARAM_TYPE_INTU},  //anlog spindle rounds/hz
+   //{100,1,1000,2,18,          PARAM_TYPE_INTU},  //anlog spindle hz/v
+
+   {0,-10000,10000,2,17,   PARAM_TYPE_INTS},  //10v compen voltage unit:mv
+   {9999,0,9999,2,18,    PARAM_TYPE_INTU},  //anlog spindle 10v speed  m41
+   {9999,0,9999,2,19,    PARAM_TYPE_INTU},  //anlog spindle 10v speed  m42
+   {9999,0,9999,2,20,    PARAM_TYPE_INTU},  //anlog spindle 10v speed  m43
+   {9999,0,9999,2,21,    PARAM_TYPE_INTU},  //anlog spindle 10v speed  m44
+   {0,0,1000,2,22,    PARAM_TYPE_INTU},  // 58 spindle PID act
+   {0,-10000,10000,2,23,   PARAM_TYPE_INTS},  //0v compen voltage unit:mv
+
+   {10000000,0,0,3,21,   PARAM_TYPE_INTS},//60 soft limit x pos  //180-189
+   {-10000000,0,0,3,22,  PARAM_TYPE_INTS},//61 soft limit x neg
+   {10000000,0,0,3,23,   PARAM_TYPE_INTS},//62 asoft limit y pos
+   {-10000000,0,0,3,24,  PARAM_TYPE_INTS},  //63 soft limit y neg
+   {10000000,0,0,3,25,   PARAM_TYPE_INTS},  //64 soft limit z pos
+
+   {-10000000,0,0,3,26,  PARAM_TYPE_INTS},  //65 soft limit z neg
+   {0,0,0,0,-1,    PARAM_TYPE_INTS},
+   {0,0,0,0,-1,    PARAM_TYPE_INTS},
+   {0,0,0,0,-1,    PARAM_TYPE_INTS},
+   {0,0,0,0,-1,    PARAM_TYPE_INTS},
+
+   {0,0,100,0,-1,    PARAM_TYPE_INTU},  //G92 TDHL    //70-79   //190-199
+   {1,1,99999,6,0,    PARAM_TYPE_INTU},  //g71 72 delta dcoord set 2 x
+   {0,0,99999,6,1,    PARAM_TYPE_INTU},  //g71 72 e
+   {0,-9999999,9999999,6,2,    PARAM_TYPE_INTS},  //g73 delta i
+   {0,-9999999,9999999,6,3,    PARAM_TYPE_INTS},  //g73 delta k
+
+   {1,1,9999,6,4,   PARAM_TYPE_INTU},  //g73 d
+   {0,0,99999,6,5,  PARAM_TYPE_INTU},  //g7475 e
+   {1,1,99,6,6,     PARAM_TYPE_INTU},  //g76 m //fine cut time
+   {0,0,99,6,7,     PARAM_TYPE_INTU},  //g76 g92r //dao jiao
+   {60,0,90,6,8,    PARAM_TYPE_INTU},  //g76 a //tool angle
+
+   {100,0,99999,6,9,    PARAM_TYPE_INTU}, //80 //200  //g76 min cut deep
+   {100,0,99999,6,10,    PARAM_TYPE_INTU},  //g76 fine cut deep
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {200,0,0,7,3,    PARAM_TYPE_INTS},
+   {1000,0,0,7,4,    PARAM_TYPE_INTS},
+   {0,0,0,7,5,    PARAM_TYPE_INTS},
+   {0,0,0,7,6,    PARAM_TYPE_INTS},
+   {0,0,0,7,7,    PARAM_TYPE_INTS},
+
+   {0,0,0,7,8,    PARAM_TYPE_INTS}, //90
+   {0,0,0,7,9,    PARAM_TYPE_INTS},
+   {0,0,0,7,10,    PARAM_TYPE_INTS},
+   {0,0,0,7,11,    PARAM_TYPE_INTS},
+   {0,0,0,7,12,    PARAM_TYPE_INTS},
+
+   {0,0,0,7,13,    PARAM_TYPE_INTS},
+   {0,0,0,7,14,    PARAM_TYPE_INTS},
+   {0,0,0,0,-1,    PARAM_TYPE_INTS},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,999999,5,13,    PARAM_TYPE_HEX}, //KEYBOARD lock password
+
+   {0,0,0,5,14,    PARAM_TYPE_HEX}, //100 //MAC H16
+   {0,0,0,5,15,    PARAM_TYPE_HEX}, //101 MAC LOW 32
+   {0,0,0,5,16,    PARAM_TYPE_HEX}, // 102 IP
+   {0,0,0,5,17,    PARAM_TYPE_HEX}, //103 GATEWAY
+   {0,0,0,5,18,    PARAM_TYPE_HEX}, //104 NETMASK
+
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},  //105-109
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+   {0,0,0,0,-1,    PARAM_TYPE_RESV},
+
+   {0xFFFFFF,0,0XFFFFFF,5,19, PARAM_TYPE_HEX}, // 110 Color of main back ground
+   {0,0,0XFFFFFF,5,20,        PARAM_TYPE_HEX},      //Color of main chars
+   {0x0,0,0XFFFFFF,5,21,      PARAM_TYPE_HEX}, //Color of  hilight back ground
+   {0xFFFF00,0,0XFFFFFF,5,22, PARAM_TYPE_HEX},      //Color of  hilight chars
+   {0x60AFFF,0,0XFFFFFF,5,23, PARAM_TYPE_HEX}, //Color of menu area back ground
+
+   {0x0,0,0XFFFFFF,5,24, PARAM_TYPE_HEX},  //Color of menu chars
+   {0X0,0,0XFFFFFF,5,25, PARAM_TYPE_HEX},//Color of spit line
+   {0X0,0,0XFFFFFF,5,26, PARAM_TYPE_HEX},
+   {0,0,0,0,-1,           PARAM_TYPE_RESV},
+   {2,0,3,5,27,           PARAM_TYPE_INTU},
+
+   //---------------------------------------------------------------
+   //IN SYS PARAM, HERE,  INDEX IS 241
+
+};
+//******************************************************************************
+U16 PGroup[SYS_PARAM_GROUP_MAX][SYS_PGROUP_INDEX_MAX];
+U8  PGcount[SYS_PARAM_GROUP_MAX];
+/*
+*------------------------------------------------------------------------------
+* function: param
+* parameter: void
+* return   : void
+* description : init SYSparam array map functons
+*------------------------------------------------------------------------------
+*/
+void paramInit(void)
+{
+	U16 i;
+	// 1-120 dsp byte param ,121-240 dsp dword param
+    //copy the 240 dsp parameter to sysparam array,set type to decimal
+    for(i=1;i<DSP_PARAM_BYTE_COUNT;i++)
+    {
+        if((SYSparam[i].type==PARAM_TYPE_INTU)
+        ||(SYSparam[i].type==PARAM_TYPE_RESV))
+            SYSparam[i].val=(U8)DSPparam.sysbyte[i-1];
+        else
+            SYSparam[i].val=DSPparam.sysbyte[i-1];
+        //SYSparam[i].type=PARAM_TYPE_INTU;
+    }
+    for(;i<DSP_PARAM_MAX;i++)
+    {
+        SYSparam[i].val=DSPparam.sysdword[i-DSP_PARAM_BYTE_COUNT];
+        //SYSparam[i].type=PARAM_TYPE_INTU;
+    }
+    for(;i<SYS_PARAM_MAX;i++)
+    {
+        SYSparam[i].val=0;
+       // SYSparam[i].type=PARAM_TYPE_INTU;
+    }
+    //init the param groups
+    for(i=1;i<DSP_PARAM_MAX;i++)
+    {
+        if(SYSparam[i].group!=0)
+        {
+            PGroup[SYSparam[i].group][SYSparam[i].grpIndex]=i;
+            //count how many param in this group
+            if(SYSparam[i].grpIndex>=PGcount[SYSparam[i].group])
+            {
+                PGcount[SYSparam[i].group]=SYSparam[i].grpIndex+1;
+            }
+        }
+    }
+    //copy it to the dsp sharemem
+    memcpy(pPARADSPB0_1,DSPparam.sysbyte,120);
+    memcpy(pPARADSPB0_2,DSPparam.sysdword,120*4);
+}
+/*
+*---------------------------------------------------------------------
+* function: paramSetVal
+* parameter: index of param to set, new  value
+* return   : err number if any
+* description :set the given value to current select parameter
+*---------------------------------------------------------------------
+*/
+U8 paramSetVal(U16 index,S32 newval)
+{
+    U8 err;
+/*    if((sysMode!=SYS_MODE_MDI)||(opLock==2))
+        return PARAM_SET_ERR_WRP;*/
+    if(index>=SYS_PARAM_MAX)
+        return PARAM_SET_ERR_NOPARAM;
+    if(SYSparam[index].type==PARAM_TYPE_BOOL)
+    {
+       err=paramChkBool(index, newval);
+    }else{
+       err=paramChkLimit(index,newval);
+    }
+    //for
+    return err;
+}
+/*
+*---------------------------------------------------------------------
+* function: paramAutoSetVal
+* parameter: index of param to set, new  value
+* return   : err number if any
+* description :auto set val is used in gcompile or some place that
+*      need to save param not in mdi mode.
+*---------------------------------------------------------------------
+*/
+U8 paramAutoSetVal(U16 index,S32 newval)
+{
+    U8 err;
+    U32 wp=SYSparam[0].val;
+    SYSparam[0].val=1;
+    if(index>=SYS_PARAM_MAX)
+        return PARAM_SET_ERR_NOPARAM;
+    if(SYSparam[index].type==PARAM_TYPE_BOOL)
+    {
+       err=paramChkBool(index, newval);
+    }else{
+       err=paramChkLimit(index,newval);
+    }
+    SYSparam[0].val=wp;
+    //for
+    return err;
+}
+/*
+*---------------------------------------------------------------------
+* function: paramChkBool
+* parameter: void
+* return   : void
+* description :check that a bool is give to a param
+*---------------------------------------------------------------------
+*/
+U16 parma_err_index=0;
+U8 paramChkBool(const U16 index,S32 newval)
+{
+    if((index>SYS_PARAM_MAX)||(SYSparam[index].type!=PARAM_TYPE_BOOL))
+        return PARAM_SET_ERR_NOPARAM;
+    if((newval<0)||(newval>1))
+    {
+        parma_err_index=index;
+        return PARAM_SET_ERR_NOTBOOL;
+    }
+    if(index!=0) //Sysparam 0 is run time param to check store or not
+    {
+       return paramSave(index, newval);
+    }else{
+        //just set the param value os sysparam 0
+        SYSparam[0].val=newval;
+
+    }
+    return PARAM_SET_ERR_OK;
+}
+/*
+*---------------------------------------------------------------------
+* function: paramChkLimit
+* parameter: void
+* return   : void
+* description :check if the value given to the param is exit limit
+*---------------------------------------------------------------------
+*/
+U8 paramChkLimit(const U16 index,S32 newval)
+{
+    if((index>SYS_PARAM_MAX)||
+        ((SYSparam[index].type!=PARAM_TYPE_HEX)&&
+         (SYSparam[index].type!=PARAM_TYPE_INTU)&&
+         (SYSparam[index].type!=PARAM_TYPE_INTS)))
+        //return PARAM_SET_ERR_NOPARAM;
+        {
+            goto SAVE_PARAM; //check nothing for resved param
+        }
+    if((SYSparam[index].limitL==0)&&(SYSparam[index].limitH==0))
+        goto SAVE_PARAM;
+    if((newval<SYSparam[index].limitL)||(newval>SYSparam[index].limitH))
+    {
+        parma_err_index=index;
+        return PARAM_SET_ERR_OUTRANGE;
+    }
+SAVE_PARAM:
+    return paramSave(index,newval);
+    //return PARAM_SET_ERR_OK;
+}
+/*
+*---------------------------------------------------------------------
+* function: paramSave
+* parameter: void
+* return   : void
+* description :check if the param need to save to IIC and save if it does.
+*---------------------------------------------------------------------
+*/
+U8 paramSave(const U16 index, S32 newval)
+{
+    U16 dspindex;
+   // STRU_SYS_TIME dt;
+    if(SYSparam[0].val!=1)
+    {
+        return PARAM_SET_ERR_WRP;
+    }
+    if(newval!=SYSparam[index].val)
+    {
+        SYSparam[index].val=newval;
+
+        //we should write it back to flash here
+        if((index>0)&&(index<DSP_PARAM_BYTE_COUNT))
+        {
+            dspindex=index-1;
+            DSPparam.sysbyte[dspindex]=newval;
+            if(SYSparam[0].val==1)
+                IIC_Write1(IICADDR_PARAM_BYTE+dspindex, newval);
+        }else if((index>=DSP_PARAM_BYTE_COUNT)&&(index<DSP_PARAM_MAX))
+        {
+            dspindex=index-DSP_PARAM_BYTE_COUNT;
+            DSPparam.sysdword[dspindex]=newval;
+            if(SYSparam[0].val==1)
+                IIC_Write4(IICADDR_PARAM_DWORD+dspindex*4, newval);
+        }
+    }
+    return PARAM_SET_ERR_OK;
+}
+/*
+*---------------------------------------------------------------------
+* function: paramLoadDefault
+* parameter: void
+* return   : void
+* description :load the default param set ,overwrite all thins in IIC saving
+*---------------------------------------------------------------------
+*/
+void paramLoadDefault(void)
+{
+    if((sysMode!=SYS_MODE_MDI)||(opLock==2)||(SYSparam[0].val==0))
+    {
+        //showHint(GERR_PARAM_SET_START+PARAM_SET_ERR_WRP,SHOW_TIME_NORMAL);
+        return;
+    }
+    /*
+    if(strcmp(cmdbuf,"L")!=0)
+    {
+        showHint(GERR_PARAM_SET_START+PARAM_SET_ERR_WRP,SHOW_TIME_NORMAL);
+        return ;
+    }*/
+    if(assure==0)
+    {
+        assure=ASSURE_PARAM_DEFAULT;
+        //showHint(OPERR_ASSURE_ENTER,SHOW_TIME_FEVER);
+        return;
+    }
+    DSPparam=DSPparamDefault;
+    IIC_Write(IICADDR_PARAM_BYTE,DSPparam.sysbyte,DSP_PARAM_BYTE_COUNT);
+    IIC_Write(IICADDR_PARAM_DWORD,DSPparam.sysdword,DSP_PARAM_DWORD_COUNT*4);
+    //showHint(PARAM_LOAD_END, SHOW_TIME_QUICK);
+    paramInit();
+}
+/*
+*---------------------------------------------------------------------
+* function: paramSave2File
+* parameter: void
+* return   : void
+* description :write all the params to a file
+*---------------------------------------------------------------------
+*/
+void paramSave2File()
+{
+   /*  U8 buf[4000];
+    U8 tempstr[20];
+    U16 len=0;
+    U16 templen;
+    S32 SSDfile;
+    U8 i;
+    if((sysMode!=SYS_MODE_MDI)||(SYSparam[0].val==0))
+    {
+        //showHint(GERR_PARAM_SET_START+PARAM_SET_ERR_WRP, SHOW_TIME_QUICK);
+        return;
+    }
+
+    //showHint(PARAM_SAVE_START, SHOW_TIME_FEVER);
+    OSTimeDly(300);
+    for(i=1;i<SYS_PARAM_MAX;i++)
+    {
+        templen=snprintf(tempstr,19,"%d/%d;\r\n",i,SYSparam[i].val);
+        templen=strlen(tempstr);
+        strncpy(&buf[len],tempstr,templen);
+        len=len+templen;
+    }
+    //write to file
+    //SSDfile = yaffs_open("/PARAMBAK.TXT",O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file PARAMBAK.TXT\n");
+        //showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return;
+    }
+    yaffs_write(SSDfile, buf, len);
+    yaffs_close(SSDfile);
+    getSSDfileList();
+    //showHint(PARAM_SAVE_END, SHOW_TIME_QUICK);*/
+}
+/*
+*---------------------------------------------------------------------
+* function: paramLoadFromFile
+* parameter: void
+* return   : void
+* description :load some param value form a specify file
+*---------------------------------------------------------------------
+*/
+U8 paramLoadFromFile()
+{
+     U8 buf[4000];
+    S32 i;
+    U16 len;
+    S32 SSDfile;
+    //struct yaffs_stat ssdFileStat;
+    if((sysMode!=SYS_MODE_MDI)||(SYSparam[0].val==0))
+    {
+        //showHint(GERR_PARAM_SET_START+PARAM_SET_ERR_WRP, SHOW_TIME_QUICK);
+        return 1;
+    }
+    /*
+    if(strcmp(cmdbuf,"L")!=0)
+    {
+        showHint(GERR_PARAM_SET_START+PARAM_SET_ERR_WRP,SHOW_TIME_NORMAL);
+        return PARAM_SET_ERR_WRP;
+    }
+    showHint(PARAM_LOAD_START, SHOW_TIME_FEVER);
+    OSTimeDly(300);
+    */
+    if(assure==0)
+    {
+        assure=ASSURE_PARAM_LOAD;
+        //showHint(OPERR_ASSURE_ENTER,SHOW_TIME_FEVER);
+        return 1;
+    }
+    /*
+    SSDfile = open("PARAMBAK.TXT",O_RDWR);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file PARAMBAK.TXT\n");
+        //showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return 1;
+    }
+    read(SSDfile, buf, filelength("PARAMBAK.TXT"));
+    close(SSDfile);
+    */
+    /*if(paramLoadFromBuffer(buf,len)==GERR_OK)
+        showHint(PARAM_LOAD_END, SHOW_TIME_QUICK);
+    else
+        showHint(PARAM_LOAD_ERR, SHOW_TIME_QUICK);*/
+    return PARAM_SET_ERR_OK;
+}
+/*
+*---------------------------------------------------------------------
+* function: paramLoadFromBuffer
+* parameter: buffer pointer ,buf length
+* return   : 0 if ok ,err code if error
+* description :load some param value form a buffer
+*---------------------------------------------------------------------
+*/
+U8 paramLoadFromBuffer(U8* buf, U16 bufLen)
+{
+    U16 i;
+    U8 dot;
+    U8 ct;
+    U8 index;
+    U8 indexlen;
+    S32 val;
+    S32 sign;
+    while(i<bufLen)
+    {
+        dot=0;
+        index=0;
+        indexlen=0;
+        val=0;
+        ct=0;
+        sign=1;
+        while(ct<17)
+        {
+           if(buf[i]=='/')
+           {
+               if(dot==1)
+                   goto SAVE_PARAM;
+               else if (dot==0)
+               {
+                   if(ct>3)//INDEX TOO LONG
+                      goto ERR;
+               }
+               dot++;
+               indexlen=ct+1;
+           }else if(buf[i]=='-')
+           {
+               if(ct==indexlen)
+                   sign=-1;
+               else
+                   goto ERR;
+           }else if((buf[i]>='0')&(buf[i]<='9'))
+           {
+               if(dot==0)
+               {
+                   index=index*10+buf[i]-'0';
+               }else if(dot==1)
+               {
+                   val=val*10+buf[i]-'0';
+               }
+           }else
+           {
+               if(dot==0)
+               {
+                   if(indexlen==0)
+                      goto EMPTY_LINE;
+               }else if(dot==1)
+               {
+                   goto SAVE_PARAM;
+               }else
+                   goto ERR;
+           }
+           i++;
+           ct++;
+        }
+SAVE_PARAM:
+        if((ct-indexlen)>11)
+            goto ERR;
+        if(paramSetVal(index, val*sign)!=GERR_OK)
+            goto ERR;
+EMPTY_LINE:
+        while((i<bufLen)&&(buf[i]!=10))
+            i++;
+        i++;
+    }
+    return GERR_OK;
+ERR:
+    return GERR_VALUE_INVALID;
+}
+
+/********************************************************************
+* function: CheckParma
+* parameter: void
+* return :  void
+* description : check parma at system start
+*********************************************************************
+*/
+void CheckParma(void)
+{
+    static U8 haspass=0;
+    U16 index;
+    U8 err=GERR_OK;
+    if(haspass==1)
+    {
+        return;
+    }
+    for(index=1;index<SYS_PARAM_MAX;index++)
+    {
+        if(SYSparam[index].type==PARAM_TYPE_BOOL)
+        {
+            if((SYSparam[index].val<0)||(SYSparam[index].val>1))
+            {
+                parma_err_index=index;
+                err++;
+            }
+        }else{
+            if(SYSparam[index].type==PARAM_TYPE_RESV)
+            {
+                continue;
+            }
+            if((SYSparam[index].limitL==0)&&(SYSparam[index].limitH==0))
+            {
+                continue;
+            }
+            if((SYSparam[index].val<SYSparam[index].limitL)||(SYSparam[index].val>SYSparam[index].limitH))
+            {
+                parma_err_index=index;
+                err++;
+            }
+        }
+    }
+    if(err==GERR_OK)
+    {
+        haspass=1;
+    }else{
+//        showHint(PARAM_LOAD_ERR,SHOW_TIME_QUICK);
+    }
+}
+
+
+
+
+
+
+
+///////////////////////////////////////////////////////////
+//pass word management
+//*********************************************************
+
+/********************************************************************
+* function: setPasswords
+* parameter: void
+* return :  0 ok , others ,err
+* description : set password given in the file
+*********************************************************************
+*/
+#define PASS_FILE_OLDLEN (711)
+#define PASS_FILE_LEN (736)
+U32 setPasswords()
+{
+    #if 0
+    TpassWord temppass;
+     U8 buf[1024];
+    U8 name[128];
+    U32 flag=0;
+    U8 serNum[13];
+    S32 i,j,k,lock;
+    U8 keystart,datestart;
+    U16 len;
+    U32 time;
+    U16 value;
+    U8 firstFlag=0;
+     U8 ssdFileName[256];
+    int SSDfile;
+    U8 oldtype=0;
+    /*
+    FIL fatFile;
+    if(FATfileCT==0)
+        return FERR_OPEN_FAIL;
+    makeFATfullName("PASSWORD.TXT", name);
+    i=f_open(&fatFile,name,FA_READ|FA_OPEN_EXISTING);
+    if((i!=FR_OK)||(fatFile.fsize!=PASS_FILE_LEN))
+    {
+        //showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        //return 0;
+        return FERR_OPEN_FAIL;
+    }
+    f_lseek(&fatFile, 0);
+    i=0;
+    f_read(&fatFile, buf, fatFile.fsize, &i);
+    f_close(&fatFile);
+    */
+//    makeSSDfullName(SSDfileList[SSDcurFile].d_name,ssdFileName);
+    SSDfile = yaffs_open(ssdFileName,O_RDWR|O_EXCL, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file %s\n",ssdFileName);
+//        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return;
+    }
+    i=yaffs_read(SSDfile , buf, PASS_FILE_LEN);
+    yaffs_close(SSDfile);
+    if(i==PASS_FILE_OLDLEN) //len as old type
+    {
+        oldtype=1;
+    }
+    else if(i!=PASS_FILE_LEN) //not len ad new type
+    {
+        return 1;
+    }
+
+    ////////////////////////////////////////////////////////
+    memset((U8*)(&temppass),0,sizeof(TpassWord));
+    //CONVER data str to data
+    //read pass strings
+    k=0;
+
+    for(i=0;i<SYS_PASS_MAX;i++)
+    {
+        value=0;
+        time=0;
+        if(i<9)
+        {
+            keystart=1;
+            datestart=11;
+        }else{
+            keystart=2;
+            datestart=12;
+        }
+        for(j=datestart;j<(datestart+10);j++)
+        {
+            if(!((buf[k+j]>='0')&&(buf[k+j]<='9')))
+            {
+                if(buf[k+j]=='-')
+                    continue;
+                else
+                    goto ERR_HANDLE; //error
+            }
+            value=value*10+buf[k+j]-'0';
+
+            if(j==(datestart+3)) //year
+            {
+                if(value<2009)
+                    goto ERR_HANDLE;
+                time=(value-1980)<<9;
+                value=0;
+            }else if(j==(datestart+6)) //month
+            {
+                if((value<1)||(value>12))
+                    goto ERR_HANDLE;
+                time|=value<<5;
+                value=0;
+            }else if(j==(datestart+9)) //day
+            {
+                /*if((value<1)||(value>28))
+                    goto ERR_HANDLE; //error
+                    */
+                if(value<1)
+                    value=1;
+                else if(value>28)
+                    value=28;
+                time|=value;
+                value=0;
+            }
+        }
+        temppass.keyDate[i]=time<<16;
+        //check time
+        if((i>0)&&(temppass.keyDate[i]<temppass.keyDate[i-1]))
+        {
+            goto ERR_HANDLE;
+        }
+        //read password string
+        lock=0;
+        for(j=keystart;j<(keystart+10);j++)
+        {
+            if(((buf[k+j]>='0')&&(buf[k+j]<='9'))||
+               ((buf[k+j]>='A')&&(buf[k+j]<='Z')))
+            {
+                temppass.keys[i][j-keystart]=buf[k+j];
+                if((lock==0)&&(buf[k+j]!='0')) //if all 0 ,disable
+                {
+                    lock=1;  //it is a enabled password
+                }
+            }else{
+                goto ERR_HANDLE; //error
+            }
+        }
+        if(i<9)
+        {
+            k=k+21;
+        }else{
+            k=k+22;
+        }
+        if((lock==1)&&(firstFlag==0))
+        {
+            lock=0;
+            firstFlag=1;
+        }
+        temppass.flag|=(lock<<i);
+        if((buf[k++]!='\r')||(buf[k++]!='\n'))
+        {
+            goto ERR_HANDLE; //error
+        }
+        //write all pass word
+    }
+    //get the serial number
+    k=721; // pass the 系统条形码
+    if(oldtype==1)
+    {
+        for(j=0;j<13;j++)
+        {
+            serNum[j]='0';
+        }
+    }
+    else //新密码文件带有条码
+    {
+        for(j=0;j<13;j++)
+        {
+            if(((buf[k+j]>='A')&&(buf[k+j]<='Z'))
+            ||((buf[k+j]>='0')&&(buf[k+j]<='9'))
+            ||(buf[k+j]=='-'))
+            {
+                serNum[j]=buf[k+j];
+            }else
+            {
+                goto ERR_HANDLE;
+            }
+        }
+    }
+    //write the string
+    IIC_Write(IICADDR_PASS_USERID, serNum, 13);
+    strncpy(sysSerNum, serNum, 13);
+    IIC_Write1(IICADDR_PASS_INITED,0);  //FALSE inited
+    sysPassInited=0;
+    IIC_Write4(IICADDR_PASSFLAG, temppass.flag);
+    for(i=0;i<SYS_PASS_MAX;i++)
+    {
+        IIC_Write4(IICADDR_PASSDATE+i*4,temppass.keyDate[i]);
+        IIC_Write(IICADDR_PASSSTRING+i*PASSWORD_LEN, temppass.keys[i], PASSWORD_LEN);
+    }
+    sysPassWord=temppass;
+    checkPassword();
+    //showHint(PASS_LOAD_OK, SHOW_TIME_NORMAL);
+    return 0;
+ERR_HANDLE:
+    //showHint(PASS_LOAD_FAIL, SHOW_TIME_NORMAL);
+    return 1;
+    #endif
+}
+/*
+*---------------------------------------------------------------------
+* function: unlockPassWord
+* parameter: pass index to unlokc ,key string
+* return   : key passed TRUE, else FALSE
+* description :unlock the locked pass key
+*---------------------------------------------------------------------
+*/
+U32 unlockPassWordBat(U8 index, U8* str)
+{
+    #if 0
+    TpassWord temppass;
+     U8 buf[1024];
+    U8 name[128];
+    U32 flag=0;
+
+    S32 i,j,k,lock;
+    U8 keystart,datestart;
+    U16 len;
+    U32 time;
+    U16 value;
+    FIL fatFile;
+    //#define PASS_FILE_LEN (736)
+    //return GERR_OK;
+    if(FATfileCT==0)
+        return FERR_OPEN_FAIL;
+    makeFATfullName("PASSWORD.TXT", name);
+    i=f_open(&fatFile,name,FA_READ|FA_OPEN_EXISTING);
+    if((i!=FR_OK)||(fatFile.fsize!=PASS_FILE_LEN))
+    {
+        //showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        //return 0;
+        return FERR_OPEN_FAIL;
+    }
+    f_lseek(&fatFile, 0);
+    i=0;
+    f_read(&fatFile, buf, fatFile.fsize, &i);
+    ////////////////////////////////////////////////////////
+    memset((U8*)(&temppass),0,sizeof(TpassWord));
+    //CONVER data str to data
+    //read pass strings
+    k=0;
+
+    for(i=0;i<SYS_PASS_MAX;i++)
+    {
+        value=0;
+        time=0;
+        if(i<9)
+        {
+            keystart=1;
+            datestart=11;
+        }else{
+            keystart=2;
+            datestart=12;
+        }
+        for(j=datestart;j<(datestart+10);j++)
+        {
+            if(!((buf[k+j]>='0')&&(buf[k+j]<='9')))
+            {
+                if(buf[k+j]=='-')
+                    continue;
+                else
+                    goto ERR_HANDLE; //error
+            }
+            value=value*10+buf[k+j]-'0';
+
+            if(j==(datestart+3)) //year
+            {
+                if(value<2009)
+                    goto ERR_HANDLE;
+                time=(value-1980)<<9;
+                value=0;
+            }else if(j==(datestart+6)) //month
+            {
+                if((value<1)||(value>12))
+                    goto ERR_HANDLE;
+                time|=value<<5;
+                value=0;
+            }else if(j==9) //day
+            {
+                if((value<1)||(value>28))
+                    goto ERR_HANDLE; //error
+                time|=value;
+                value=0;
+            }
+        }
+        temppass.keyDate[i]=time<<16;
+        //check time
+        if((i>0)&&(temppass.keyDate[i]<temppass.keyDate[i-1]))
+        {
+            goto ERR_HANDLE;
+        }
+        //read password string
+        lock=0;
+        for(j=keystart;j<(keystart+10);j++)
+        {
+            if(((buf[k+j]>='0')&&(buf[k+j]<='9'))||
+               ((buf[k+j]>='A')&&(buf[k+j]<='Z')))
+            {
+                temppass.keys[i][j-keystart]=buf[k+j];
+                if((lock==0)&&(buf[k+j]!='0')) //if all 0 ,disable
+                {
+                    lock=1;  //it is a enabled password
+                }
+            }else{
+                goto ERR_HANDLE; //error
+            }
+        }
+        if(i<9)
+        {
+            k=k+21;
+        }else{
+            k=k+22;
+        }
+
+        temppass.flag|=(lock<<i);
+        if((buf[k++]!='\r')||(buf[k++]!='\n'))
+        {
+            goto ERR_HANDLE; //error
+        }
+        //write all pass word
+    }
+
+    for(i=0;i<SYS_PASS_MAX;i++)
+    {
+        for(j=0;j<PASSWORD_LEN;j++)
+        {
+            if(temppass.keys[i][j]!=sysPassWord.keys[i][j])
+            {
+                break;
+            }
+        }
+    }
+    if(i==SYS_PASS_MAX)
+    {
+        sysPassWord.flag=0;
+        IIC_Write4(IICADDR_PASSFLAG, 0);
+    }
+    checkPassword();
+    //showHint(PASS_LOAD_OK, SHOW_TIME_NORMAL);
+    return PASS_LOAD_OK;
+ERR_HANDLE:
+    //showHint(PASS_LOAD_FAIL, SHOW_TIME_NORMAL);
+    return PASS_LOAD_FAIL;
+    #endif
+}
+/*
+*---------------------------------------------------------------------
+* function: unlockPassWord
+* parameter: pass index to unlokc ,key string
+* return   : key passed TRUE, else FALSE
+* description :unlock the locked pass key
+*---------------------------------------------------------------------
+*/
+U32 unlockPassWord(U8 index, U8* str)
+{
+    #if 0
+    //U8 tempstr[64];
+    U8 i;
+    U8 pass=1;
+
+    if(sysMode!=SYS_MODE_MDI)
+        return OPERR_ACT_NORIGHT;
+    if((index>=SYS_PASS_MAX)||(PASS_LOCKED(index)==FALSE))
+        return OPERR_UNVALID_ACT;
+    //unlockCal(str, tempstr);
+    for(i=0;i<PASSWORD_LEN;i++)
+    {
+        if(str[i]!=sysPassWord.keys[index][i])
+        {
+            pass=0;
+            break;
+        }
+    }
+    if(pass==1)
+    {
+        for(i=0;i<=index;i++)
+        {
+            PASS_UNLOCK(i);
+        }
+        IIC_Write4(IICADDR_PASSFLAG, sysPassWord.flag);
+        checkPassword();
+    }
+    return GERR_OK;
+    #endif
+}
+/*
+*---------------------------------------------------------------------
+* function: setPassWordTime
+* parameter: timeOut, 0 the first password outdate will be a month later
+        1 ,the first password outdate after this set time
+* return   : ok TRUE, else FALSE
+* description :reset the date of the pass word
+*---------------------------------------------------------------------
+*/
+U8 setPassWordTime(BOOL timeOut)
+{
+    #if 0
+    U8 i;
+    U32 curdate,datetime;
+    U16 year,month,day;
+    curdate=Get_Time32BIT()&0xFFFF0000;
+    year=((curdate>>16)&DD_YEAR_MASK)>>DD_YEAR_SHIFT;
+    month=((curdate>>16)&DD_MONTH_MASK)>>DD_MONTH_SHIFT;
+    day=((curdate>>16)&DD_DAY_MASK)>>DD_DAY_SHIFT;
+    //if(timeOut==0)
+    //    month=month+1;
+    if(month>12)
+    {
+        month=1;
+        year++;
+    }
+    if(day>28)
+        day=28;
+    datetime=0;
+    for(i=0;i<SYS_PASS_MAX;i++)
+    {
+        if((sysPassWord.flag&(1<<i))==0)
+            continue; //unlocked
+        else//{
+            break;
+    }
+    if(i>0)i--;
+    for(;i<SYS_PASS_MAX;i++)
+    {
+        datetime=(INT16U)(year<<DD_YEAR_SHIFT) + (month<<DD_MONTH_SHIFT) + day;
+        datetime=datetime<<16;
+        sysPassWord.keyDate[i]=datetime;
+        IIC_Write4(IICADDR_PASSDATE+i*4,sysPassWord.keyDate[i]);
+        month=month+1;
+        if(month>12)
+        {
+            month=1;
+            year++;
+        }
+    }
+    #endif
+}
+/*
+*---------------------------------------------------------------------
+* function: checkPassword
+* parameter:
+* return   : ok TRUE, else FALSE
+* description :check if system is lock by password over date
+*---------------------------------------------------------------------
+*/
+U8 checkPassword()
+{
+    U8 i;
+    U32 curdate;
+    //Readbuf=Read_Block; //set the read write func
+    //Writebuf=Write_Block;
+    //if(sysPassWord.flag==0||sysPassInited==0)
+    {
+        passValid=2;
+        return passValid;
+    }
+
+/*    curdate=Get_Time32BIT()&0xFFFF0000;
+    passValid=1;
+    for(i=0;i<SYS_PASS_MAX;i++)
+    {
+        if((sysPassWord.flag&(1<<i))==0)
+        {
+            continue; //unlocked
+        }else{
+            if(curdate>=sysPassWord.keyDate[i])
+            {
+                passValid=0; //is out date
+            }
+            return passValid; //not unlock but is in date limit
+        }
+    }
+    passValid=2; //all password is unlocked
+    sysPassWord.flag=0;
+    IIC_Write4(IICADDR_PASSFLAG, 0);
+    return passValid;*/
+}
+
+/*
+*---------------------------------------------------------------------
+* function: setOPlock
+* parameter:
+* return   : ok TRUE, else FALSE
+* description :check if system is lock by password over date
+*---------------------------------------------------------------------
+*/
+U8 setOPlock(U8*keystr)
+{
+    #if 0
+    U32 val,i;
+    if(sysMode!=SYS_MODE_MDI)
+        return OPERR_UNVALID_ACT;
+    val=0;
+    for(i=0;i<6;i++)
+    {
+        if((keystr[i]>='0')&&(keystr[i]<='9'))
+            val=val*10+keystr[i]-'0';
+        else
+            return GERR_VALUE_INVALID;
+    }
+
+    if((SYSparam[85].val==0)||(opLock==0))
+    {
+        if(opLockChanged==0)
+        {
+            opLockChanged=val;
+            cmdbufClear();
+            return OP_SET_OPKEY_AGAIN;
+        }else{
+            if(opLockChanged==val)
+            {
+                opLockVal=val;
+                opLockChanged=0;
+                IIC_Write4(IICADDR_PASS_OPKEY, val);
+                cmdbufClear();
+                return OP_SET_OPKEY_OK;
+            }else{
+                opLockChanged=0;
+                cmdbufClear();
+                return OP_SET_OPKEY_NOEQUAL;
+            }
+        }
+    }
+    else{
+        return OPERR_UNVALID_ACT;
+    }
+    #endif
+}
+/*
+*---------------------------------------------------------------------
+* function: checkOPlock
+* parameter:
+* return   : ok TRUE, else FALSE
+* description :check if system is lock by password over date
+*---------------------------------------------------------------------
+*/
+U8 checkOPlock(U8* keystr)
+{
+    return GERR_OK;
+    #if 0
+    U32 val,i;
+    if(sysMode!=SYS_MODE_MDI)
+        return FALSE;
+    if((SYSparam[85].val==0)||(opLock==0))
+        return OPERR_UNVALID_ACT;
+    val=0;
+    for(i=0;i<6;i++)
+    {
+        if((keystr[i]>='0')&&(keystr[i]<='9'))
+            val=val*10+keystr[i]-'0';
+        else
+            return GERR_VALUE_INVALID;
+    }
+    if((val==505931)||(val==opLockVal))
+    {
+        opLock=0;
+        IIC_Write1(IICADDR_PASS_OPCLASS,opLock);
+        return GERR_OK;
+    }
+
+    return GERR_VALUE_INVALID;
+    #endif
+}
+
+/*
+*---------------------------------------------------------------------
+* function: toolCompSave2File
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : save tool compansation data to file
+*---------------------------------------------------------------------
+*/
+U8  toolCompSave2File2()
+{
+   /*  U8 buf[12000];
+    U8 tempstr[64];
+    U16 len=0;
+    U16 templen;
+    S32 SSDfile;
+    U8 i;
+    if(sysMode!=SYS_MODE_MDI)
+    {
+        //showHint(OPERR_TOOLSTORE_FAIL, SHOW_TIME_QUICK);
+        return GERR_OK;
+    }
+    //showHint(PARAM_SAVE_START, SHOW_TIME_FEVER);
+    //OSTimeDly(300);
+    for(i=0;i<TOOL_MAX;i++)
+    {
+        //format is like X+09999999Y+9999999Z+9999999R+9999999T0
+        //unit is always um
+        templen=snprintf(tempstr,52,"%02d,X%+010dY%+010dZ%+010dR%+010dT%1d\r\n",i,
+        toolOffset[i].x,toolOffset[i].y,toolOffset[i].z,
+        toolOffset[i].r,toolOffset[i].tdir);
+        //templen=strlen(tempstr);
+        strncpy(&buf[len],tempstr,52);
+        len=len+51;
+    }
+    for(i=0;i<TOOL_MAX;i++)
+    {
+        //format is like X+09999999Y+9999999Z+9999999R+9999999T0
+        //unit is always um
+        templen=snprintf(tempstr,52,"%02d,X%+010dY%+010dZ%+010dR%+010dT%1d\r\n",i,
+        toolWear[i].x,toolWear[i].y,toolWear[i].z,
+        toolWear[i].r,0);
+        //templen=strlen(tempstr);
+        strncpy(&buf[len],tempstr,52);
+        len=len+51;
+    }
+    for(i=0;i<REFP_MAX;i++)
+    {
+        //format is like X+09999999Y+9999999Z+9999999R+9999999T0
+        //unit is always um
+        templen=snprintf(tempstr,39,"%02d,X%+010dY%+010dZ%+010d\r\n",i,
+        coordRef[i].x,coordRef[i].y,coordRef[i].z);
+        //templen=strlen(tempstr);
+        strncpy(&buf[len],tempstr,39);
+        len=len+38;
+    }
+    for(i=0;i<G5X_MAX;i++)
+    {
+        //format is like X+09999999Y+9999999Z+9999999R+9999999T0
+        //unit is always um
+        templen=snprintf(tempstr,40,"%03d,X%+010dY%+010dZ%+010d\r\n",i,
+        coordOrginWorkG5x[i].x,coordOrginWorkG5x[i].y,coordOrginWorkG5x[i].z);
+        //templen=strlen(tempstr);
+        strncpy(&buf[len],tempstr,40);
+        len=len+39;
+    }
+    //write to file
+    SSDfile = yaffs_open("/TOOLBAK.TXT",O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file TOOLBAK.TXT\n");
+        //showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return GERR_OK;
+    }
+    yaffs_write(SSDfile, buf, len);
+    yaffs_close(SSDfile);
+    getSSDfileList();
+    //showHint(OPERR_TOOLSTORE_OK, SHOW_TIME_QUICK);  */
+
+}
+
+/*
+*---------------------------------------------------------------------
+* function: ReadNumFromFile
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : load tool compansation data from file
+*---------------------------------------------------------------------
+*/
+U8* ReadNumFromFile(U8 *ch,S32 *result)
+{
+    S32 sign=1;
+    U32 num=0;
+    U8 tail=0;
+    U8 dot=0;
+    while(*ch!=',')
+    {
+        if(*ch=='-')
+        {
+            sign=-1;
+        }else if(*ch=='.'){
+            dot=1;
+        }else{
+            if(tail<4)
+            {
+                num=num*10+((*ch)-0x30);
+                if(dot==1)
+                {
+                    tail++;
+                }
+            }
+        }
+        ch++;
+    }
+    if(dot==0)
+    {
+        num*=10000;
+    }else{
+        while(4-tail)
+        {
+            num*=10;
+            tail++;
+        }
+
+    }
+    *result=sign*num;
+    return ch;
+}
+/*
+*---------------------------------------------------------------------
+* function: toolCompSave2File
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : save tool compansation data to file
+* format:01,Xxxx,Yxxx,Zxxx,Rxxx,Tx
+*---------------------------------------------------------------------
+*/
+U8  toolCompSave2File()
+{
+ /*    U8 buf[12000]={0,};
+    U8 tempstr[64];
+    U16 len=60*2*TOOL_MAX;
+    U16 templen;
+    S32 SSDfile;
+    U8 i;
+    if(sysMode!=SYS_MODE_MDI)
+    {
+        //showHint(OPERR_TOOLSTORE_FAIL, SHOW_TIME_QUICK);
+        return GERR_OK;
+    }
+    //showHint(PARAM_SAVE_START, SHOW_TIME_FEVER);
+    //OSTimeDly(300);
+    for(i=1;i<TOOL_MAX;i++)
+    {
+        templen=snprintf(tempstr,60,"%02d,X,%-.4f,Y,%-.4f,Z,%-.4f,R,%-.4f,T,%1d,\n",i,
+        toolOffset[i].x/10000.0,toolOffset[i].y/10000.0,toolOffset[i].z/10000.0,
+        toolOffset[i].r/10000.0,toolOffset[i].tdir);
+        strcat(buf,tempstr);
+    }
+    for(i=1;i<TOOL_MAX;i++)
+    {
+        //format is like X+09999999Y+9999999Z+9999999R+9999999T0
+        //unit is always um
+        templen=snprintf(tempstr,60,"%02d,X,%-.4f,Y,%-.4f,Z,%-.4f,R,%-.4f,T,%1d,\n",i,
+        toolWear[i].x/10000.0,toolWear[i].y/10000.0,toolWear[i].z/10000.0,
+        toolWear[i].r/10000.0,0);
+        strcat(buf,tempstr);
+    }
+    //write to file
+    SSDfile = yaffs_open("/TOOLBAK.TXT",O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file TOOLBAK.TXT\n");
+        //showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return GERR_OK;
+    }
+    yaffs_write(SSDfile, buf, len);
+    yaffs_close(SSDfile);
+    getSSDfileList();
+    //showHint(OPERR_TOOLSTORE_OK, SHOW_TIME_QUICK);  */
+}
+/*
+*---------------------------------------------------------------------
+* function: toolCompLoadFromFile
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : load tool compansation data from file
+*---------------------------------------------------------------------
+*/
+
+U8  toolCompLoadFromFile()
+{
+     U8 buf[12000];
+    U8 *strptr,*numptr;
+    U16 len;
+    S32 SSDfile;
+    U32 i;
+    S32 j,tempval;
+    U8 newtype=0;
+    TtoolComp tempComp[TOOL_MAX*2];
+
+
+    if((sysMode!=SYS_MODE_MDI)||((curTool%100)!=0))
+    {
+    //    showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_QUICK);
+        return 1;
+    }
+    if(assure==0)
+    {
+        assure=ASSURE_TOOLCOMP_LOAD;
+    //    showHint(OPERR_ASSURE_ENTER,SHOW_TIME_FEVER);
+        return 1;
+    }
+    /*
+    SSDfile = open("/TOOLBAK.TXT",O_RDWR|O_EXCL, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file TOOLBAK.TXT\n");
+    //    showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return 1;
+    }*/
+    /*if(ssdFileStat.st_size!=60*2*TOOL_MAX)
+    {
+        yaffs_close(SSDfile);
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }*/
+    //len=read(SSDfile, buf, filelength("/TOOLBAK.TXT"));
+    //close(SSDfile);
+    //--------------------------------------
+    //write the tool compensation back
+    strptr=buf;
+    for(i=1;i<TOOL_MAX;i++)
+    {
+        strptr=ReadNumFromFile(strptr,&j)+3;
+        strptr=ReadNumFromFile(strptr,&(toolOffset[i].x))+3;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp), toolOffset[i].x);
+        strptr=ReadNumFromFile(strptr,&(toolOffset[i].y))+3;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+4, toolOffset[i].y);
+        strptr=ReadNumFromFile(strptr,&(toolOffset[i].z))+3;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+8, toolOffset[i].z);
+        strptr=ReadNumFromFile(strptr,&(toolOffset[i].r))+3;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+12, toolOffset[i].r);
+        toolOffset[i].tdir=(*strptr)-0x30;
+        strptr+=2;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+16, toolOffset[i].tdir);
+    }
+    for(i=1;i<TOOL_MAX;i++)
+    {
+        strptr=ReadNumFromFile(strptr,&j)+3;
+        strptr=ReadNumFromFile(strptr,&(toolWear[i].x))+3;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp), toolWear[i].x);
+        strptr=ReadNumFromFile(strptr,&(toolWear[i].y))+3;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+4, toolWear[i].y);
+        strptr=ReadNumFromFile(strptr,&(toolWear[i].z))+3;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+8, toolWear[i].z);
+        strptr=ReadNumFromFile(strptr,&(toolWear[i].r))+3;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+12, toolWear[i].r);
+        toolWear[i].tdir=(*strptr)-0x30;
+        strptr+=2;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+16, toolWear[i].tdir);
+    }
+
+    //showHint(OPERR_TOOLLOAD_OK, SHOW_TIME_QUICK);
+    return GERR_OK;
+ERR:
+    //showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_NORMAL);
+    return GERR_OK;
+}
+
+/*
+*---------------------------------------------------------------------
+* function: refpSave2File
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : save refp data to file
+* format:01,Xxxx,Yxxx,Zxxx
+*---------------------------------------------------------------------
+*/
+U8  refpSave2File()
+{
+  /*   U8 buf[60*REFP_MAX]={0,};
+    U8 tempstr[64];
+    U16 len=60*REFP_MAX;
+    U16 templen;
+    S32 SSDfile;
+    U8 i;
+    if(sysMode!=SYS_MODE_MDI)
+    {
+        //showHint(OPERR_TOOLSTORE_FAIL, SHOW_TIME_QUICK);
+        return GERR_OK;
+    }
+    //showHint(PARAM_SAVE_START, SHOW_TIME_FEVER);
+    //OSTimeDly(300);
+    for(i=1;i<REFP_MAX;i++)
+    {
+        templen=snprintf(tempstr,60,"%02d,X,%-.4f,Y,%-.4f,Z,%-.4f,\n",i,
+        coordRef[i].x/10000.0,coordRef[i].y/10000.0,coordRef[i].z/10000.0);
+        strcat(buf,tempstr);
+    }
+    //write to file
+    SSDfile = yaffs_open("/REFPBAK.TXT",O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        //showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return GERR_OK;
+    }
+    yaffs_write(SSDfile, buf, len);
+    yaffs_close(SSDfile);
+    getSSDfileList();
+    //showHint(OPERR_TOOLSTORE_OK, SHOW_TIME_QUICK);  */
+}
+/*
+*---------------------------------------------------------------------
+* function: refpLoadFromFile
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : load tool compansation data from file
+*---------------------------------------------------------------------
+*/
+
+U8  refpLoadFromFile()
+{
+    #if 0
+     U8 buf[60*REFP_MAX];
+    U8 *strptr,*numptr;
+    U16 len;
+    S32 SSDfile;
+    U32 i;
+    S32 j;
+
+    struct yaffs_stat ssdFileStat;
+
+    if((sysMode!=SYS_MODE_MDI)||((curTool%100)!=0))
+    {
+        showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_QUICK);
+        return;
+    }
+    if(assure==0)
+    {
+        assure=ASSURE_REFP_LOAD;
+        showHint(OPERR_ASSURE_ENTER,SHOW_TIME_FEVER);
+        return;
+    }
+    SSDfile = yaffs_open("/REFPBAK.TXT",O_RDWR|O_EXCL, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    i=yaffs_fstat(SSDfile, &ssdFileStat);
+    if(i<0)
+    {
+        yaffs_close(SSDfile);
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    len=yaffs_read(SSDfile, buf, ssdFileStat.st_size);
+    yaffs_close(SSDfile);
+    if(len!=ssdFileStat.st_size)
+    {
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    //--------------------------------------
+    //write the tool compensation back
+    strptr=buf;
+    for(i=1;i<REFP_MAX;i++)
+    {
+        strptr=ReadNumFromFile(strptr,&j)+3;
+        strptr=ReadNumFromFile(strptr,&(coordRef[i].x))+3;
+        IIC_Write4(IICADDR_REFP+i*8, toolOffset[i].x);
+        strptr=ReadNumFromFile(strptr,&(coordRef[i].y))+3;
+        IIC_Write4(IICADDR_REFP+i*8+4, toolOffset[i].y);
+        strptr=ReadNumFromFile(strptr,&(coordRef[i].z))+2;
+        IIC_Write4(IICADDR_REFP+i*8+8, toolOffset[i].z);
+    }
+
+    showHint(OPERR_TOOLLOAD_OK, SHOW_TIME_QUICK);
+    return GERR_OK;
+ERR:
+    showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_NORMAL);
+    return GERR_OK;
+    #endif
+}
+
+/*
+*---------------------------------------------------------------------
+* function: g54Save2File
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : save refp data to file
+* format:01,Xxxx,Yxxx,Zxxx
+*---------------------------------------------------------------------
+*/
+U8  g54Save2File()
+{
+    #if 0
+     U8 buf[60*G5X_MAX]={0,};
+    U8 tempstr[64];
+    U16 len=60*G5X_MAX;
+    U16 templen;
+    S32 SSDfile;
+    U8 i;
+    if(sysMode!=SYS_MODE_MDI)
+    {
+        showHint(OPERR_TOOLSTORE_FAIL, SHOW_TIME_QUICK);
+        return GERR_OK;
+    }
+    //showHint(PARAM_SAVE_START, SHOW_TIME_FEVER);
+    //OSTimeDly(300);
+    for(i=1;i<G5X_MAX;i++)
+    {
+        templen=snprintf(tempstr,60,"%02d,X,%-.4f,Y,%-.4f,Z,%-.4f,\n",i,
+        coordOrginWorkG5x[i].x/10000.0,coordOrginWorkG5x[i].y/10000.0,coordOrginWorkG5x[i].z/10000.0);
+        strcat(buf,tempstr);
+    }
+    //write to file
+    SSDfile = yaffs_open("/G54BAK.TXT",O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return GERR_OK;
+    }
+    yaffs_write(SSDfile, buf, len);
+    yaffs_close(SSDfile);
+    getSSDfileList();
+    showHint(OPERR_TOOLSTORE_OK, SHOW_TIME_QUICK);
+    #endif
+}
+/*
+*---------------------------------------------------------------------
+* function: refpLoadFromFile
+* parameter:
+* return   : ok TRUE, else FALSE
+* description : load tool compansation data from file
+*---------------------------------------------------------------------
+*/
+
+U8  g54LoadFromFile()
+{
+    #if 0
+     U8 buf[60*G5X_MAX];
+    U8 *strptr,*numptr;
+    U16 len;
+    S32 SSDfile;
+    U32 i;
+    S32 j;
+    struct yaffs_stat ssdFileStat;
+
+    if((sysMode!=SYS_MODE_MDI)||((curTool%100)!=0))
+    {
+        showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_QUICK);
+        return;
+    }
+    if(assure==0)
+    {
+        assure=ASSURE_G54_LOAD;
+        showHint(OPERR_ASSURE_ENTER,SHOW_TIME_FEVER);
+        return;
+    }
+    SSDfile = yaffs_open("/G54BAK.TXT",O_RDWR|O_EXCL, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    i=yaffs_fstat(SSDfile, &ssdFileStat);
+    if(i<0)
+    {
+        yaffs_close(SSDfile);
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    len=yaffs_read(SSDfile, buf, ssdFileStat.st_size);
+    yaffs_close(SSDfile);
+    if(len!=ssdFileStat.st_size)
+    {
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    //--------------------------------------
+    //write the tool compensation back
+
+    strptr=buf;
+    for(i=1;i<G5X_MAX;i++)
+    {
+        strptr=ReadNumFromFile(strptr,&j)+3;
+        strptr=ReadNumFromFile(strptr,&(coordOrginWorkG5x[i].x))+3;
+        IIC_Write4(IICADDR_G5X_X+i*4,coordOrginWorkG5x[i].x);
+        strptr=ReadNumFromFile(strptr,&(coordOrginWorkG5x[i].y))+3;
+        IIC_Write4(IICADDR_G5X_Y+i*4,coordOrginWorkG5x[i].y);
+        strptr=ReadNumFromFile(strptr,&(coordOrginWorkG5x[i].z))+2;
+        IIC_Write4(IICADDR_G5X_Z+i*4,coordOrginWorkG5x[i].z);
+    }
+    coordOrginWork.x=coordOrginWorkG5x[gWorkState.GG05].x+coordOrginWorkG5x[0].x;
+    coordOrginWork.y=coordOrginWorkG5x[gWorkState.GG05].y+coordOrginWorkG5x[0].y;
+    coordOrginWork.z=coordOrginWorkG5x[gWorkState.GG05].z+coordOrginWorkG5x[0].z;
+    showHint(OPERR_TOOLLOAD_OK, SHOW_TIME_QUICK);
+    return GERR_OK;
+ERR:
+    showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_NORMAL);
+    return GERR_OK;
+    #endif
+}
+
+U32 converToolCompFromStr(U8* str, S32 *retvalue)
+{   // if ok return 0 else -1
+    U8 ct,sign;
+    S32 result=0;
+
+    for(ct=1;ct<10;ct++)
+    {
+        if((str[ct]<'0')||(str[ct]>'9'))
+            return -1;
+        result=result*10+str[ct]-'0';
+    }
+    if(str[0]=='-')
+        *retvalue=0-result;
+    else if(str[0]=='+')
+        *retvalue=result;
+    else
+        return -1;
+    return 0;
+}
+U8  toolCompLoadFromFile2()
+{
+    #if 0
+     U8 buf[12000];
+    U8 *strptr,*numptr;
+    U16 len;
+    S32 SSDfile;
+    U32 i;
+    S32 j,tempval;
+    U8 newtype=0;
+
+    TtoolComp tempComp[TOOL_MAX*2];
+    struct yaffs_stat ssdFileStat;
+
+    if((sysMode!=SYS_MODE_MDI)||((curTool%100)!=0))
+    {
+        showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_QUICK);
+        return;
+    }
+    if(assure==0)
+    {
+        assure=ASSURE_TOOLCOMP_LOAD;
+        showHint(OPERR_ASSURE_ENTER,SHOW_TIME_FEVER);
+        return;
+    }
+    SSDfile = yaffs_open("/TOOLBAK.TXT",O_RDWR|O_EXCL, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file TOOLBAK.TXT\n");
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    i=yaffs_fstat(SSDfile, &ssdFileStat);
+    if(i<0)
+    {
+        yaffs_close(SSDfile);
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    if(ssdFileStat.st_size>11203)
+    {
+        yaffs_close(SSDfile);
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }else if(ssdFileStat.st_size>3060){
+        newtype=1;
+    }
+    len=yaffs_read(SSDfile, buf, ssdFileStat.st_size);
+    yaffs_close(SSDfile);
+    if(len!=ssdFileStat.st_size)
+    {
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return FERR_OPEN_FAIL;
+    }
+    //--------------------------------------
+    //write the tool compensation back
+    for(i=1;i<TOOL_MAX*2;i++)
+    {
+        strptr=&buf[i*51];
+        //X
+        numptr=strptr+4;
+        j=converToolCompFromStr(numptr, &(tempComp[i].x));
+        if(j<0) goto ERR;
+        //Y
+        numptr=strptr+15;
+        j=converToolCompFromStr(numptr, &(tempComp[i].y));
+        if(j<0) goto ERR;
+        //Z
+        numptr=strptr+26;
+        j=converToolCompFromStr(numptr, &(tempComp[i].z));
+        if(j<0) goto ERR;
+        //R
+        numptr=strptr+37;
+        j=converToolCompFromStr(numptr, &(tempComp[i].r));
+        if(j<0) goto ERR;
+        //T
+        numptr=strptr+48;
+        if((numptr[0]<'0')||(numptr[0]>'9'))
+            goto ERR;
+        tempComp[i].tdir=numptr[0]-'0';
+    }
+    for(i=1;i<TOOL_MAX;i++)
+    {
+        toolOffset[i].x=tempComp[i].x;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp), toolOffset[i].x);
+        toolOffset[i].z=tempComp[i].y;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+4, toolOffset[i].y);
+        toolOffset[i].z=tempComp[i].z;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+8, toolOffset[i].z);
+        toolOffset[i].r=tempComp[i].r;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+12, toolOffset[i].r);
+        toolOffset[i].tdir=tempComp[i].tdir;
+        IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+16, toolOffset[i].tdir);
+    }
+    for(i=TOOL_MAX;i<TOOL_MAX*2;i++)
+    {
+        toolWear[i].x=tempComp[i].x;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp), toolWear[i].x);
+        toolWear[i].y=tempComp[i].y;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+4, toolWear[i].y);
+        toolWear[i].z=tempComp[i].z;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+8, toolWear[i].z);
+        toolWear[i].r=tempComp[i].r;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+12, toolWear[i].r);
+        toolWear[i].tdir=tempComp[i].tdir;
+        IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+16, toolWear[i].tdir);
+    }
+    for(i=1;i<TOOL_MAX;i++)
+    {
+        toolCompensation[i].x=toolOffset[i].x+toolWear[i].x;
+        toolCompensation[i].z=toolOffset[i].z+toolWear[i].z;
+        toolCompensation[i].y=toolOffset[i].y+toolWear[i].y;
+        toolCompensation[i].r=toolOffset[i].r+toolWear[i].r;
+        toolCompensation[i].tdir=toolOffset[i].tdir;
+    }
+    if(newtype)
+    {
+        for(i=0;i<REFP_MAX;i++)
+        {
+            strptr=&buf[i*38+51*TOOL_MAX*2];
+            //X
+            numptr=strptr+4;
+            j=converToolCompFromStr(numptr, &tempval);
+            if(j<0) goto ERR;
+            coordRef[i].x=tempval;
+            //Y
+            numptr=strptr+15;
+            j=converToolCompFromStr(numptr, &tempval);
+            if(j<0) goto ERR;
+            coordRef[i].z=tempval;
+            //Z
+            numptr=strptr+26;
+            j=converToolCompFromStr(numptr, &tempval);
+            if(j<0) goto ERR;
+            coordRef[i].z=tempval;
+        }
+        for(i=0;i<REFP_MAX;i++)
+        {
+            IIC_Write4(IICADDR_REFP+i*8, coordRef[i].x);
+            IIC_Write4(IICADDR_REFP+i*8+4, coordRef[i].y);
+            IIC_Write4(IICADDR_REFP+i*8+8, coordRef[i].z);
+        }
+        for(i=0;i<G5X_MAX;i++)
+        {
+            strptr=&buf[i*39+51*TOOL_MAX*2+38*REFP_MAX];
+            //X
+            numptr=strptr+5;
+            j=converToolCompFromStr(numptr, &tempval);
+            if(j<0) goto ERR;
+            coordOrginWorkG5x[i].x=tempval;
+            //Y
+            numptr=strptr+16;
+            j=converToolCompFromStr(numptr, &tempval);
+            if(j<0) goto ERR;
+            coordOrginWorkG5x[i].y=tempval;
+            //Z
+            numptr=strptr+27;
+            j=converToolCompFromStr(numptr, &tempval);
+            if(j<0) goto ERR;
+            coordOrginWorkG5x[i].z=tempval;
+        }
+        for(i=0;i<G5X_MAX;i++)
+        {
+            IIC_Write4(IICADDR_G5X_X+i*4,coordOrginWorkG5x[i].x);
+            IIC_Write4(IICADDR_G5X_Y+i*4,coordOrginWorkG5x[i].y);
+            IIC_Write4(IICADDR_G5X_Z+i*4,coordOrginWorkG5x[i].z);
+        }
+        coordOrginWork.x=coordOrginWorkG5x[gWorkState.GG05].x+coordOrginWorkG5x[0].x;
+        coordOrginWork.y=coordOrginWorkG5x[gWorkState.GG05].y+coordOrginWorkG5x[0].y;
+        coordOrginWork.z=coordOrginWorkG5x[gWorkState.GG05].z+coordOrginWorkG5x[0].z;
+    }
+    ToolChangeHandle();
+    showHint(OPERR_TOOLLOAD_OK, SHOW_TIME_QUICK);
+    return GERR_OK;
+ERR:
+    showHint(OPERR_TOOLLOAD_FAIL, SHOW_TIME_NORMAL);
+    return GERR_OK;
+    #endif
+}
+
+U8 toolclearall(void)
+{
+    #if 0
+    U32 i;
+    if(assure==0)
+    {
+        assure=ASSURE_CLEARALL;
+        showHint(OPERR_ASSURE_ENTER,SHOW_TIME_FEVER);
+        return;
+    }
+    switch(currentGUI)
+    {
+        case(GUINUM_TCOMP):
+            for(i=1;i<TOOL_MAX;i++)
+            {
+                toolOffset[i].x=0;
+                toolOffset[i].y=0;
+                toolOffset[i].z=0;
+                toolOffset[i].r=0;
+                toolOffset[i].tdir=0;
+                toolWear[i].x=0;
+                toolWear[i].y=0;
+                toolWear[i].z=0;
+                toolWear[i].r=0;
+                toolCompensation[i].x=0;
+                toolCompensation[i].y=0;
+                toolCompensation[i].z=0;
+                toolCompensation[i].r=0;
+                toolCompensation[i].tdir=0;
+                IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp), toolOffset[i].x);
+                IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+4, toolOffset[i].y);
+                IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+8, toolOffset[i].z);
+                IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+12, toolOffset[i].r);
+                IIC_Write4(IICADDR_TOOLCOMP+i*sizeof(TtoolComp)+16, toolOffset[i].tdir);
+                IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp), toolWear[i].x);
+                IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+4, toolWear[i].y);
+                IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+8, toolWear[i].z);
+                IIC_Write4(IICADDR_TOOLWEAR+i*sizeof(TtoolComp)+12, toolWear[i].r);
+            }
+            break;
+        case(GUINUM_REFP):
+            for(i=0;i<REFP_MAX;i++)
+            {
+                coordRef[i].x=0;
+                coordRef[i].y=0;
+                coordRef[i].z=0;
+                IIC_Write4(IICADDR_REFP+i*8, coordRef[i].x);
+                IIC_Write4(IICADDR_REFP+i*8+4, coordRef[i].y);
+                IIC_Write4(IICADDR_REFP+i*8+8, coordRef[i].z);
+            }
+            break;
+        case(GUINUM_VAR):
+            for(i=0;i<GLOBAL_VAR_MAX;i++)
+            {
+                globalVar[i]=0;
+            }
+            for(i=200;i<GLOBAL_VAR_MAX;i++)
+            {
+                IIC_Write4(IICADDR_GVARS+(i-200)*4,0);
+            }
+            break;
+        case(GUINUM_G5X):
+            for(i=0;i<G5X_MAX;i++)
+            {
+                coordOrginWorkG5x[i].x = 0;
+                coordOrginWorkG5x[i].y = 0;
+                coordOrginWorkG5x[i].z = 0;
+                IIC_Write4(IICADDR_G5X_X+i*4,coordOrginWorkG5x[i].x);
+                IIC_Write4(IICADDR_G5X_Y+i*4,coordOrginWorkG5x[i].y);
+                IIC_Write4(IICADDR_G5X_Z+i*4,coordOrginWorkG5x[i].z);
+            }
+            coordOrginWork.x=0;
+            coordOrginWork.y=0;
+            coordOrginWork.z=0;
+            break;
+    }
+    showMsg=FALSE;
+    #endif
+}
+

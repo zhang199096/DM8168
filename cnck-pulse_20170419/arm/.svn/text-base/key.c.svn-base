@@ -1,0 +1,737 @@
+/*-------------------------------------------------------------------
+/ FILE : key.h
+/ DESCRIPTION: key board read header file
+/ AUTHOR : vinge
+/ DATA:    20080716
+/ VERSION: 20080716 V 0.0 
+/--------------------------------------------------------------------
+*/
+//#include "..\include\key.h"
+//#include "..\include\sci.h"
+#include "..\include\dec6713_main.h"
+#include "taskglobal.h"
+
+
+
+
+INT16U keyBoardVersion;
+INT8U prevKeyCode; //storethe key code before lookup
+INT16U prevJogKey;
+INT8U prevKey[KEY_SAVE_MAX ];  //for dng
+
+INT16U keyRetransWait=0;
+
+INT8U shiftKeyState=FALSE;
+INT8U hasKey=0;
+INT8U keywaiting=0;
+INT16U recvbytes=0;
+INT16U seq=0;
+
+INT32U lightState=0;
+INT8U ledlcdTestStep=0;
+//--------------------------------
+// this vars is for statistic,
+INT32U keyStatisSend=0;
+INT32U keyStatisRecv=0;
+INT32U keyStatisError=0;
+INT32U keyStatisRetrans=0;
+INT32U OKSend = 0;
+////
+
+//-------------------------------------------
+//LED palcement  0x0001-0x0080 at the top
+// 0x8000   0x4000    0x2000
+// 0x1000   0x0800
+// 0x0400   0x0200    0x0100   
+//define the macro to operate the light in the  keyboard
+tsKEY_PACKETIN tsKeyPacketIn;
+tsKEY_PACKETOUT tsKeyPacketOut;
+
+#define KBLED1  tsKeyPacketOut.LED1
+#define KBLED2  tsKeyPacketOut.LED2
+#define KBLED3  tsKeyPacketOut.LED3
+
+
+
+
+//MODE  LED2
+#define LED_MODE_EDIT     KBLED1|=0X0080;
+#define LED_MODE_AUTO     KBLED1|=0X0002;
+#define LED_MODE_MDI      KBLED1|=0X0800;
+#define LED_MODE_REF      KBLED1|=0X0001;
+#define LED_MODE_WHELL    KBLED1|=0X0200;
+#define LED_MODE_JOG      KBLED1|=0X0020;
+//KEY LINE2 //LED1
+#define LED_MODE_SINGLE   KBLED1|=0X0004;
+#define LED_MODE_JUMP     KBLED2|=0X0002;
+#define LED_MODE_MLOCK    KBLED2|=0X0200;//O4
+#define LED_MODE_falseRUN KBLED1|=0X0400;  //NET
+#define LED_MODE_WHELLRUN KBLED1|=0X0040;
+#define LED_MODE_PROGZERO KBLED2|=0X0020;//计划暂停
+//KEY LINE 2
+#define LED_WHELL_1     //  KBLED1|=0X0040;
+#define LED_WHELL_10     // KBLED1|=0X0080;
+#define LED_WHELL_100   //  KBLED2|=0X1000;
+#define LED_WHELL_AXISX //  KBLED1|=0X0200;//KBLED1|=0X0100;
+#define LED_WHELL_AXISY //  KBLED1|=0X0100;//KBLED2|=0X0010;
+#define LED_WHELL_AXISZ  // KBLED2|=0X0800;
+//JOG_GRADE   //LED1
+//#define LED_JOG_GRADE1    KBLED2|=0X0100;
+//#define LED_JOG_GRADE2    KBLED2|=0X0010;
+//#define LED_JOG_GRADE3    KBLED2|=0X0001;    //led2
+
+#define LED_JOG_GRADE1     KBLED3|=0X0100;
+#define LED_JOG_GRADE2      KBLED3|=0X0040;
+#define LED_JOG_GRADE3      KBLED3|=0X0010;   //led3
+
+//IO RUN STATES  //LED1
+//#define LED_SPINDEL_MASK  ~0X9400;
+#define LED_SPINDLE_CW    KBLED2|=0X2000;
+#define LED_SPINDLE_STOP  KBLED2|=0X4000;
+#define LED_SPINDLE_CCW   KBLED2|=0X1000;
+
+
+#define LED_COOL          KBLED2|=0X0008;
+#define LED_OIL           KBLED2|=0X0040;
+#define LED_TOOLCHANGE    KBLED1|=0X0100;
+
+#define LED_PAUSE         KBLED1|=0X0010;
+#define LED_RUN           KBLED1|=0X2000;
+
+#define LED_KEYBB         KBLED3|=0X0008;
+//DRILL
+#define LED_HEADBACK          KBLED2|=0X0010;// KBLED2|=0X0020;
+#define LED_HEADBEFORE            KBLED2|=0X0100;// KBLED2|=0X0400;
+#define LED_LAMP          KBLED2|=0X0800;
+#define LED_CHIP         KBLED2|=0X0004;
+#define LED_PUMP           KBLED2|=0X0080;
+#define LED_HEADBACK_IN      KBLED3|=0X0001;   //led3
+//top led in keyboard  //led3
+#define LED_SHIFT         KBLED1|=0X0008;
+#define LED_XREF          KBLED3|=0X0200;
+#define LED_YREF          KBLED3|=0X0080;
+#define LED_ZREF          KBLED3|=0X0020;    
+#define LED_RESV1     KBLED2|=0X0010;
+#define LED_RESV2     KBLED2|=0x0020;
+#define LED_RESV3     KBLED2|=0X0040;
+#define LED_RESV4     KBLED2|=0X0080;
+
+/*
+unsigned short halfCRC[16]={
+0x0000, 0x1081, 0x2102, 0x3183,0x4204, 0x5285, 0x6306, 0x7387,
+0x8408, 0x9489, 0xa50a, 0xb58b,0xc60c, 0xd68d, 0xe70e, 0xf78f
+};*/
+void sendKeypkg();
+void  recvKeypkg();
+INT8U  lookupKey(INT8U);
+extern INT16U halfCRC[16];
+Uint16 halfRvertCRC (Uint8 *ptr,Uint16 len)
+{
+    unsigned short crc=0;
+    unsigned char da;
+    while(len--!=0)
+    {
+        da = (unsigned char)(crc&0x000f);
+        crc >>= 4;
+        crc ^= halfCRC [da^(*ptr&0x0f)];
+        da = (unsigned char)(crc&0x000f);
+        crc >>= 4;
+        crc ^= halfCRC [da^(*ptr/16)];
+        ptr++;
+    }
+    return crc;
+}
+/*--------------------------------------------------------------------
+/ functon: keyPkgInit
+/ parmeter: 
+/ return :
+/ description:  init the keybord com port, and send out the init package.
+/---------------------------------------------------------------------
+*/
+void keyPkgInit(void)
+{
+    //set up the uart; use uart1 of fpga for key board
+
+    //init send pkg the const
+    //sendPKG.fix=LKB_HEAD;
+    tsKeyPacketOut.Head=0XAA;
+    tsKeyPacketOut.Check=0XBB;
+    tsKeyPacketOut.Len=16;
+    tsKeyPacketOut.Type=1;
+    tsKeyPacketOut.Address=0XD0;
+    tsKeyPacketOut.Command=0XD0;
+    tsKeyPacketOut.Keynum=0xFF;
+    tsKeyPacketOut.LED1=0x0;
+    tsKeyPacketOut.LED2=0x0;
+    tsKeyPacketOut.LED3=0x0;
+    tsKeyPacketOut.Seq=0;
+
+}
+/*--------------------------------------------------------------------
+/ functon: recvKeypkg
+/ parmeter: 
+/ return : 
+/ description: main loop of key package recevie and send
+/---------------------------------------------------------------------
+*/
+void key_com()
+{
+    //send out
+    #define KEY_BROKEN_TIME (30)
+    INT8U tempkey;
+    if(keywaiting==TRUE)
+        return;
+    if(keyRetransWait==0)
+    {
+        tsKeyPacketOut.Keynum=prevKeyCode;
+        //top leds
+		tsKeyPacketOut.Command  &=~(1<<3);
+        sendKeypkg();
+        keyRetransWait++;	 
+    }else{
+        recvKeypkg();
+        if(hasKey==1)
+        {
+        	
+            if((tsKeyPacketIn.Keynum>0)||(tsKeyPacketIn.Multikey!=0))
+            {
+                INT8U i;
+                //printf("key received 0x%x----%c\n",prevKeyCode);
+                tempkey=lookupKey(tsKeyPacketIn.Keynum);
+                for(i=(KEY_SAVE_MAX-1);i>0;i--)
+                {
+                    prevKey[i]=prevKey[i-1];   //save the lookuped keyval
+                }
+                if(tsKeyPacketIn.Multikey!=0)
+                    prevJogKey=tsKeyPacketIn.Multikey;
+                keywaiting=TRUE;
+
+                Log_info4("Key recived = %d--static: send %d; recv %d; retrans %d\n",
+                	tempkey,keyStatisSend,keyStatisRecv,keyStatisRetrans);
+                //
+                keyHandle(tempkey);
+                keywaiting=FALSE;
+            }else{ //once pkg geted ,allways treat it as a key,even 0
+                keywaiting=FALSE;
+				
+            }
+            // get teh G0F G1F SPINF
+            multiKey =tsKeyPacketIn.Multikey;
+            feedGrade=tsKeyPacketIn.GradeG1;
+            rapidGrade=tsKeyPacketIn.GradeG0;
+            spindleGrade=tsKeyPacketIn.GradeS;
+            prevKeyCode=tsKeyPacketIn.Keynum;
+            hasKey=0;
+            recvbytes=0;
+            keyRetransWait=0;
+        }else{            
+	        keyRetransWait++;
+
+            if(keyRetransWait>KEY_BROKEN_TIME)
+            {
+                //printf("key retrans\n");
+                if((keyStatisRetrans%10)==0)//10
+                {  //reset the key board transmision
+                    keyPkgInit();
+                }                
+                sendKeypkg();
+	            hasKey=0;
+	            recvbytes=0;
+	            keyRetransWait=1;
+	            keyStatisRetrans++;	            
+            }
+        }
+    }
+    //flagkey++;
+}
+
+/*--------------------------------------------------------------------
+/ functon: sendKeypkg
+/ parmeter: 
+/ return 
+/ description:  send out the key package to key board;
+
+/---------------------------------------------------------------------
+*/
+void sendKeypkg()
+{
+    
+    INT8U *ptr=(INT8U*)(&tsKeyPacketOut);
+
+    //INT16U head=0x101;
+    tsKeyPacketOut.Seq=seq;
+    //cal the crc;
+    tsKeyPacketOut.CRC=halfRvertCRC(ptr+1,16-2);
+    keyboardTX(ptr,16+2);
+    keyStatisSend++;
+}
+
+/*--------------------------------------------------------------------
+/ functon: recvKeypkg
+/ parmeter: 
+/ return : if a key packege is received reutrn 1, 
+/  0 if nothing received, 2 if error;
+/ description:  send out the key package to key board;
+
+/---------------------------------------------------------------------
+*/
+void recvKeypkg()
+{
+    //static int times;
+    INT16U crc;
+
+    INT8U* recvbuf=(INT8U*)(&tsKeyPacketIn);
+    keyboardRX(recvbuf, &recvbytes,16+2);
+
+    if(recvbytes<16+2)
+    {
+        return;
+    }
+    //check is the the package ok?
+    if((tsKeyPacketIn.Head!=0xAA)||
+       (tsKeyPacketIn.Check!=0XBB)||
+       (tsKeyPacketIn.Type!=0XF)||
+       (tsKeyPacketIn.Address!=0XD0)||
+       (tsKeyPacketIn.Command!=0XD0)||
+       (tsKeyPacketIn.Seq!=seq))
+        {            
+            keyStatisError++;
+            return;
+        }
+       crc=halfRvertCRC(recvbuf+1,16-2);
+       if(tsKeyPacketIn.CRC!=crc)
+       {
+        keyStatisError++;
+        return;        
+       }
+    //recvKEY=recvPKG.keyinfo;
+
+    hasKey=1;
+    seq++;
+    keyStatisRecv++;
+    return;    
+}
+/*--------------------------------------------------------------------
+/ functon: lookupKey
+/ parmeter: key code of keyboard
+/ return : key value define by system
+/ description:  translate the keyboard key num to systom KEY number; 
+/   include the shifted keys 
+/----------------------------------------------------------------------
+*/
+INT8U  lookupKey(INT8U keycode)
+{
+   INT8U result; 
+//   keyvaltemp[ukey++] = keycode;
+    switch(keycode)
+    {
+    //---------------------------------------------------------------
+    //0-9
+        case 0x0:
+             result= KEY_JOG_GRADE;
+            break;
+        case 0x1:
+		result=KEY_FUP;
+            break;
+        case 0x2:
+		 result=KEY_F1;
+            break;
+        case 0x3:
+			result=KEY_F2;
+            break;
+         case 0x4:
+		 	result=KEY_F3;
+            break;
+        case 0x5:
+			result=KEY_F4;
+            break;
+        case 0x6:
+			result=KEY_F5;
+            break;
+        case 0x7:
+			result=KEY_F6;
+            break;
+        //-------
+        case 0x8:
+			result=KEY_F7;
+            break;
+        case 0x9:
+            result=KEY_F8;
+            break;
+        //-----------------------------------------------------
+        //10-19
+        case 0xA:
+            result=KEY_F9;
+            break;
+        case 0xB:
+            result=KEY_F10;
+     
+            break;
+        case 0xC:
+			result=KEY_FROLL;
+            break;
+	 case 0x11:
+		result=KEY_POSITION ;
+            break;
+        case 0x12:
+		 result=KEY_PROGRAM ;
+            break;
+        case 0x13:
+			result=KEY_COMPENS ;
+            break;
+         case 0x14:
+		 	result=KEY_PARAM ;
+            break;
+        case 0x15:
+			result= KEY_DGN ;
+			
+            break;
+        case 0x16:
+            result= KEY_SIMTRACE;
+            break;
+        case 0x17:
+			result=KEY_ALARM;
+            break;
+        //-------
+        case 0x18:
+            result=0;//KEY_DRILL;
+			break;
+
+        case 0x21:
+           result='M';
+            break;
+	 case 0x22:
+           result='S';
+            break;
+	 case 0x23:
+           result='T';
+            break;
+	 case 0x24:
+           result='G';
+            break;
+	 case 0x25:
+           result='F';
+            break;
+	 case 0x31:
+           result='N';
+            break;
+	 case 0x32:
+           result='O';
+            break;
+	 case 0x33:
+           result='L';
+            break;
+	 case 0x34:
+           result='A';
+            break;
+	 case 0x35:
+           result='U';
+            break;
+	 case 0x41:
+           result='I';
+            break;
+	 case 0x42:
+           result='J';
+            break;
+	 case 0x43:
+           result='K';
+            break;
+	 case 0x44:
+           result='B';
+            break;
+	 case 0x45:
+           result='V';
+            break;
+	 case 0x51:
+           result='H';
+            break;
+	 case 0x52:
+           result='D';
+            break;
+	 case 0x53:
+           result='E';
+            break;
+	 case 0x54:
+           result='C';
+            break;
+	 case 0x55:
+           result='W';
+            break;
+	 case 0x61:
+           result='R';
+            break;
+	 case 0x62:
+           result='Q';
+            break;
+	 case 0x63:
+           result='P';
+            break;
+	 case 0x64:
+          // result='B1';
+		   result=0;
+            break;
+	 case 0x65:
+           //result='B2';
+		   result=0;
+            break;
+	 case 0x26:
+           result='X';
+            break;
+	 case 0x36:
+           result='Y';
+            break;
+	 case 0x46:
+           result='Z';
+            break;
+	 case 0x56:
+           result='B';
+            break;
+	 case 0x66:
+           result='V';
+            break;
+	 case 0x27:
+           result='7';
+            break;
+	 case 0x28:
+           result='8';
+            break;
+	 case 0x29:
+           result='9';
+            break;
+	case 0x37:
+           result='4';
+            break;
+	 case 0x38:
+           result='5';
+            break;
+	 case 0x39:
+           result='6';
+            break;
+	case 0x47:
+           result='1';
+            break;
+	 case 0x48:
+           result='2';
+            break;
+	 case 0x49:
+           result='3';
+            break;
+	case 0x57:
+           result='0';
+            break;
+	 case 0x58:
+           result='.';
+            break;
+	 case 0x59:
+           /*if(shiftKeyState==FALSE)
+                result='-';
+            else
+                result='+';*/result=KEY_RST;
+            break;
+	case 0x67:
+         result=KEY_ENTER;
+            break;
+	 case 0x68:
+           result=' ';//KEY_SPACE2;
+            break;
+	 case 0x69:
+          // result='B3';
+		result=0;
+            break;
+	case 0x2A:
+           result='#';
+            break;
+	 case 0x2B:
+           result='=';
+            break;
+	 case 0x2C:
+          if(shiftKeyState==FALSE)
+                result='(';
+            else
+                result=')';
+            break;
+	 case 0x2D:
+           if(shiftKeyState==FALSE)
+                result='[';
+            else
+                result=']';
+            break;
+	case 0x3A:
+           result='/';
+            break;
+	 case 0x3B:
+           result='*';
+            break;
+	 case 0x3C:
+         
+            result='+';
+            break;
+	 case 0x3D:
+           
+            result='_';
+            break;
+	// case 0x40:
+           
+         //  result= KEY_JOG_GRADE;
+        //    break;
+	case 0x4A:
+		result=0;
+            break;
+	 case 0x4B:
+           result=KEY_PAGEUP;
+            break;
+	 case 0x4C:
+         
+            result=KEY_UP;;
+            break;
+	 case 0x4D:
+           
+            result=KEY_PAGEDOWN;
+            break;
+	case 0x5A:
+          // result='END';
+		   result=0;
+            break;
+	 case 0x5B:
+           result=KEY_LEFT;
+            break;
+	 case 0x5C:
+         
+            result=KEY_JUMPSEG ;
+            break;
+	 case 0x5D:
+           
+            result=KEY_RIGHT;
+            break;
+	 case 0x6A:
+            result=KEY_DOWN;
+            break;
+	case 0x6B:
+            result=KEY_ENTER;
+            break;
+	case 0x2E:
+            result=KEY_RST;
+            break;
+	case 0x4E:
+            result=KEY_CANCLE;
+            break;
+	case 0x5E:
+			result=0;
+            break;
+	case 0x7E:
+           result=KEY_WHEEL;
+            break;
+	 case 0x7D:
+            result=KEY_JOG;
+            break;
+	 case 0x7C:
+            result=KEY_REF;
+            break;
+	case 0x7B:
+		   result=0;//KEY_falseRUN  ;
+            break;
+	 case 0x7A:
+            result= KEY_WHELLRUN ;
+            break;
+	 case 0x79:
+            result=KEY_AUTO;
+            break;
+	case 0x78:
+		   result= KEY_MDI;
+            break;
+	 case 0x77:
+            result=KEY_EDIT;
+            break;
+	 case 0x76:
+            result=KEY_SINGLE;
+            break;
+	case 0x75:
+		 //result='ATC';
+		 result = 0;//KEY_MACHLOCK;
+           
+            break;
+	 case 0x74:
+           result=KEY_TOOL ;
+            break;
+	 case 0x73:
+             if(shiftKeyState==0)
+            {    shiftKeyState=1;
+            }else{ 
+                shiftKeyState=0;
+            }
+            result=0;
+            break;
+	case 0x72:
+            result=KEY_RUN;
+            break;
+	case 0x71:
+            result=KEY_PAUSE;
+            break;
+	case 0x8F:
+           // result='O1';
+            result=0;//KEY_HEADBEFORE;
+            break;
+	case 0x8E:
+           // result='O2';
+            result=0;//KEY_HEADBACK ;
+            break;
+	case 0x8D:
+            //result='O3';
+			result=0;
+            break;
+	case 0x8C:
+		//	result=0;
+			 result = KEY_MACHLOCK;
+            break;
+	case 0x8B:
+		//	result=KEY_STARTP ;
+		
+            break;
+	case 0x8A:
+			result= KEY_JUMPSEG;
+            break;
+	case 0x89:
+		//	result=KEY_HEADBEFORE;
+            break;
+	case 0x88:
+          //  result= KEY_OIL   ;
+            break;
+	case 0x87:
+            result=0;//KEY_CHIP;
+            break;
+	case 0x84:
+            result=0;//KEY_LAMP;
+            break;
+	case 0x85:
+            result=0;//KEY_PUMP;
+            break;
+	case 0x86:
+            result=KEY_COOL ;
+            break;
+	case 0x81:
+            result=KEY_SPIN_STOP;
+            break;
+	case 0x82:
+            result=KEY_SPIN_CW;
+            break;
+	case 0x83:
+            result=KEY_SPIN_CCW;
+            break;
+	  default:
+            result=0;
+    }
+	
+    if((keycode!=0x73)&&(shiftKeyState==1))//SHIFT
+    {
+        shiftKeyState=0;
+    }
+    //printf("receive key 0x%x\n",keycode);
+
+    //do nothing with key rightnow ,just send it to arm
+    //shm_cycBufWriteValue(CYCBUF_KEY,keycode);
+    //shm_cycBufWriteValue(CYCBUF_DSPEVENT,DSP_EVENT_KEY);
+    shm_cycBufWriteValue(CYCBUF_KEY,result);
+    shm_cycBufWriteValue(CYCBUF_DSPEVENT,DSP_EVENT_KEY);
+    
+    return result;
+}

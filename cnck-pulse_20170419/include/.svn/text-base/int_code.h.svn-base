@@ -1,0 +1,48 @@
+// FILE:	int_code.h
+
+#ifndef DSP6713_INT_CODE_H
+#define DSP6713_INT_CODE_H
+
+// register bit definitions:
+struct  DSP_CORE_LED_BITS 
+{     // bits   description
+	INT32U REV0:1;		//BIT:   
+	INT32U LED2:1;		//BIT1 	0-OFF 1-ON;
+	INT32U REV2:1;		//BIT:   
+	INT32U LED3:1;		//BIT3 	0-OFF 1-ON; 
+	INT32U REV4:1;		//BIT:   
+	INT32U REV5:1;		//BIT:   
+	INT32U REV6:1;		//BIT:   
+	INT32U REV7:1;		//BIT:   
+	INT32U REV8:1;		//BIT:   
+	INT32U REV9:1;		//BIT:   
+	INT32U REV10:1;		//BIT:   
+	INT32U REV11:1;		//BIT:   
+	INT32U REV12:1;		//BIT:   
+	INT32U REV13:1;		//BIT:   
+	INT32U REV14:1;		//BIT:   
+	INT32U REV15:1;		//BIT:   
+};
+
+union DSP_CORE_LED_REG {
+   INT16U               all;
+   struct DSP_CORE_LED_BITS  bit;
+};
+
+extern int Interrupt6Counter;  
+
+extern union DSP_CORE_LED_REG 	DSP_CORE_LED_Register;
+extern void interrupt4();
+extern void interrupt6();
+extern void main_cycle();
+extern void Led3Flash();
+extern void get_ABS_coordinate(void);
+extern void PRD_20us_interpolation();
+extern void LEDDisplayStatus( int a, int b, int c, int d );
+extern INT16U Read_M2_Complete(void);
+
+#endif  // end of definition
+
+//===========================================================================
+// No more.
+//===========================================================================

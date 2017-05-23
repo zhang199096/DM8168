@@ -1,0 +1,1355 @@
+/*
+*   file name: task3.c
+*   author : vinge
+*   create date: 20080819
+*   version: 20080819--init version,  ;
+*/
+#ifndef __TASKGLOBAL_H__
+#define __TASKGLOBAL_H__
+#include "armdatatype.h"
+//*****************************************************************
+//UTIL Macros  for common use
+// universal cycle buf macro , write pointer point to next empty buf
+// read pointer point to the first filled buf
+// it allways left one empty
+#define CYCLE_BUF_INIT(wptr,rptr)  {wptr=0;rptr=0;}
+#define CYCLE_BUF_FULL(wptr, rptr, bufsize) (((wptr+1)%bufsize)==rptr)
+#define CYCLE_BUF_EMPTY(wptr, rptr)        (wptr==rptr)
+#define CYCLE_BUF_DEEP(wptr, rptr, bufsize) ((wptr>=rptr)?(wptr-rptr):(wptr+bufsize-rptr))
+#define CYCLE_BUF_WINC(wptr, bufsize)      (wptr=(wptr+1)%bufsize)
+#define CYCLE_BUF_RINC(rptr, bufsize)      (rptr=(rptr+1)%bufsize)
+
+#define	PI	3.1415926535897932384626433832795
+#define ARC2ANGLE(arc)      ((double)arc*180.0/PI)
+#define ANGLE2ARC(angle)    ((double)angle*PI/180.0)
+#define UNIT_ND(angle,unit) ((double)angle*unit/1000000.0)
+//*********************************************************************
+#define LEDON  (1)
+#define LEDOFF (0)
+
+//************************************************************************
+#define AXISX  (0)
+#define AXISY  (1)
+#define AXISZ  (2)
+#define AXISA4 (3)
+#define AXISA5 (4)
+
+#define AXISWX (10)  //wear out of x in tool compensation
+#define AXISWY (11)  //wear out of y in tool compensation
+#define AXISWZ (12)  //wear out of Z in tool compensation
+//************************************************************************
+//system info defination
+#define SYS_AXIS                (5)
+#define COMP_MAX                (280)
+#define TCOMP_MAX               (30)
+#define TOOL_MAX                (30)
+#define TOOL_CHANGE_TIME_LIMIT  (200)  // tool change max time 200 ms
+#define SPIN_RUN_TIME_LIMIT     (1000)
+//************************************************************************
+#define FILEOP_RECORD_MAX       (10)
+
+//************************************************************************
+// system buffer defination
+#define CMD_BUF_SIZE  (26)   //user command line buf size
+//************************************************************************
+// system mode
+#define SYS_MODE_EDIT   (0)
+#define SYS_MODE_AUTO   (1)
+#define SYS_MODE_MDI    (2)
+#define SYS_MODE_WHEEL  (3)
+#define SYS_MODE_JOG    (4)
+#define SYS_MODE_REF    (5)
+#define SYS_MODE_ZERO   (6)
+// system state machine
+#define SYS_STATE_RST            (0)
+#define SYS_STATE_INIT1          (1)   //SYS PARAM
+#define SYS_STATE_INIT2          (2)   //X COMPENSATION
+#define SYS_STATE_INIT3          (3)   //Y COMPENSATION
+#define SYS_STATE_INIT4          (4)   //Z COMPENSATION
+#define SYS_STATE_INIT5          (5)   //A4 COMPENSATION
+#define SYS_STATE_INIT6          (6)   //A5 COMPENSATION
+#define SYS_STATE_INIT7          (7)   //S COMPENSATION
+
+#define SYS_STATE_REF                 (50)   //START FIND REF ,FINDNG LIMITZ
+#define SYS_STATE_REF_STANDBY         (51)
+#define SYS_STATE_REF_GOPOS           (52)
+#define SYS_STATE_REF_LEAVELIMIT      (53)
+#define SYS_STATE_REF_WAITLEAVELIMIT  (54)
+#define SYS_STATE_REF_READYTOFINDREF  (55)
+#define SYS_STATE_REF_FINDREF         (56)
+#define SYS_STATE_REF_WAITFINDREF     (57)
+#define SYS_STATE_REF_LOCA            (58)
+#define SYS_STATE_REF_WAITLOCA        (59)
+#define SYS_STATE_REF_GOZERO          (60)
+#define SYS_STATE_REF_END             (61)
+//the normal states while mach work, =SYS_MODE+100
+#define SYS_STATE_EDIT   (100)
+#define SYS_STATE_AUTO   (101)
+#define SYS_STATE_MDI    (102)
+#define SYS_STATE_WHEEL  (103)
+#define SYS_STATE_JOG    (104)
+#define SYS_STATE_ZERO   (105)  //GO ZERO MODE
+
+#define SYS_STATE_ALARM        (200)
+//************************************************************************
+/*
+**************************************************************************
+* events sent between tasks
+*/
+#define EVENT_STATE_DONE    (0)
+#define EVENT_STATE_REQ     (1)
+#define EVENT_STATE_SEND    (2)
+#define EVENT_STATE_ACKED   (3)
+#define EVENT_STATE_ERROR   (10)
+
+#define TEVENT_NONE           (0)
+#define TEVENT_MOD_AUTO       (1)
+#define TEVENT_MOD_JOG        (2)
+#define TEVENT_MOD_WHELL      (3)
+#define TEVENT_MOD_MDI        (4)
+#define TEVENT_MOD_ZERO       (9)
+
+#define TEVENT_SENT_JOGCODE   (5)
+#define TEVENT_SENT_BATCODE   (6)
+#define TEVENT_COORDOFFSET    (7) //SET OFFSET
+#define TEVENT_COORDORGSET    (8) //SET ORGIN
+
+#define TEVENT_FIND_REF         (50)
+
+#define TEVENT_SEND_SYSPARAM    (201)
+#define TEVENT_SEND_COMPX       (202)
+#define TEVENT_SEND_COMPY       (203)
+#define TEVENT_SEND_COMPZ       (204)
+#define TEVENT_SEND_COMPA4      (205)
+#define TEVENT_SEND_COMPA5      (206)
+#define TEVENT_SEND_COMPS       (207)
+
+#define TEVENT_IDLE             (255)
+//------------------------------------------------------------
+// g code NUM that use in both in before and after tool compensation
+#define GCODE_00        (0X0000)
+#define GCODE_01        (0X0001)
+#define GCODE_02        (0X0002)
+#define GCODE_03        (0X0003)
+#define GCODE_04        (0X0004)
+
+#define GCODE_20        (20)
+#define GCODE_21        (21)
+
+#define GCODE_40  (40)
+#define GCODE_41  (41)
+#define GCODE_42  (42)
+
+//this G45 G46 use to tel toolcompensation model to stop
+// or recover g41 g42 state when g7x or screw code is gived
+#define GCODE_45  (45)   //temp stop g41 g42
+#define GCODE_46  (46)   //recover g41  g42
+
+#define GCODE_50  (50)
+
+#define GCODE_54  (54)
+#define GCODE_55  (55)
+#define GCODE_56  (56)
+#define GCODE_57  (57)
+#define GCODE_58  (58)
+#define GCODE_59  (59)
+
+#define GCODE_65  (65)
+
+#define GCODE_70  (70)
+#define GCODE_71  (71)
+#define GCODE_72  (72)
+#define GCODE_73  (73)
+#define GCODE_74  (74)
+#define GCODE_75  (75)
+#define GCODE_76  (76)
+
+#define GCODE_96  (96)
+#define GCODE_97  (97)
+#define GCODE_98  (98)
+#define GCODE_99  (99)
+
+#define GCODE_F             (0X0464)
+#define GCODE_S             (0X0564)
+#define GCODE_SCREW         (0X0664)
+#define GCODE_T             (0x0f65)
+#define GCODE_LOCATE        (0x1065)
+
+#define GCODE_M00           (0X0065)
+#define GCODE_M03           (0x0365)
+#define GCODE_M04           (0x0465)
+#define GCODE_M05           (0x0565)
+#define GCODE_M06           (0x0665)
+#define GCODE_M07           (0x0765)
+#define GCODE_M08           (0x0865)
+#define GCODE_M09           (0x0965)
+#define GCODE_M10           (0x0A65) //TAIL STOP
+#define GCODE_M11           (0x0B65)
+#define GCODE_M12           (0x0C65) //chuck
+#define GCODE_M13           (0x0D65)
+#define GCODE_M15           (0x7365) //0xf65 is set to T code use 115 instead
+#define GCODE_M19           (0x1365) //spindle locate
+
+#define GCODE_M19           (0x1365) //spindle locate
+
+#define GCODE_M20           (0x1465)
+#define GCODE_M30           (0x1E65)
+#define GCODE_M31           (0X1F65) //for tool compent use
+#define GCODE_M32           (0X2065) //SMOTH OPEN
+#define GCODE_M33           (0X2165) //SMOTH CLOSE
+
+#define GCODE_M41           ((41<<8)|0x65)
+#define GCODE_M42           ((42<<8)|0x65)
+#define GCODE_M43           ((43<<8)|0x65)
+#define GCODE_M44           ((44<<8)|0x65)
+
+#define GCODE_M50           (0X3265)
+#define GCODE_M65           ((65<<8)|0x65)
+
+#define GCODE_M81           ((81<<8)|0x65)
+#define GCODE_M82           ((82<<8)|0x65)
+#define GCODE_M83           ((83<<8)|0x65)
+#define GCODE_M84           ((84<<8)|0x65)
+#define GCODE_M85           ((85<<8)|0x65)
+#define GCODE_M86           ((86<<8)|0x65)
+#define GCODE_M87           ((87<<8)|0x65)
+#define GCODE_M88           ((88<<8)|0x65)
+#define GCODE_M89           ((89<<8)|0x65)
+
+
+#define GCODE_M91           ((91<<8)|0x65)
+#define GCODE_M98           ((98<<8)|0x65)
+#define GCODE_M99           ((99<<8)|0x65)
+
+#define GCODE_M253          (0xFD65)
+#define GCODE_M254          (0xFE65)
+#define GCODE_M255          (0xFF65)
+
+//h code
+#define GCODE_H01           (0X0170)
+#define GCODE_H02           (0X0270)
+#define GCODE_H03           (0X0370)
+#define GCODE_H04           (0X0470)
+#define GCODE_H05           (0X0570)
+
+#define GCODE_H11           ((11<<8)|0X70)
+#define GCODE_H12           ((12<<8)|0x70)
+#define GCODE_H13           ((13<<8)|0X70)
+
+#define GCODE_H21           ((21<<8)|0X70)
+#define GCODE_H22           ((22<<8)|0X70)
+#define GCODE_H23           ((23<<8)|0X70)
+#define GCODE_H24           ((24<<8)|0X70)
+#define GCODE_H25           ((25<<8)|0X70)
+#define GCODE_H26           ((26<<8)|0X70)
+#define GCODE_H27           ((27<<8)|0X70)
+
+#define GCODE_H31           ((31<<8)|0X70)
+#define GCODE_H32           ((32<<8)|0X70)
+#define GCODE_H33           ((33<<8)|0X70)
+#define GCODE_H34           ((34<<8)|0X70)
+
+#define GCODE_H80           ((80<<8)|0X70)
+#define GCODE_H81           ((81<<8)|0X70)
+#define GCODE_H82           ((82<<8)|0X70)
+#define GCODE_H83           ((83<<8)|0X70)
+#define GCODE_H84           ((84<<8)|0X70)
+#define GCODE_H85           ((85<<8)|0X70)
+#define GCODE_H86           ((86<<8)|0X70)
+
+#define GCODE_H99           ((99<<8)|0X70)
+//------------------------------------------------------------
+//buf after gcode exec, prepare for tool compensation
+// The kind of buf name as TCG ,it mean tool compent gcode
+//
+/*
+typedef  struct __TCGline
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 a4;
+
+}__attribute__((packed)) TTCGline,*PTCGline;
+typedef  struct __TCGarc
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;
+    U32 srcCode;     //compiled gcode index
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 i;
+    S32 k;
+    S32 r;
+    S32 s;
+    S32 e;
+
+}__attribute__((packed)) TTCGarc,*PTCGarc;
+typedef  struct __TCGfst
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;
+    U32 srcCode;     //compiled gcode index
+    U32 value;
+
+    S32 coordx;   //to record the new x z coord for tool compensation
+    S32 coordz;
+    S32 coordy;
+}__attribute__((packed)) TTCGfst,*PTCGfst;
+typedef  struct __TCGmcode
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;
+    U32 srcCode;     //compiled gcode index
+}__attribute__((packed)) TTCGmcode,*PTCGmcode;
+*/
+//#define TCG_MAX_LEN  (sizeof(TTCGarc)) //34 BYTE
+#define TCG_BUF_MAX  (400)
+extern TTCGarc TCGbuf[TCG_BUF_MAX];
+extern U16 TCGrptr,TCGwptr;
+
+extern TTCGarc TCGbufBk[TCG_BUF_MAX];  //用于缓存辅助代码，调整send_count
+extern U16 TCGrptrBk,TCGwptrBk;
+//-------------------------------------------------------------
+//buf after tool compensation,ready to dsp
+// The kind of buf name as TDG ,it mean TO DSP gcode
+/*
+typedef  struct __DGline
+{
+    //U8 pkghead;
+    U8 len;
+    U16 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 a4;
+    S32 a5;
+    U32 realSendCount;
+    U32 sendCount;
+    //U8  pkgtail;
+}__attribute__((packed)) TDGline,*PDGline;
+typedef  struct __DGBline
+{
+    U8 len;
+    U16 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 a4;
+    S32 a5;
+    U32 realSendCount;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index
+}__attribute__((packed)) TDGBline,*PDGBline;
+typedef  struct __DGlinePkg
+{
+    U8 pkghead;
+    TDGline line;
+    U8  pkgtail;
+}__attribute__((packed)) TDGlinePkg,*PDGlinePkg;
+
+typedef  struct __DGarc
+{
+    //U8 pkghead;
+    U8 len;
+    U16 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 i;
+    S32 j;
+    S32 k;
+    U32 r;
+    S32 a4;
+    S32 a5;
+    S32 s;
+    S32 e;
+    U32 realSendCount;
+    U32 sendCount;
+    //U8  pkgtail;
+}__attribute__((packed)) TDGarc,*PDGarc;
+typedef  struct __DGBarcPkg
+{
+    U8 len;
+    U16 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 i;
+    S32 j;
+    S32 k;
+    U32 r;
+    S32 a4;
+    S32 a5;
+    S32 s;
+    S32 e;
+    U32 realSendCount;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index
+}__attribute__((packed)) TDGBarc,*PDGBarc;
+
+*/
+typedef  struct __DGarcPkg
+{
+    U8 pkghead;
+    TDGarc arc;
+    U8  pkgtail;
+} TDGarcPkg,*PDGarcPkg;
+
+typedef  struct __DGfst
+{
+    //U8 pkghead;
+    U8 len;
+    U16 gnum;
+    U32 value;
+    U32 realSendCount;
+    U32 sendCount;
+    //U8  pkgtail;
+} TDGfst,*PDGfst;
+typedef  struct __DGBfst
+{
+    U8 len;
+    U16 gnum;
+    U32 value;
+    U32 realSendCount;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index
+} TDGBfst,*PDGBfst;
+typedef  struct __DGfstPkg
+{
+    U8 pkghead;
+    TDGfst fst;
+    U8  pkgtail;
+} TDGfstPkg,*PDGfstPkg;
+//M code include the T and M  code
+typedef  struct __DGmcode
+{
+    //U8 pkghead;
+    U8 len;
+    U16 gnum;
+    U32 realSendCount;
+    U32 sendCount;
+    //U8  pkgtail;
+} TDGmcode,*PDGmcode;
+typedef  struct __DGBmcode
+{
+    U8 len;
+    U16 gnum;
+    U32 realSendCount;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index
+} TDGBmcode,*PDGBmcode;
+typedef  struct __DGmcodePkg
+{
+    U8 pkghead;
+    TDGmcode mcode;
+    U8  pkgtail;
+} TDGmcodePkg,*PDGmcodePkg;
+
+
+//type to save the gcode info after it had sendout to dsp
+//it is simpily for dg
+//for g00-g03 ,it save gnum and end point
+//for mfst and other gcode it save gnum and param value in x if any
+typedef struct __SEDgcode
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;
+    U32 srcCode;
+    S32 x;
+    S32 z;
+    S32 y;
+}TSEDgcode,*PSEDgcode;
+
+//#define DG_MAX_LEN  (sizeof(TGarc)) //34 BYTE
+#define DG_BUF_MAX  (400)
+extern TDGBarc DGbuf[DG_BUF_MAX];
+extern U16 DGrptr, DGwptr,DGprptr;
+#define SENDED_BUF_MAX (200) //this should eaquot to dsp side buffer plus whell back buf
+extern TSEDgcode sendedBuf[SENDED_BUF_MAX];
+extern U16 SENDEDwptr,SENDEDrptr;
+extern U8  sendedPtr;  //current runing ptr;
+//**********************************************************************
+//gcode state ,held all status of gcode run and compile
+typedef struct __gstate
+{
+    //U8 gcode;
+    U16 currentProg; //current o program
+    U8 GG00;   //g group 00: G04 G28 G70-G75
+    U8 GG01;   //g group 01: G00-G03
+    U8 GG02;   //g group 02: G96 G97
+    U8 GG03;   //g group 03: G98 G99
+    U8 GG04;   //g group 04: G40-G42
+    U8 GG05;   //g group 04: G54-G59
+    U8 GG06;   //G group 06: G20 G21 INCH METER SETTING
+    //current coord value;
+    S32 x;
+    S32 z;
+    S32 y;
+    S32 a4;
+    S32 i;
+    S32 k;
+    S32 r;
+    S32 g9x;  //the x and z value use by g90 g92 g94
+    S32 g9z;
+    S32 g9r;
+    S32 orgx;    //coord origin offset in mach coord G50外部坐标偏置与G54等合成
+    S32 orgz;    //coord shift offset on work coord.
+    S32 orgy;
+    S32 shiftx;
+    S32 shiftz;
+    S32 shifty;
+    S32 screwf;
+    U8  screwHead;
+    U16 t;
+    U32 f;  //UNIT um
+    U32 s;  //UNIT 0.1 rpm
+    U8  sdir; //spindle direction 3 cw 4 ccw 5 stop
+    U8  chuck; //12 close 13 lose
+    U8  tail;
+    U8 fseted;
+    U32 sSetVal;
+    U32 slinespeed; // line speed use in save g96
+    U32 G96SpinspeedLimit;
+    U8 m4x;
+}Tgstate, *Pgstate;
+// g code compile exec state
+#define GEXEC_RESET  (0)  //reset state, no code is compile yet
+#define GEXEC_START  (1)  //start to compile the code
+#define GEXEC_AUTO_START  (2) //the run key is press,auto compile and start
+
+#define GEXEC_CMPLE  (4)  //compile finish,waiting to run and trans
+#define GEXEC_RUNINIT (5) //init run config ,goto run mode autoly
+#define GEXEC_RUN    (6)  // into runing mode after run key pressed ,until READE state
+#define GEXEC_READE  (7)  //all compiled code readed out, hit m30
+#define GEXEC_TOOLCE (8)  //the last code is compensated,waiting for send only.
+#define GEXEC_SENDE  (9) //SEND FINISH WAITING THE CODE DONE BIT TO GOTO DONE
+#define GEXEC_DONE   (10)//ALL CODE AND EXECED,WAITING AND OTHER RUN CYCLE
+#define GEXEC_CERR   (11)  //COMPILE ERR;
+#define GEXEC_EXERR  (12)   //EXECUTION ERROR
+#define GEXEC_EXERR_HANDLED (13) //err had deal
+
+extern U8 gexecState;  //gcode execution state
+extern U8 gexecError;
+extern U8 gexecErrInsend;
+#define GEXEC_STATE_RUNING ((SYS_STATE_AUTO==sysState)&&(((gexecState>=GEXEC_RUNINIT)&&(gexecState<GEXEC_DONE))||(gexecState==GEXEC_EXERR)))
+
+
+//some flags that efect the gcode execution process
+#define GCODE_PRE_COMPILE (200) //gcode pre compile before runing
+#define GCODEC_PRE_CYCLE (3)
+extern U8  gexecReq;
+extern U8  gcodeAll;    // gcode is compile once at all
+extern U32 gCompiledCt; // gcode in compiled buffer
+extern U32 preO9XXXgCt;
+extern U8  TCodeUseSub;
+extern U32 grunPtr;
+extern U32 sourceCT;
+extern U32 MDI_sourceCT;
+extern U32 O9XXXsrc;
+extern U32 O9XXXrunptr;
+extern U32 O9XXXruning;
+extern Tgstate gCompileState; //stauts record in compile
+extern Tgstate gC2TCState;    //status in exec compiled gcode
+extern Tgstate gWorkState;    //g code state
+/*
+*----------------------------------------------------------------------------
+* now define coordinates
+*/
+//coordinate types
+
+typedef  struct _tNamedCoord
+{
+    TCoord pos;
+    TCoord org;
+}TNamedCoord,*PNamedCoord;
+
+typedef struct __axisCompensationPoint
+{
+    S32 l,r;
+}TaxisCompensationPoint;
+typedef struct __toolComp{
+    S32 x,y,z,r;                          // tool compensation, unit um
+    U32  tdir;
+}TtoolComp,*PtoolComp;
+
+
+typedef struct __breakPoint{
+    U16  flag; //0 not used 1 start form src line  2 start form tool code   3 n sign
+    //  103 send m1213;102 send m3m4m5; 101 send t; 100 send g0
+    //  106 m41-m44
+    U16  tag;  //target tool code or source line
+    U16  t; //trace the tool in program
+    U16   m345;
+    U16   m89;
+    U16   m1213;
+    U16   m4x;
+    U32  fvalue;
+    U32  sendCount;
+    U32  srcLine;
+    U32  srcCode;
+    U32  codeIndex; //breakpoint code index in compiled buf
+    TCoord coord;
+}TbreakPoint,*PbreakPoint;
+/*
+*----------------------------------------------------------------------------
+* global vars use in the hole system,can be seen every task
+*----------------------------------------------------------------------------
+*/
+//*******************************************************************
+//debug vars ,should be remove later
+//*******************************************************************
+//statistic
+extern U32 StatsTunCount;
+extern U8 task1led,task2led,task3led;
+//********************************************************************
+/*
+extern U32 UNIFONT16[65536][8];
+extern U16 U2L[65536];
+extern U16 L2U[65536];
+*/
+extern U32 spindleSpotTimer;
+extern U32 spindleSpotSaveSpeed;
+extern U16 uartControl;
+//********************************************************************
+//some system state s and events
+extern U32 taskEvent;
+extern U8  taskEventState;
+extern U32 DSPStatisOK;
+extern U32 DSPStatisFail;
+extern U32 DSPStatisRetrans;
+extern U8  retransFlag;
+extern U16 O9XXXchangeFlag;
+extern U32 whellTestCT;
+//******************************************************
+//test key board and lcd
+extern U8 ledlcdTestOnFlag;
+extern U8 ledlcdTestStep;
+extern U8 ledlcdTestStepTimer;  //unit :ms cycle
+extern U32 DNGmsgNUM[3];
+extern U8 DNGmsgBuf[3][50];
+extern U8 DNGmsgPtr;
+#define LEDLCD_TEST_STEP_MAX   38
+#define LEDLCD_TEST_TIME_MAX   8
+//*********************************************************************
+// task2 flags thant control the g code execute process
+
+
+extern TDGBarc assistenCode;
+extern U8 assistenFlag;
+extern U8 assistStart;
+extern U32 assistenTimer;
+extern U8  autoAssistenPlcRequest;
+extern U16 curTool;
+extern U16 nextTool;
+
+extern U16 resetFlag;
+extern U8 useToolWearFlag;
+//********************************************************************
+extern U8 sysUnit; //0 meter ,3 tail,1 meter 4 tail; use in exec, in compile use unitMode
+extern U8 sysShowUnit; //0 show value in meter mode, 1 inch
+extern U8 showDigit; //how many digit should we show , decided by sysUnit and sysShowUnit
+// no matter what sysUnit is use 4 tail meter in internal calculation
+//********************************************************************
+extern U8  sysState;
+extern U8  sysModePrev;
+extern U8  sysMode;
+
+#define MODE_RADIU (0)
+#define MODE_DIM  (1)
+extern U8 dimMode;   //dimeter or radiu mode 0 radiu 1 dim
+//******************************************************************
+
+//*****************************************************************
+extern U32 taskEventBuf[];  //for task2 use only //define in task2.c
+extern U8  taskEventCount;
+//*****************************************************************
+// buffers used in system
+#define ARMDSP_BUF_SIZE  (4096)
+extern U16 arm2dspBufLen;
+//extern U8 arm2dspFilled;
+extern U8 arm2dspREQ;
+// ARM send to DSP  pkg
+extern  U8 arm2dspPKG[ARMDSP_BUF_SIZE];
+extern  U8 dsp2armACK[ARMDSP_BUF_SIZE];
+extern  U8 ARM2DSPBUF[ARMDSP_BUF_SIZE];
+
+//extern U16 dsp2armBufLen;
+//extern U8 dsp2armFilled;
+extern U8 dsp2armREQ;
+//DSP send to ARM pkg
+extern  U8 dsp2armPKG[ARMDSP_BUF_SIZE];
+extern  U8 DSP2ARMBUF[ARMDSP_BUF_SIZE];
+extern U32 recvtime[];
+extern U32 armdspPKGCount;
+//extern U8 DSP2ARMBUF[4096];
+//extern U32 SPC_GBUF_FULL;
+extern U8  FLAGguiUpdate;
+//***********************************************************************
+// system vars not relate to the interpolation
+extern U8 prevGUI;
+//extern U8 prevMenu;
+extern U8 currentGUI;   // record which user interface now showing
+extern U8 currentMenu;
+//extern U8 guiUpdateReq;  // request a gui update in the internal operation need
+//extern U8 guiUpdateMenuReq;
+extern U8 guilayer;    //main gui or sub gui record.
+extern U8 cursorsChr;
+#define PARAM_MAX (240) //sys param count
+extern U8  currentParamGrp;
+extern U16 currentParam;
+extern U16 currentToolCP;
+enum TCOMPSELECTION {TCX,TCZ,TCR,TCT,TCY,XW,ZW,RW,YW};
+extern enum TCOMPSELECTION currentToolCPxz;
+extern U16 currentRef;  //selected var in coord offset
+extern U16 currentG5xrow;
+extern U16 currentG5xcol;
+extern U16 currentVar;   //selected var in gui var
+extern U16 assure;
+#define ASSURE_FILE_DELETE   1
+#define ASSURE_DISK_FORMAT   2
+#define ASSURE_PARAM_DEFAULT 3
+#define ASSURE_PARAM_LOAD    4
+#define ASSURE_UPGRADE       5
+#define ASSURE_TOOLCOMP_LOAD 6
+#define ASSURE_REFP_LOAD     7
+#define ASSURE_G54_LOAD      8
+#define ASSURE_CLEARALL      9
+////////////////////////////////////////////////
+extern U16 curPLCins;
+extern U16 curPLCxy;
+extern U16 curPLCf;
+extern U16 curPLCg;
+extern U16 curPLCc;
+extern U16 curPLCt;
+extern U16 curPLCr;
+extern U16 curPLCd;
+extern U16 curPLCk;
+extern U16 curPLCTLine; //当前梯形图行数
+extern U16 StartPLCRow;
+extern U16 plcTBreakpnt; //T星图断点位置
+extern U16  curPLCTCol; //梯形图当前列数
+
+extern U16 PlcTColour[12];  //add by wqm 2011.12.26
+extern U16 curPLCx;
+extern U16 curPLCy;
+//*************************************************
+extern U16 curColourMainSel;
+extern S16 curColourSel;
+extern S16 curColourrgbSel;
+extern S16 nowhue;
+extern S16 nowbri;
+extern S16 nowsat;
+extern U16 curColourSelMenu;
+//extern U8 curColourSelSetOrSave;
+extern U16 curColourSelCol;
+//extern HSB HsbValue[];
+//****************************************************************************
+
+//task 2 and task 3 communicate
+extern U8 cmdbuf[CMD_BUF_SIZE];
+extern U8 cmdbufPtr;
+extern U8 cmdbufDispPtr;
+extern U16 cmderr;
+extern U16 showMsg;  //for user input or gcode err
+extern U16 showTime; // how long the message show be delay until auto clear;
+//U16 showAlarm=FALSE;   //for system waring and alarm ,higher priv to errmsg
+
+#define SHOW_TIME_NORMAL  40
+#define SHOW_TIME_QUICK  40
+#define SHOW_TIME_FEVER   120   //need to press enter
+
+//extern Tparameter SYSparam[];
+//***********************************************************************
+//extern TDSPparam DSPparam;
+//system vars for interpolation
+#define GLOBAL_VAR_MAX 400
+extern double globalVar[GLOBAL_VAR_MAX];
+extern TaxisCompensationPoint axisCompensationInt[SYS_AXIS][COMP_MAX];
+extern TtoolComp toolCompensation[TCOMP_MAX];
+extern TtoolComp toolOffset[TCOMP_MAX];
+extern TtoolComp toolWear[TCOMP_MAX];
+
+//extern U8 tool[TOOL_MAX];
+
+//***********************************************************************
+
+// Coordinates : work coord, local coord, machine coord ;
+//user was allow to set work coord, local is only set by program
+#define GCODE_BUF_MAX (2000)
+extern TCoord coordGend[GCODE_BUF_MAX];
+extern TCoord coordGendSPC[GCODE_BUF_MAX];
+extern TCoord coordWork;
+extern TCoord coordOrginWork;  //of set of the work coordinate form mach coord origin
+extern TCoord coordShiftWork;
+//extern TCoord coordOrginLocal; //of set of the local coordinate form work coord origin
+extern TCoord coordCurGstart,coordCurGend,coordCurGendMach; //current g code start and end piont
+extern TCoord coordSentedGend;
+extern TCoord coordSPCGend;
+
+#define G5X_MAX (201)
+extern TCoord coordOrginWorkG5x[];
+
+extern TCoord coordRelate;
+extern TCoord coordOrginRelate;
+extern TCoord coordMACH;
+extern TCoord coordWorkBack; // 反馈计算得到的值
+extern TCoord coordWorkShow; // 显示值
+extern TCoord coordMACHShow;
+extern TCoord coordRemain;    //distant remaining
+extern TCoord lostPwrSave[5];
+#define REFP_MAX (8)
+extern TCoord coordRef[REFP_MAX];
+extern U8 coordShowing; // which coord is showing in coord guis 0 w 1 r 2 m 3 remain
+//*************************************************************************
+//hand whell vars
+extern U8  whellControlAxis;   //hand whell selected axis
+extern U32 whellFeedRate; //mm/minute;
+//override feedrates
+extern U16 whellGrade;
+extern U16 multiKey;
+extern U8 jogGrade;
+extern U32 jogFeed;   //feed speed that is select by joggrade;
+extern U8 feedGrade;
+extern U8 rapidGrade;
+extern U8 spindleGrade;
+extern U8 spinRunSign;
+extern U32 spindleRealSpeed;
+extern U8 spindleLoad;
+extern U8 spindleAutoStateBak;
+extern U8 spindleAutoStateChanged;
+extern U8 chuckAutoStateBak;
+extern U8 chuckAutoStateChanged;
+extern U8 tailAutoStateBak;
+extern U8 tailAutoStateChanged;
+extern U32 realFeedSpeed;
+extern U8 goZeroSign;
+
+extern U8  tailSign;
+extern U8 coolSign;
+extern U8 oilSign;
+extern U32 oilTimer;
+
+extern U8 TLPOS;
+extern U8 TLNEG;
+extern U8 Toolchange;
+extern U8 toolChangingFlag;
+extern U32 toolChangeTimer;
+extern U8 toolReposition;
+extern U8 chuckchange;
+extern U8 chuckchanging;
+extern U8 G9899,G9697,sendedG9899,sendedG9697;
+//--------------------------------------
+//mfunctions to plc
+#define MFUNCS_OFF  0  //ON REQ
+#define MFUNCS_REQ  1  //CNC requested
+#define MFUNCS_ANS  2 //plcanswered
+#define MFUNCS_PROC 3 // plc handling
+extern U8 mfuncState; //0 no req, 1 reqed, 2 handling
+extern U8 mfuncNum;
+#define MBUF_MAX 8
+extern U8 mbufwptr,mbufrptr;
+extern U8 mfuncBuf[MBUF_MAX];  //queue of mcode to exec
+
+#define MFUNC_COOLON   8
+#define MFUNC_COOLOFF  9
+#define MFUNC_TAILON   10
+#define MFUNC_TAILOFF  11
+#define MFUNC_CHUCKON  12
+#define MFUNC_CHUCKOFF 13
+#define MFUNC_OILON    32
+#define MFUNC_OILOFF   33
+//#define MFUNC_AUTOOIL  34
+//#define MFUNC_TOOL     123 //add by lxw
+//-----------------------------------------------
+//extern U8 lampSign;
+/*
+extern U8 programFeed;
+extern U8 realFeed;
+extern U16 spindleSpeed;
+extern U8   curTool;
+*/
+extern U32 workPieceCT;  //record how many work piece it had done
+extern U32 cutTimeReg;   //record the start time of cutting ,
+extern U32 cutTimePiece; // unit 0.1 s
+extern U32 cutTimePieceRecord; //record the cut time of one piece when stop
+extern U32 cutTimeCT;    //record how many times it had used in cutting unit 1/10 sec
+extern U8 m20flag;
+//**********************************************************************
+/*
+//global definded in gcompile for  gcode and command line compile
+extern U8 compiledGbuf[1024*1000]; //for g code form file
+extern U32 gsrc2compiled[100000];
+
+extern Tgstate gstate;    //g code state
+
+extern U8 cmdlineGBuf[256];  //for g code input form cmd line
+*/
+//********************************************************************
+#define ARMCMDB0_ALIVE   (0) //b0 Keep alive package ,it clear bit 1,3,keep prev info 0
+#define ARMCMDB0_MDI      (1)  //NC run sign 0, no axis move BIT 56 CLR
+#define ARMCMDB0_STD      (2)  // go into std mode ,it set b0, bit 5
+#define ARMCMDB0_SPC      (3)   //go into spc mode ,it set b3, bit 6
+#define ARMCMDB0_SINGLE   (4)   //go into singel mode when in std
+#define ARMCMDB0_COFFSET  (5)  //set coordinate offset
+#define ARMCOMB0_CORGSET  (6)  //set coordinate orgin, re position
+
+#define ARMCMDB0_POSREF (20)   // Positive finding ref
+#define ARMCMDB0_PREF_WAIT (21)   //wait pos gcode to end
+#define ARMCMDB0_NEGREF (22)   //Negative finding ref
+#define ARMCMDB0_NREF_WAIT (23)    //wait neg gcode to end
+#define ARMCMDB0_REF_LOCA   (24)    //wait re init spc and get stable coord of dsp mach
+#define ARMCMDB0_REF_LOCA_WAIT (25)   //keep alive ,wait BIT_LOCA_OVER
+
+extern U8  armReqCMD;
+//system dsp info back cmdbo info 1 bit
+#define BIT_SPCGEN         (0X01)
+#define BIT_STDGEN         (0X02)
+#define BIT_DSP0ALARM    (0X04)
+#define BIT_DSP1ALARM    (0X08)
+#define BIT_SINGLE_END   (0X10)
+#define BIT_LOCA_OVER    (0X20)   //coord is stable
+#define BIT_COORD_LOCK (0X40)
+#define BIT_CODE_OVER   (0X80)   //code is finish
+extern U8 DSPState;
+// system hardware infos   ,AXIS BITS
+#define BITX      (0X01)
+#define BITY      (0X02)
+#define BITZ      (0X04)
+#define BITA4     (0X08)
+#define BITA5     (0X10)
+#define BITA6     (0X20)
+#define BITS      (0X40)
+
+extern U8   hardLimitPosState;
+extern U8   hardLimitNegState;
+extern U8   softLimitPosState;
+extern U8   softLimitNegState;
+extern U8   locateState;
+extern U8   referenceState;
+extern U8   refFounded;
+extern U16   refFindAxis;
+#define REFERENCE_ALLOK (Yavailable?((refFounded&(BITX|BITZ|BITY))==(BITX|BITZ|BITY)):((refFounded&(BITX|BITZ))==(BITX|BITZ)))
+
+#define BIT_STD  (0X01)
+#define BIT_SPC  (0X02)
+#define BIT_SREACH  (0X04)
+#define BIT_A4LOCK  (0X08)
+#define BIT_A4LOSE  (0X10)
+#define COOORD_STABLE_CHECK_DELAY (3) //UNIT COM CYCLE
+extern U8 SA4State;
+extern U8 coordStable;
+extern U8 coordStableCheckDelay;
+extern U8 singleModeFlag;
+extern U8 singleRunFlag;
+extern U8 jumpSegFlag;
+extern U8 whellRunFlag;  //use whell to control the grade of auto run every 50 ms
+extern U8 whellRunGrade; // feed grade in whellRunMode 0-12;
+extern U8 whellRunState;
+extern U8 programZeroFlag;
+extern U8 machLockFlag;
+extern U8 falseRunFlag;
+extern U8 pauseFlag;
+extern U8 safedoorFlag;
+extern U8 autoAlarmClrFlag;
+extern TbreakPoint autoBreakPoint;
+extern U8 addLineMode;
+//********************************************************************
+extern U32 STDsendcount;
+extern U32 STDrealsendcount;
+extern U32 STDruncount;
+extern U32 prevSrcLine;
+extern U32 SPCsendcount;
+extern U32 SPCruncount;
+extern U32 Errsrc;
+extern U32 Errsrc_Tool;
+extern U32 UNKNOW_ERR_src;
+//********************************************************************
+//extern FATFS SDfs;
+//********************************************************************
+//define ADDRESS IN 24C256 that record param and exception data
+#define MAGIC_NUM_CNCL   (0X5D593CC1)
+#define IICADDR_MAGIC     (0)
+// magic number of SDS9-3CNCL, if not equal ,need to init system
+#define IICADDR_EXIT      (4)//RECORD The last exit //0 pwr off //1 exception
+
+#define IICADDR_EXCEPTION (64)  //exception record start 16 BYTE
+#define IICADDR_EXCEPTION_TIME (80) //16 RECORD OR TIME //80-143
+//-----------------------------------------------
+#define IICADDR_COORD     (256)  //XYZ A4A5 a6 coordinate when power off
+#define IICADDR_PROGX    IICADDR_COORD     //PROGRAM origin as mach coord
+#define IICADDR_PROGY    (IICADDR_COORD+4)
+#define IICADDR_PROGZ    (IICADDR_COORD+8)
+#define IICADDR_PROG4    (IICADDR_COORD+12)
+
+#define IICADDR_ORGWX     (IICADDR_COORD+16)  //Work coordinate origin
+#define IICADDR_ORGWY     (IICADDR_COORD+20)
+#define IICADDR_ORGWZ     (IICADDR_COORD+24)
+#define IICADDR_ORGWA     (IICADDR_COORD+28)
+
+#define IICADDR_OFFSX     (IICADDR_COORD+32)
+#define IICADDR_OFFSY     (IICADDR_COORD+36)
+#define IICADDR_OFFSZ     (IICADDR_COORD+40)
+#define IICADDR_OFFSA     (IICADDR_COORD+44)
+
+#define IICADDR_ORGRX     (IICADDR_COORD+32)
+#define IICADDR_ORGRY     (IICADDR_COORD+36)
+#define IICADDR_ORGRZ     (IICADDR_COORD+40)
+#define IICADDR_ORGRA     (IICADDR_COORD+44)
+
+#define IICADDR_REFP      (IICADDR_ORGRA+4)  //reference coord 7, i is orgw
+
+#define IICADDR_TRACECX   (IICADDR_REFP+8*8)
+#define IICADDR_TRACECZ   (IICADDR_TRACECX+4)
+#define IICADDR_TRACECS   (IICADDR_TRACECZ+4)
+
+#define IICADDR_LPWRX     (IICADDR_TRACECS+16)  //LOST POWER SAVING
+#define IICADDR_LPWRY     (IICADDR_LPWRX+4)
+#define IICADDR_LPWRZ     (IICADDR_LPWRY+4)
+#define IICADDR_LPWRA     (IICADDR_LPWRZ+4)
+#define IICADDR_LPWRMSXZ  (IICADDR_LPWRA+4)
+#define IICADDR_LPWRMSY  (IICADDR_LPWRMSXZ+4)
+//------------------------------------------------
+#define IICADDR_GRADE_BEGIN  (448)
+#define IICADDR_GRADER    IICADDR_GRADE_BEGIN  //rapid grade  1byte
+#define IICADDR_GRADEF    (IICADDR_GRADER+1)  //feed grade   1byte
+#define IICADDR_GRADES    (IICADDR_GRADEF+1)  //spin grade  1byte
+
+#define IICADDR_GRADEW    (IICADDR_GRADES+1)  //whell grade  1byte
+#define IICADDR_GRADEJ    (IICADDR_GRADEW+1)  //jog grade   1 byte;
+
+#define IICADDR_TOOL      (IICADDR_GRADEJ+4)   //TOOL and toocompent num
+
+#define IICADDR_SPIN_M    (IICADDR_TOOL+4)
+#define IICADDR_G98G99    (IICADDR_SPIN_M+1)
+#define IICADDR_TRACECOLOUR (IICADDR_G98G99+1)
+
+#define IICADDR_ALARMPTR (512)
+#define IICADDR_ALARM    (520)  // 8*128 BYTE ALARM 4BYTE NUM 4 BYTE TIME
+
+//*******************************************************************
+#define IICADDR_USER_COOR      (1024*3)
+//*******************************************************************
+#define IICADDR_PARAM_BYTE     (4096) //Parameter record start address
+#define IICADDR_PARAM_DWORD    (IICADDR_PARAM_BYTE+120)
+
+#define IICADDR_TOOLCOMP      (8192)   //TOOL compensation data start form 8k,len 1k
+#define IICADDR_TOOLWEAR      (10240)  //TOOL wear out data start form 10 k len 2k
+//*******************************************************************
+#define IICADDR_GVARS         (1024*12)  //global vars ,len =4*256, 4K IS given
+//*********************************************************************
+#define IICADDR_FILE               (IICADDR_GVARS+4*1024) //128 byte;
+#define IICADDR_FILE_SHORT          (IICADDR_FILE+256)  //8 byte;
+
+#define IICADDR_SYSNAME     (IICADDR_FILE_SHORT+16)  //64 byte is given
+
+#define IICADDR_WORKPIECE   (IICADDR_SYSNAME+64)  //work piece count ,4 byte
+#define IICADDR_CUT_TIME    (IICADDR_WORKPIECE+4) //total cut time 4 byte
+//********************************************************************
+#define PASSWORD_MAX  (33)
+#define SYS_PASS_MAX  (30)
+#define PASSWORD_LEN  (10)
+#define OP_PASS_LEN   (6)
+//password start form 20k, 1K given, max 20 level pass set
+#define IICADDR_PASSWORD    (1024*20)   //16*10 byte password
+#define IICADDR_PASS_OPKEY    (IICADDR_PASSWORD)  // 4 byte
+#define IICADDR_PASS_OPCLASS  (IICADDR_PASS_OPKEY+4) // 4byte
+
+#define IICADDR_PASS_DATECHECK (IICADDR_PASSWORD+20) //LAST correct date
+#define IICADDR_PASS_TIMECHECK (IICADDR_PASSWORD+24) //when date changed time can be change
+// 6*4 byte reserve for further use
+//32 B for factory id ,20 real used
+#define IICADDR_PASS_USERID (IICADDR_PASSWORD+8*4)  //USER ID
+
+#define IICADDR_PASS_INITED (IICADDR_PASS_USERID+18)
+// flag witch is locked
+#define IICADDR_PASSFLAG    (IICADDR_PASS_USERID+20)  // 4 byte;
+// 20 date of valid pass
+#define IICADDR_PASSDATE    (IICADDR_PASSFLAG+4)//10 byte password
+// 30 pass keyword ,each 10 byte
+#define IICADDR_PASSSTRING    (IICADDR_PASSDATE+SYS_PASS_MAX*4)
+
+//********************************************************************
+//PLC D and k RECORD FORM 21K 1K given
+#define IICADDR_PLC_D      (IICADDR_PASSWORD+1024)  //100 d=200 byte,400 is resv
+#define IICADDR_PLC_K      (IICADDR_PLC_D+800)      //40 k=80byte, 100 resv
+
+//********************************************************************
+#define IICADDR_FILEOP_PTR  (IICADDR_PLC_K+400)
+#define IICADDR_FILEOP_NAME (IICADDR_FILEOP_PTR+4)
+#define IICADDR_FILEOP_CT   (IICADDR_FILEOP_PTR+1280)
+#define IICADDR_FILEOP_TIME  (IICADDR_FILEOP_CT+40)
+//********************************************************************
+#define IICADDR_G5X_X        (1024*40)
+#define IICADDR_G5X_Y        (IICADDR_G5X_X+4*G5X_MAX)
+#define IICADDR_G5X_Z        (IICADDR_G5X_Y+4*G5X_MAX)
+#define IICADDR_G5X_A        (IICADDR_G5X_Z+4*G5X_MAX)
+#define IICADDR_G5X_C        (IICADDR_G5X_A+4*G5X_MAX)
+//********************************************************************
+
+typedef struct _TpassWord{
+    U32 flag;
+    U32 keyDate[SYS_PASS_MAX];
+    U8  keys[SYS_PASS_MAX][PASSWORD_LEN];
+}TpassWord;
+extern TpassWord sysPassWord;
+#define PASS_LOCK(x)   sysPassWord.flag=sysPassWord.flag|(1<<x)
+#define PASS_UNLOCK(x) sysPassWord.flag=sysPassWord.flag&(~(1<<x))
+#define PASS_LOCKED(x) ((sysPassWord.flag>>x)&1)
+extern U8 sysSerNum[13];
+extern U8 sysPassInited;
+extern U8 passValid;
+//extern U16 passValidDate;
+extern U8 curPassWord;
+extern U8 keyLock; //use param 219 for password
+extern U8 opLock;
+extern U32 opLockChanged;
+extern U32 opLockVal;
+extern U8 chuckReaded;
+//********************************************************************
+extern U16 testChar; //for test char in DGN
+extern U16 editHasFile;
+#define RECORD_FILE_NAME_LEN 127
+extern S8 openFileName[RECORD_FILE_NAME_LEN+1];
+extern U8 editbuf[];
+extern U8 editbuf_MDI[];
+extern U8 editbuf_O9XXX[];
+
+extern U32 excpTime[];
+extern U8  excpRecord[];
+extern U8 excpPtr;
+//********************************************************************
+//vars for net work
+extern S8 sysName[17];
+extern U8 focus; //input focus to switch from inputs
+extern U16 colorPanel[];
+extern U8 machMAC[6];
+extern U32 machIP,machGW,machNM;
+
+//********************************************************************
+extern U8 trace_real_clear;//实际刀路初始化，设为1则清除当前实际刀路图形
+extern U8 trace_real_enable;//实际刀路i记录
+#define TRACE_GWIDTH   (500)
+#define TRACE_GHEIGHT  (300)
+#define TRACE_BIG_GRID         (100)  //坐标线1，有标数字
+#define TRACE_SMALL_GRID       (50)   //坐标线2，无数字
+#define TRACE_MENU_MAX  (4)
+#define TRACE_MENU0_MAX (10)
+#define TRACE_MENU1_MAX (4)
+#define TRACE_MENU3_MAX (8)
+#define TRACE_COLOUR_MAX    (16)
+#define TRACE_DATA_MAX    (DG_BUF_MAX*25)  //轨迹存储区，大小不够时每次移动缩放都要重编译文件
+#define TRACE_MIN_SCALE   (100/TRACE_SMALL_GRID)    //最小每像素大小 单位0.1u ,1000即删格最小0.01mm
+#define TRACE_MAX_SCALE   (100000000/TRACE_SMALL_GRID)
+#define TRACE_MOVE_MIN    (10)
+typedef struct
+{//仿真图形轨迹记录结构
+    U8 gnum;
+    S32 sx,sz,ex,ez,r;
+}TRACEDATA;
+extern TRACEDATA trace_data[];//轨迹记录数组
+extern U8  trace_real_image[TRACE_GWIDTH][TRACE_GHEIGHT]; //实际刀路点阵记录，初始化为0
+extern U16 trace_sim_image[TRACE_GWIDTH*TRACE_GHEIGHT]; //仿真刀路图形
+extern S32 trace_cen_x,trace_cen_z;//图形中心
+extern S32 trace_scale;  //分辨率，刀路图形中没两点间距离
+extern U8  trace_virtual_run;   //为得到仿真图形，开启虚假运行
+extern U8  trace_autpfix_run;
+extern S32 trace_autofix_max_x,trace_autofix_max_z,trace_autofix_min_x,trace_autofix_min_z;//仿真图形自适应用最大最小坐标，在记录仿真轨迹时更新
+extern U8  trace_g0_on; //仿真图形显示G00轨迹开关
+extern U8  trace_x_symmetry;//仿真图形轨迹X对称开关
+extern U32 trace_data_record;//已记录轨迹数
+extern U32 trace_has_print;//已画图轨迹数
+extern U8  trace_menu;   //刀路图形界面当前菜单
+extern U8  trace_menu0_sel;//菜单0当前选择
+extern U8  trace_menu1_sel;
+extern U8  trace_menu2_sel;
+extern U16 trace_colour_pool[TRACE_COLOUR_MAX];//刀路图形可用颜色
+extern U8  trace_colour_select[TRACE_MENU3_MAX];//各轨迹使用颜色
+extern S32 trace_cursor_x;//光标1坐标
+extern S32 trace_cursor_z;
+extern S32 trace_cursor2_x;
+extern S32 trace_cursor2_z;
+extern U8  trace_zoom_on;
+extern U8  trace_move_on;
+extern S32 trace_zoom_square_length;
+//********************************************************************
+extern U8 language;  //0 ascii, 1 others,unicode support is enable and loaded
+extern U8 checkFontSize;  //
+extern U16 checkFontStart;
+//***************************************************************
+typedef struct
+{
+    U8 refStateBak;
+    U8 coolSignBak;
+    U8 chuckBak;
+    U8 tailBak;
+    U16 tool;
+    TCoord orgworkg50Bak;
+    TCoord orgRelateBak;
+    TCoord workBak;
+    U8 g5xBak;
+    U8 m4xBak;
+    //Tgstate workStateBackup;
+}TmachLockReg;
+extern TmachLockReg machLockReg;
+//*******************************************************************
+
+extern U8 fileOPptr;
+typedef struct
+{
+    U32 count;
+    U32 datetime;
+    U8 filename[128];
+}TfileOperationRecord;
+extern TfileOperationRecord fileOPrecord[10];
+//*******************************************************************
+#ifdef STATIS
+extern U32 statisSTDrun;
+extern U32 errx,erry,errz,errspeed;
+#endif
+//********************************************************************
+//DEBUGS
+#define DBMSG_LEN 128
+#define DBMSG_MAX 512
+
+extern U8 dbMSG[DBMSG_MAX][DBMSG_LEN];
+extern U16 dbMSGrptr, dbMSGwptr;
+
+#ifdef DEBUG_DATA
+extern U32 idlect;
+extern U32 intct;
+extern U32 emptyct;
+extern U32 pulsect;
+extern U32 calct;
+extern U32 DBcount;
+extern U32 DBDSPINT[1000];
+extern double DBDSPFLOAT[1000];
+extern U16 *storePulse;
+extern U32 *storeLineS;
+#endif
+
+#ifdef FAIT_MOTOR
+extern S32 MOTOR_X;
+extern S32 MOTOR_Z;
+#endif
+//---------------------------
+extern U8 EventSaveEdit;
+//extern U8 editKey;
+extern U8 EventJump;
+extern U32 EventJumpNum;
+extern U8 EventPLCsetVar;
+extern U8 EventPLCsetVarType;
+extern S32 EventPLCsetVarValue;
+//--------------------------------------------
+extern U16 manMakeRunKeyDelay;
+//********************************************************************
+// global useful functions
+extern void Init(void);
+void softReset(void);
+void softResetVars(void);
+void openPrevfileOnReset(void);
+void system_init(void);
+U8   sysReadIIcInit(void);
+void initIICParam(void);
+void initSYSother(void);
+//void setSystemColorPanel(void);
+//S32 calUnit2ShowUnit(S32 val);
+
+void lightLED(U8 lednum ,U8 onoff);
+void TooLinit(void);
+//*************************************************************
+//infotopc
+typedef struct _recordmach
+{
+    S32 machx;
+    S32 machz;
+    U32 ostick;
+}RECORDMACH;
+
+typedef struct _recordpulse
+{
+    U16 xpulse;
+    U16 xperiod;
+    U16 zpulse;
+    U16 zperiod;
+    U32 ostick;
+}RECORDPULSE;
+
+#define CMDRECORDMACH   (0)
+#define CMDRECORDPULSE  (1)
+
+extern RECORDMACH recordmach[100];
+extern RECORDPULSE recordpulse[100];
+extern U16 zpulses[2400];
+extern U32 taskct[4];
+extern U32 taskctever[4];
+//extern U8 extOutPutBuf[3];
+
+
+extern void RecordMach(void);
+extern void RecordPulse(U16 axis,U16 pulse,U16 period);
+//*************************************************************
+typedef struct _mdimode
+{
+    U16 inmdi;
+    U16 mdirunning;
+    U16 runO9XXX;
+}MDIMODE;
+extern MDIMODE mdimode;
+extern U16 modeBackup;
+extern U16 manMakeRunKeyDelay;
+//#define ALLOW_RUN_IN_MDI_MODE
+//*************************************************************
+extern U8 Yavailable;
+//*************************************************************
+extern int mystrcmp(S8 *s1,S8 *s2,U8 fullflag);
+//*************************************************************
+extern U32 starttick;
+extern U32 deltatime;
+//*************************************************************
+// for bmp showing
+#define BMPSLOT 4
+#define BMPSIZE (320*240)
+#define BMPFILESIZE (320*240*4) //BMP MAY BE 320*240*3 FOR 24BIT, NO 32BIT
+extern U16 BMPsizexy[BMPSLOT][2];
+extern U8  BMPfileName[BMPSLOT][128];
+extern U16 BMPframebuf[BMPSLOT][BMPSIZE];
+extern U8 BMPfileBuf[BMPSLOT][BMPFILESIZE];
+
+#define EDIT_BUFFER_SIZE (1024*1024*4)
+extern U32 OSGetTimeTick(void);
+
+extern U32 recvCounter;
+extern U32 sendCounter;
+extern U32 errCounter;
+extern U32 clitCounter;
+extern U16 pkglen;
+
+extern U32 filelength(U8 *name);
+
+#include "lkbus.h"
+#include "sysparam.h"
+#include "alarm.h"
+#include "gui.h"
+#include "../include/key.h"
+#include "gcompile.h"
+#include "toolcompen.h"
+#include "task2.h"
+#include "keyhandle.h"
+
+#include "../include/spi.h"
+#endif
+

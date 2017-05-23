@@ -1,0 +1,476 @@
+#ifndef __CPLD_H
+#define __CPLD_H
+
+#include "datatype.h"
+#define FPGA_BASE      0x11000000 //0x11000000
+#define FPAG_STEP   	2
+//cpld registers
+//通用IO输入输出
+#define ADDRESS_GIN1         (FPGA_BASE+FPAG_STEP*0)
+#define ADDRESS_GIN2         (FPGA_BASE+FPAG_STEP*1)
+#define ADDRESS_GOUT1        (FPGA_BASE+FPAG_STEP*2)
+#define ADDRESS_GOUT2        (FPGA_BASE+FPAG_STEP*3)
+//手轮IO
+#define ADDRESS_WHEEL_IO     (FPGA_BASE+FPAG_STEP*4)
+//手轮脉冲计数器地址
+#define ADDRESS_WHEEL_ENCODER_COUNTER         (FPGA_BASE+FPAG_STEP*5)
+#define ADDRESS_DOG          (FPGA_BASE+FPAG_STEP*6)
+#define ADDRESS_FKEY         (FPGA_BASE+FPAG_STEP*7)
+//16BITS 脉冲发生器地址
+#define ADDRESS_X_PWM         (FPGA_BASE+FPAG_STEP*16)
+#define ADDRESS_Y_PWM         (FPGA_BASE+FPAG_STEP*17)
+#define ADDRESS_Z_PWM         (FPGA_BASE+FPAG_STEP*18)
+#define ADDRESS_A_PWM         (FPGA_BASE+FPAG_STEP*19)
+//16BITS 脉冲计数器
+#define ADDRESS_X_PULSE_COUNTER         (FPGA_BASE+FPAG_STEP*20)
+#define ADDRESS_Y_PULSE_COUNTER         (FPGA_BASE+FPAG_STEP*21)
+#define ADDRESS_Z_PULSE_COUNTER         (FPGA_BASE+FPAG_STEP*22)
+#define ADDRESS_A_PULSE_COUNTER         (FPGA_BASE+FPAG_STEP*23)
+//16BIT 编码器地址
+#define ADDRESS_X_ENCODER_COUNTER         (FPGA_BASE+FPAG_STEP*24)
+#define ADDRESS_Y_ENCODER_COUNTER         (FPGA_BASE+FPAG_STEP*25)
+#define ADDRESS_Z_ENCODER_COUNTER         (FPGA_BASE+FPAG_STEP*26)
+#define ADDRESS_A_ENCODER_COUNTER         (FPGA_BASE+FPAG_STEP*27)
+#define ADDRESS_U_ENCODER_COUNTER         (FPGA_BASE+FPAG_STEP*28)
+//系统特殊IO
+#define ADDRESS_IO_IN1          (FPGA_BASE+FPAG_STEP*29)
+#define ADDRESS_IO_IN2          (FPGA_BASE+FPAG_STEP*30)
+#define ADDRESS_IO_OUT1         (FPGA_BASE+FPAG_STEP*31) //rctrl
+
+//#define FPGA_DSP_BASE       0x11000000
+#define FPGA_ADDR(addr)      (*(volatile INT16U*)(addr))
+
+#define rCPLD_IO_OUT1 FPGA_ADDR(ADDRESS_IO_OUT1)
+#define rCPLD_IO_IN1  FPGA_ADDR(ADDRESS_IO_IN1)
+#define rCPLD_IO_IN2  FPGA_ADDR(ADDRESS_IO_IN2)
+#define rCPLD_GPIO_IN1   FPGA_ADDR(ADDRESS_GIN1)
+#define rCPLD_GPIO_IN2   FPGA_ADDR(ADDRESS_GIN2)
+#define rCPLD_GPIO_OUT1  FPGA_ADDR(ADDRESS_GOUT1)
+#define rCPLD_GPIO_OUT2  FPGA_ADDR(ADDRESS_GOUT2)
+#define rCPLD_DOG        FPGA_ADDR(ADDRESS_DOG)
+#define rCPLD_WHEEL_IO   FPGA_ADDR(ADDRESS_WHEEL_IO)
+#define rCPLD_FKEY       FPGA_ADDR(ADDRESS_FKEY)
+
+extern INT16U  CPLD_IO_Out1Register;
+extern INT16U  CPLD_IO_In1Register;
+extern INT16U  CPLD_IO_In2Register;
+extern INT16U  CPLD_GPIO_INRegister[2];
+extern INT16U  CPLD_GPIO_OUTRegister[2];
+
+/*---------------------------------------------------------------------------*/
+
+//------------------------------------------------------------------------
+
+
+
+
+/*
+// register bit definitions:
+typedef struct  IO_OUT1_BITS
+{     // bits   description
+    INT32U XSON:1;		//BIT0: X_MOTOR_ON	 0:OFF  1:SERVO ON
+    INT32U YSON:1;		//BIT1: Y_MOTOR_ON
+    INT32U ZSON:1;		//BIT2: Z_MOTOR_ON
+    INT32U ASON:1;		//BIT3: A_MOTOR_ON
+                        //
+    INT32U XSIGN:1;		//BIT4: X_MOTOR_SIGN		0:NEGTIVE 1:POSITIVE
+    INT32U YSIGN:1;		//BIT5: Y_MOTOR_SIGN		0:NEGTIVE 1:POSITIVE
+    INT32U ZSIGN:1;		//BIT6: Z_MOTOR_SIGN		0:NEGTIVE 1:POSITIVE
+    INT32U ASIGN:1;		//BIT7: A_MOTOR_SIGN		0:NEGTIVE 1:POSITIVE
+                        //
+    INT32U LPMEN:1;		//BIT8: 1:OFF 0:ON, enable or disable cpld pwm
+    INT32U X_ENCODER_RST:1;		//BIT9: X ENCODER RESET	 0:RESET
+    INT32U Y_ENCODER_RST:1;		//BIT10:
+    INT32U Z_ENCODER_RST:1;		//BIT11:
+                                //
+    INT32U A_ENCODER_RST:1;		//BIT12:
+    INT32U S_ENCODER_RST:1;		//BIT13:
+    INT32U W_ENCODER_RST:1;		//BIT14:
+    INT32U CLR_REF:1;		//BIT15:
+}tsIO_OUT1_BITS;
+union tsIO_OUT1_REG
+{
+	INT16U all;
+	tsIO_OUT1_BITS bit;
+};*/
+#define SET_CPLD_IOOUT1(bit) {SETBIT(CPLD_IO_Out1Register,bit);\
+                             rCPLD_IO_OUT1 = CPLD_IO_Out1Register;}
+#define CLR_CPLD_IOOUT1(bit) {CLRBIT(CPLD_IO_Out1Register,bit);\
+                             rCPLD_IO_OUT1 = CPLD_IO_Out1Register;}
+
+#define SET_ALLAXIS_ON  {CPLD_IO_Out1Register|=0XF;\
+                        rCPLD_IO_OUT1 = CPLD_IO_Out1Register;}
+#define SET_ALLAXIS_OFF {CPLD_IO_Out1Register&=(~0XF);\
+                        rCPLD_IO_OUT1 = CPLD_IO_Out1Register;}
+//writebit not real out yet ,must follow by flush                        
+#define WRITE_CPLD_IOOUT1(bit,val) WRITEBIT(CPLD_IO_Out1Register,bit,val)
+#define FLUSH_CPLD_OUT {rCPLD_IO_OUT1 = CPLD_IO_Out1Register;}
+
+#define SET_XON  SET_CPLD_IOOUT1(0)
+#define SET_YON  SET_CPLD_IOOUT1(1)
+#define SET_ZON  SET_CPLD_IOOUT1(2)
+#define SET_AON  SET_CPLD_IOOUT1(3)
+
+#define SET_XOFF CLR_CPLD_IOOUT1(0)
+#define SET_YOFF CLR_CPLD_IOOUT1(1)
+#define SET_ZOFF CLR_CPLD_IOOUT1(2)
+#define SET_AOFF CLR_CPLD_IOOUT1(3)
+
+
+#define WRITE_XSIGN(val) WRITE_CPLD_IOOUT1(4,val)
+#define WRITE_YSIGN(val) WRITE_CPLD_IOOUT1(5,val)
+#define WRITE_ZSIGN(val) WRITE_CPLD_IOOUT1(6,val)
+#define WRITE_ASIGN(val) WRITE_CPLD_IOOUT1(7,val)
+
+#define SET_LPMEN SET_CPLD_IOOUT1(8)
+#define CLR_LPMEN CLR_CPLD_IOOUT1(8)
+
+#define SET_X_ENCODER_RST SET_CPLD_IOOUT1(9)
+#define SET_Y_ENCODER_RST SET_CPLD_IOOUT1(10)
+#define SET_Z_ENCODER_RST SET_CPLD_IOOUT1(11)
+#define SET_A_ENCODER_RST SET_CPLD_IOOUT1(12)
+#define SET_U_ENCODER_RST SET_CPLD_IOOUT1(13)
+#define SET_W_ENCODER_RST SET_CPLD_IOOUT1(14)
+#define CLR_X_ENCODER_RST CLR_CPLD_IOOUT1(9)
+#define CLR_Y_ENCODER_RST CLR_CPLD_IOOUT1(10)
+#define CLR_Z_ENCODER_RST CLR_CPLD_IOOUT1(11)
+#define CLR_A_ENCODER_RST CLR_CPLD_IOOUT1(12)
+#define CLR_U_ENCODER_RST CLR_CPLD_IOOUT1(13)
+#define CLR_W_ENCODER_RST CLR_CPLD_IOOUT1(14)
+
+#define SET_CLRREF       SET_CPLD_IOOUT1(15)
+#define CLR_CLRREF       CLR_CPLD_IOOUT1(15)
+
+#define RESET_REF  SET_CLRREF
+#define ENABLE_REF CLR_CLRREF
+#define REENABLE_REF {RESET_REF;ENABLE_REF;}
+
+
+/*
+typedef struct  
+{     // bits   description
+    INT32U XALM:1;				//BIT0: X_ALARM	 		0:VALID ALM
+    INT32U YALM:1;				//BIT1: Y_ALARM			0:VALID ALM
+    INT32U ZALM:1;				//BIT2: Z_ALARM			0:VALID ALM
+    INT32U AALM:1;				//BIT3: A_ALARM			0:VALID ALM
+
+    INT32U XPOS:1;			//BIT0: X_POS_LIMIT	 	0:VALID
+    INT32U XNEG:1;			//BIT1: X_NEG_LIMIT		0:VALID
+    INT32U YPOS:1;			//BIT2: Y_POS_LIMIT	 	0:VALID
+    INT32U YNEG:1;			//BIT3: Y_NEG_LIMIT		0:VALID
+
+    INT32U ZPOS:1;			//BIT4: Z_POS_LIMIT	 	0:VALID
+    INT32U ZNEG:1;			//BIT5: Z_NEG_LIMIT		0:VALID
+    INT32U APOS:1;			//BIT6: A_POS_LIMIT	 	0:VALID
+    INT32U ANEG:1;			//BIT7: A_NEG_LIMIT		0:VALID
+
+    INT32U XCOIN:1;				//BIT12:  X_SERVO_COIN	1:VALID
+    INT32U YCOIN:1;				//BIT13:  Y_SERVO_COIN	1:VALID
+    INT32U ZCOIN:1;				//BIT14:  Z_SERVO_COIN	1:VALID
+    INT32U ACOIN:1;				//BIT15:  A_SERVO_COIN	1:VALID
+}tsIO_IN1_BITS;
+union tsIO_IN1_REG 
+{
+	INT16U all;
+	tsIO_IN1_BITS bit;
+};*/  
+#define GET_XALM  GETBIT(CPLD_IO_In1Register,0)
+#define GET_YALM  GETBIT(CPLD_IO_In1Register,1)
+#define GET_ZALM  GETBIT(CPLD_IO_In1Register,2)
+#define GET_AALM  GETBIT(CPLD_IO_In1Register,3)
+
+#define GET_XPOS  GETBIT(CPLD_IO_In1Register,4)
+#define GET_YPOS  GETBIT(CPLD_IO_In1Register,5)
+#define GET_ZPOS  GETBIT(CPLD_IO_In1Register,6)
+#define GET_APOS  GETBIT(CPLD_IO_In1Register,7)
+
+#define GET_XNEG  GETBIT(CPLD_IO_In1Register,8)
+#define GET_YNEG  GETBIT(CPLD_IO_In1Register,9)
+#define GET_ZNEG  GETBIT(CPLD_IO_In1Register,10)
+#define GET_ANEG  GETBIT(CPLD_IO_In1Register,11)
+
+#define GET_XCOIN GETBIT(CPLD_IO_In1Register,12)
+#define GET_YCOIN GETBIT(CPLD_IO_In1Register,13)
+#define GET_ZCOIN GETBIT(CPLD_IO_In1Register,14)
+#define GET_ACOIN GETBIT(CPLD_IO_In1Register,15)
+
+//FAIT SET VALUE TO ALARM OR LIMIT OR COIN ,for debug or other propose
+#define WRITE_XALM(val) WRITEBIT(CPLD_IO_In1Register,0,val)
+#define WRITE_YALM(val) WRITEBIT(CPLD_IO_In1Register,1,val)
+#define WRITE_ZALM(val) WRITEBIT(CPLD_IO_In1Register,2,val)
+#define WRITE_AALM(val) WRITEBIT(CPLD_IO_In1Register,3,val)
+#define SET_ALL_ALM     WRITEBITS(CPLD_IO_In1Register,0XF,0XF)
+#define CLR_ALL_ALM     WRITEBITS(CPLD_IO_In1Register,0XF,0X0)
+
+#define WRITE_XPOS(val) WRITEBIT(CPLD_IO_In1Register,4,val)
+#define WRITE_YPOS(val) WRITEBIT(CPLD_IO_In1Register,5,val)
+#define WRITE_ZPOS(val) WRITEBIT(CPLD_IO_In1Register,6,val)
+#define WRITE_APOS(val) WRITEBIT(CPLD_IO_In1Register,7,val)
+
+#define WRITE_XNEG(val) WRITEBIT(CPLD_IO_In1Register,8,val)
+#define WRITE_YNEG(val) WRITEBIT(CPLD_IO_In1Register,9,val)
+#define WRITE_ZNEG(val) WRITEBIT(CPLD_IO_In1Register,10,val)
+#define WRITE_ANEG(val) WRITEBIT(CPLD_IO_In1Register,11,val)
+#define SET_ALL_LIMIT   WRITEBITS(CPLD_IO_In1Register,0X0FF0,0XFF0)
+#define CLR_ALL_LIMIT   WRITEBITS(CPLD_IO_In1Register,0X0FF0,0X0)
+
+#define WRITE_XCOIN(val) WRITEBIT(CPLD_IO_In1Register,12,val)
+#define WRITE_YCOIN(val) WRITEBIT(CPLD_IO_In1Register,13,val)
+#define WRITE_ZCOIN(val) WRITEBIT(CPLD_IO_In1Register,14,val)
+#define WRITE_ACOIN(val) WRITEBIT(CPLD_IO_In1Register,15,val)
+#define SET_ALL_COIN     WRITEBITS(CPLD_IO_In1Register,0XF000,0XF000)
+#define CLR_ALL_COIN     WRITEBITS(CPLD_IO_In1Register,0XF000,0X0)
+/*
+struct  IO_IN2_BITS
+{     // bits   description
+    INT32U XREF:1;		//BIT0: 		X_REF	 	1:VALID
+    INT32U YREF:1;		//BIT1: 		Y_REF	 	1:VALID
+    INT32U ZREF:1;		//BIT2: 		Z_REF	 	1:VALID
+    INT32U AREF:1;		//BIT3: 		A_REF	 	1:VALID
+
+    INT32U XOVER:1;		//BIT7: 		LPM16X pulse send OVER,CLOSE PATH  1:VALID
+    INT32U YOVER:1;		//BIT8: 		LPM16X pulse send OVER,CLOSE PATH  1:VALID
+    INT32U ZOVER:1;		//BIT9: 		LPM16X pulse send OVER,CLOSE PATH  1:VALID
+    INT32U AOVER:1;		//BIT10: 	LPM16X pulse send OVER,CLOSE PATH  1:VALID
+
+    INT32U X_ENCODER_ERR:1;		//BIT5: X_ENCODER_ERR	1:VALID ERROR
+    INT32U Y_ENCODER_ERR:1;		//BIT6: Y_ENCODER_ERR	1:VALID ERROR
+    INT32U Z_ENCODER_ERR:1;		//BIT7: Z_ENCODER_ERR	1:VALID ERROR
+    INT32U A_ENCODER_ERR:1;		//BIT8: A_ENCODER_ERR	1:VALID ERROR
+
+    INT32U W_ENCODER_ERR:1;		//BIT7: Z_ENCODER_ERR	1:VALID ERROR
+    INT32U U_ENCODER_ERR:1;		//BIT8: A_ENCODER_ERR	1:VALID ERROR
+    INT32U REV14:1;		//BIT14:
+    INT32U SREF:1;             //BIT15
+};*/
+
+#define GET_XREF  GETBIT(CPLD_IO_In2Register,0)
+#define GET_YREF  GETBIT(CPLD_IO_In2Register,1)
+#define GET_ZREF  GETBIT(CPLD_IO_In2Register,2)
+#define GET_AREF  GETBIT(CPLD_IO_In2Register,3)
+
+#define GET_UREF  GETBIT(CPLD_IO_In2Register,15)
+
+#define GET_XOVER GETBIT(CPLD_IO_In2Register,4)
+#define GET_YOVER GETBIT(CPLD_IO_In2Register,5)
+#define GET_ZOVER GETBIT(CPLD_IO_In2Register,6)
+#define GET_AOVER GETBIT(CPLD_IO_In2Register,7)
+
+#define GET_X_ENCODER_ERR  GETBIT(CPLD_IO_In2Register,8)
+#define GET_Y_ENCODER_ERR  GETBIT(CPLD_IO_In2Register,9)
+#define GET_Z_ENCODER_ERR  GETBIT(CPLD_IO_In2Register,10)
+#define GET_A_ENCODER_ERR  GETBIT(CPLD_IO_In2Register,11)
+#define GET_W_ENCODER_ERR  GETBIT(CPLD_IO_In2Register,12)
+#define GET_U_ENCODER_ERR  GETBIT(CPLD_IO_In2Register,13)
+
+
+
+struct tsIO_DOG_BITS
+{
+    INT16U CSF:1;
+    INT16U RSTF:1;
+    INT16U SCKF:1;
+    INT16U SFDI:1;
+    INT16U LED0:1;
+    INT16U LED1:1;
+    INT16U RESV6:1;
+    INT16U LCDPWMEN:1;
+    INT16U LCDPWM0:1;
+    INT16U LCDPWM1:1;
+    INT16U LCDPWM2:1;
+    INT16U LCDPWM3:1;
+    INT16U LCDPWM4:1;
+    INT16U LCDPWM5:1;
+    INT16U LCDPWM6:1;
+    INT16U LCDBLON:1;
+};
+union tsIO_DOG_REG {
+   INT16U               all;
+   struct tsIO_DOG_BITS  bit;
+};
+
+struct tsIO_WHEEL_BITS{
+    INT16U WH1:1;
+    INT16U WH2:1;
+    INT16U WH3:1;
+    INT16U WH4:1;
+    INT16U WH5:1;
+    INT16U WH6:1;
+    INT16U WH7:1;
+    INT16U SFDO:1;
+    INT16U LCDPWM0:1; //data to be read in for test
+    INT16U LCDPWM1:1;
+    INT16U LCDPWM2:1;
+    INT16U LCDPWM3:1;
+    INT16U LCDBLON:1;
+    INT16U CSF:1;
+    INT16U SCKF:1;
+    INT16U SFDI:1;
+};
+union tsIO_WHEEL_REG {
+   INT16U               all;
+   struct tsIO_WHEEL_BITS  bit;
+};
+
+extern union tsIO_DOG_REG tsDOGRegister;
+extern union tsIO_WHEEL_REG tsWHEELRegister;
+
+
+/*-----------------------------------------------------------------
+ //registers that had removed
+
+// IO OUT 2 IS ABOUNDEND
+//replaced with gpio 24-31
+
+#define A4LOCK   (24)   //the gpio out pin number
+#define A5LOCK   (25)
+#define BrakeRelease  (26)
+#define OUT4       (27)
+#define OUT5       (28)
+#define OUT6       (29)
+#define OUT7       (30)
+#define OUT8       (31)
+*/
+typedef struct  
+{		
+	INT32U  A4LOCK:1; 			//锁紧A4 轴输出  0: 有效 		
+	INT32U  A5LOCK:1; 			//锁紧A5 轴输出  0: 有效 
+	INT32U  OUT3:1;	   			//BIT10: 正向排屑(Z 轴抱閘释放。0:有效)。
+	INT32U  OUT4:1;	            		//BIT11: 反向排屑
+	INT32U  OUT5:1;	            		//BIT12: 对刀仪吹气
+	INT32U  OUT6:1;			    	//BIT13: 齿轮箱档1
+	INT32U  OUT7:1;			    	//BIT14: 齿轮箱档2
+	INT32U  OUT8:1;			    	//BIT15: 主电源控制	
+}tsIO_OUT2_BITS ;
+
+union tsIO_OUT2_REG 
+{
+	INT8U all;
+	tsIO_OUT2_BITS bit;
+};
+extern union tsIO_OUT2_REG 	sCPLD_IO_Out2Register;
+// IO_IN4_REG is abounded ,
+//replace by GPIOIN[1], since GPIOIN[1] has actual 8bit
+/*
+#define IOBIT1   (16)  //the gpio in pin number
+#define IOBIT2   (17)
+#define A4LOCKIN (18)   
+#define A5LOCKIN (19)
+#define IOBIT5   (20)   //  limit
+#define IOBIT6   (21)
+#define IOBIT7   (22)
+#define IOBIT8   (23)
+*/
+typedef struct  
+{	 
+	INT32U ATCLock:1;		//BIT0. 自动对刀开关（常开） 1-ON 对刀有效
+	INT32U ATCTrack:1;		//BIT1. 自动对刀超行程开关（常闭） 1-ON 未过行程0-OFF 过行程 
+	INT32U A4LOCK:1;	//BIT2: 4轴锁紧反馈
+					//BIT2: A4刹车盘锁紧开关（常开） 0：刹车盘锁紧（开关OFF） 1：刹车盘松开（开关ON）
+	INT32U A5LOCK:1;	//BIT3: 4轴松开反馈
+					//BIT3: A5刹车盘锁紧开关（常开） 0：刹车盘锁紧（开关OFF） 1：刹车盘松开（开关ON）
+	INT32U IN5:1;		//BIT4: 4轴零点反馈
+					//BIT4: 复用自动上下料平移传送电机行程正向硬限位0:VALID
+	INT32U IN6:1;		//BIT5: 齿轮箱档1
+					//BIT5: 全闭环Z轴霍尔开关.1:VALID
+					//BIT5: 复用自动上下料平移传送电机行程负向硬限位0:VALID
+	INT32U IN7:1;		//BIT6: 齿轮箱档2
+					//BIT6: 全闭环Y轴霍尔开关.1:VALID
+					//BIT6: 复用自动上下料上下取料电机行程正向硬限位0:VALID						
+	INT32U IN8:1;		//BIT7: 主轴零点
+					//BIT7: 全闭环X轴霍尔开关.1.触发.0未触发 
+					//BIT7: 复用自动上下料上下取料电机行程负向硬限位0:VALID
+					//BIT7:  五轴联动第五轴(C)零位信号。1:VALID						
+	INT32U REV9:1;	//BIT8: 
+}tsIO_IN4_BITS;
+
+union tsIO_IN4_REG
+{
+	INT8U all;
+	tsIO_IN4_BITS bit;
+};
+
+extern union tsIO_IN4_REG		sCPLD_IO_In4Register;
+
+
+
+//-------------------------------------------------------------------
+//UART functions
+extern void initSpindleCOM(void);
+extern void spindleTX(INT8U* buf,INT8U len);
+extern void spindleRX(INT8U* buf,INT16U* count,INT16U bufsize);
+extern void initKeyboardCOM(void);
+extern void keyboardTX(INT8U* buf,INT8U len);
+extern void keyboardRX(INT8U* buf,INT16U* count,INT16U bufsize);
+//----------------------------------------------------------------------
+/*
+extern INT16U HardLimitCounter ;
+extern INT16U UREFDistanceCounter ;
+extern FLOAT64  SYNC_ABSError;//双驱同步误差。Uint:最小输入单位。同步轴减去主动轴。
+*/
+
+extern tsENCODER X_Encoder;
+extern tsENCODER Y_Encoder;
+extern tsENCODER Z_Encoder;
+extern tsENCODER IV_Encoder;
+extern tsENCODER V_Encoder;
+extern tsENCODER VI_Encoder;
+extern tsENCODER U_Encoder;
+extern tsENCODER W_Encoder ;
+//extern tsENCODER A_Encoder;
+
+extern tsSERVO X_Servo;
+extern tsSERVO Y_Servo;
+extern tsSERVO Z_Servo;
+extern tsSERVO IV_Servo;
+extern tsSERVO V_Servo;
+extern tsSERVO VI_Servo;
+extern tsSERVO U_Servo;
+//extern tsSERVO A_Servo;
+
+extern void CPLD_ReadIOIn1(void);		//CPLD IO 输入口1
+extern void CPLD_ReadIOIn2(void);		//CPLD IO 输入口2
+
+
+extern void CPLD_EncoderResetX(void);	//初始化X 编码器
+extern void CPLD_EncoderResetY(void);	//初始化Y 编码器
+extern void CPLD_EncoderResetZ(void);	//初始化Z 编码器
+extern void CPLD_EncoderResetU(void);	//初始化U 编码器
+
+extern void CPLD_EncoderJudge(void);		//判断编码器有无报警
+extern INT16U CPLD_EncoderValue(tsENCODER *Encoder); //预锁定基本计数值
+
+extern void CPLD_ServoInit(void);
+extern void CPLD_ServoOn(void);
+extern void CPLD_ServoOff(void);
+extern void LEDset(short led,BOOL onoff);
+extern void LEDflash(short led);
+extern void SetLCDBackLight(INT8U onoff, INT8U grade);
+extern INT16U getFkey(void);
+//通用IO输入输出函数
+extern void GPIOinit(void);
+extern INT32U GPIOinput_all(void);
+extern BOOL GPIOinput_bit(INT8U bit);
+extern void GPIOinput_writebit(INT8U bit, BOOL value);
+extern void GPIOoutput_all(INT32U value);
+void GPIOoutput_flush(void);
+extern void GPIOoutput_bit(INT8U bit, BOOL value);
+extern BOOL GPIOoutput_getbit(INT8U bit);
+
+//获得U  编码器机床坐标实际位置值
+extern void NCCoord_MACValue(tsENCODER *psEncoder ,tsSERVO *psServo);	
+extern void NCCoord_ABSValue(void);	//计算绝对坐标值
+extern void NCCoord_MACToWork(INT40AXIS *psCoordinateWork,INT40AXIS *psCoordinateMAC);
+extern void NCCoord_WorkToMAC(INT40AXIS *psCoordinateWork,INT40AXIS *psCoordinateMAC);
+extern void NCCoord_WorkToMACToLinear(INT40AXIS * psCoordinateWork, INT40AXIS * psCoordinateMAC);
+extern void NCCoord_WorkToMACToLinearOne(INT40AXIS * psCoordinateWork, INT40AXIS * psCoordinateMAC, INT8U GG17ID);
+extern void NCCoord_LinearValueX(INT32S *pValueX);
+extern void	NCCoord_LinearValueY(INT32S *pValueY);
+extern void	NCCoord_LinearValueZ(INT32S *pValueZ);
+extern void NCCoord_LinearPulseX(INT32S *pPulseX);
+extern void NCCoord_LinearPulseY(INT32S *pPulseY);
+extern void NCCoord_LinearPulseZ(INT32S *pPulseZ);
+extern INT16U NCCoord_GetAndCheck(void);
+#endif  // end of DSP6713_CPLD_H definition
+
+

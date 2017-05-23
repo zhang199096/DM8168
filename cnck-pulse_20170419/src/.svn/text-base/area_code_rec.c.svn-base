@@ -1,0 +1,1036 @@
+#include "../include/dec6713_main.h"
+
+tsGCODE  *psGCodeBuffer;
+
+void STD_Deal_DeltaPoint(tsGCODE  *psNowCode)
+{	
+	psNowCode->DeltaPoint.X = (psNowCode->EndPoint.X-psNowCode->StartPoint.X)*System.UnitTo_mm;//mm
+	psNowCode->DeltaPoint.Y = (psNowCode->EndPoint.Y-psNowCode->StartPoint.Y)*System.UnitTo_mm;//mm
+	psNowCode->DeltaPoint.Z = (psNowCode->EndPoint.Z-psNowCode->StartPoint.Z)*System.UnitTo_mm;//mm
+	psNowCode->StotalCheck = powdp(psNowCode->DeltaPoint.X,2)+powdp(psNowCode->DeltaPoint.Y,2)+powdp(psNowCode->DeltaPoint.Z,2);
+	if(psNowCode->StotalCheck>=0)
+	psNowCode->StotalCheck = sqrtdp(psNowCode->StotalCheck);
+}
+
+//处理过短代码为空代码
+INT16U STD_Deal_StotalNull(tsGCODE *psNowCode)
+{
+	if(psNowCode->Stotal < 0.003)
+	{		
+		psNowCode->Stotal = 0;
+		psNowCode->Vveer = psNowCode->Feedrate*2;
+		psNowCode->CMD1 = 0x64;
+		psNowCode->CMD2 = 0xff;		
+		psNowCode->MoveCodeSign = 0;
+		OverallSign.FlexuousAxisSign.X = 0;
+		OverallSign.FlexuousAxisSign.Y = 0;
+		OverallSign.FlexuousAxisSign.Z = 0;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+INT16U STD_Deal_FlexuousAxis_Reverse(tsGCODE *psNowCode)
+{
+	INT16U ReverseSign=0;	//反向处理标志
+	
+	//如果波动长度小于单轴最大波折长度的一半则修正终点等于起点坐标
+	if(fabs(psNowCode->DeltaPoint.X) < divdp( System.FlexuousAxisLength, 2.0))	
+	{
+		if(((OverallSign.LastTheoryMoveSign.X==MovePositive)&&(psNowCode->DeltaPoint.X<-0.0005)) ||
+			((OverallSign.LastTheoryMoveSign.X==MoveNegtive)&&(psNowCode->DeltaPoint.X>0.0005)))
+		{
+			if(psNowCode->GGroup02 != 19)
+			{	//非YZ 平面
+				psNowCode->CMD1 = 1;
+			}			
+			psNowCode->EndPoint.X = psNowCode->StartPoint.X;
+			psNowCode->DeltaPoint.X = 0;
+			ReverseSign = 1;
+		}
+	}
+	if(fabs(psNowCode->DeltaPoint.Y) < divdp( System.FlexuousAxisLength, 2.0 ) ) 
+	{
+		if(((OverallSign.LastTheoryMoveSign.Y==MovePositive)&&(psNowCode->DeltaPoint.Y<-0.0005)) ||
+			((OverallSign.LastTheoryMoveSign.Y==MoveNegtive)&&(psNowCode->DeltaPoint.Y>0.0005)))
+		{
+			if(psNowCode->GGroup02 != 18)
+			{	//非XZ 平面
+				psNowCode->CMD1 = 1;
+			}
+			psNowCode->EndPoint.Y = psNowCode->StartPoint.Y;
+			psNowCode->DeltaPoint.Y = 0;
+			ReverseSign = 1;
+		}
+	}
+	if(fabs(psNowCode->DeltaPoint.Z) < divdp( System.FlexuousAxisLength, 2.0 ) ) 
+	{
+		if(((OverallSign.LastTheoryMoveSign.Z==MovePositive)&&(psNowCode->DeltaPoint.Z<-0.0005)) ||
+			((OverallSign.LastTheoryMoveSign.Z==MoveNegtive)&&(psNowCode->DeltaPoint.Z>0.0005)))
+		{
+			if(psNowCode->GGroup02 != 17)
+			{	//非XY 平面
+				psNowCode->CMD1 = 1;
+			}
+			psNowCode->EndPoint.Z = psNowCode->StartPoint.Z;
+			psNowCode->DeltaPoint.Z = 0;
+			ReverseSign = 1;
+		}
+	}
+	return (ReverseSign);
+}
+
+INT16U STD_Deal_FlexuousAxis_Judge(tsGCODE *psNowCode)
+{
+	//判定当前条是否为波动嫌疑线段
+	if(psNowCode->Stotal < FlexuousMaxLength)
+	{
+		if(fabs(psNowCode->DeltaPoint.X) < System.FlexuousAxisLength) 
+		{
+			if(((OverallSign.LastTheoryMoveSign.X==MovePositive)&&(psNowCode->DeltaPoint.X<-0.0005)) ||
+				((OverallSign.LastTheoryMoveSign.X==MoveNegtive)&&(psNowCode->DeltaPoint.X>0.0005)))
+			{
+				OverallSign.FlexuousAxisSign.X = 1;
+				psNowCode->FlexuousAxisSign = 1;
+			}
+		}
+		if(fabs(psNowCode->DeltaPoint.Y) < System.FlexuousAxisLength) 
+		{
+			if(((OverallSign.LastTheoryMoveSign.Y==MovePositive)&&(psNowCode->DeltaPoint.Y<-0.0005)) ||
+				((OverallSign.LastTheoryMoveSign.Y==MoveNegtive)&&(psNowCode->DeltaPoint.Y>0.0005)))
+			{
+				OverallSign.FlexuousAxisSign.Y = 1;
+				psNowCode->FlexuousAxisSign = 1;
+			}
+		}
+		if(fabs(psNowCode->DeltaPoint.Z) < System.FlexuousAxisLength) 
+		{
+			if(((OverallSign.LastTheoryMoveSign.Z==MovePositive)&&(psNowCode->DeltaPoint.Z<-0.0005)) ||
+				((OverallSign.LastTheoryMoveSign.Z==MoveNegtive)&&(psNowCode->DeltaPoint.Z>0.0005)))
+			{
+				OverallSign.FlexuousAxisSign.Z = 1;
+				psNowCode->FlexuousAxisSign = 1;
+			}
+		}
+	}	
+	return (psNowCode->FlexuousAxisSign);
+}
+
+void STD_Deal_FlexuousAxis(tsGCODE *psNowCode)
+{	
+	psNowCode->FlexuousAxisSign = 0;	
+	if(System.FlexuousAxisLength == 0)
+		return ;
+	if(psNowCode->CMD1 == 0)	
+	{	
+		OverallSign.FlexuousAxisSign.X = 0;
+		OverallSign.FlexuousAxisSign.Y = 0;
+		OverallSign.FlexuousAxisSign.Z = 0;	
+		return ;
+	}
+	
+	if((OverallSign.FlexuousAxisSign.X) || (OverallSign.FlexuousAxisSign.Y) ||(OverallSign.FlexuousAxisSign.Z))
+	{
+		tsGCODE *psFlexuousCode; 	//上条波动嫌疑线段指针
+		psFlexuousCode = &GCodeBuffer[(OverallSign.FlexuousRealSendCount-1) % STDGCODE_MOD];
+		if(psFlexuousCode->FlexuousAxisSign == 1)
+		{
+			//处理波动线段
+			if((STDNCSign.RealRunCount+5) < OverallSign.FlexuousRealSendCount)
+				//----------------------------------
+			{	
+				//还未执行波动线段, 可对其进行处理
+				if(OverallSign.FlexuousAxisSign.X)
+				{
+					if(psFlexuousCode->EndPoint.X > psFlexuousCode->StartPoint.X)
+					{
+						if(psNowCode->EndPoint.X <= psNowCode->StartPoint.X)
+						{	//人为消除波动，将终点坐标改为起点坐标
+							psFlexuousCode->EndPoint.X = psFlexuousCode->StartPoint.X;
+						}
+						else
+						{
+							OverallSign.FlexuousAxisSign.X = 0;
+						}
+					}
+					else
+					{
+						if(psNowCode->EndPoint.X >= psNowCode->StartPoint.X)
+						{	//人为消除波动
+							psFlexuousCode->EndPoint.X = psFlexuousCode->StartPoint.X;
+						}
+						else
+						{
+							OverallSign.FlexuousAxisSign.X = 0;
+						}
+					}	
+				}
+				if(OverallSign.FlexuousAxisSign.Y)
+				{
+					if(psFlexuousCode->EndPoint.Y > psFlexuousCode->StartPoint.Y)
+					{
+						if(psNowCode->EndPoint.Y <= psNowCode->StartPoint.Y)
+						{	//人为消除波动
+							psFlexuousCode->EndPoint.Y = psFlexuousCode->StartPoint.Y;
+						}
+						else
+						{
+							OverallSign.FlexuousAxisSign.Y = 0;
+						}
+					}
+					else
+					{
+						if(psNowCode->EndPoint.Y >= psNowCode->StartPoint.Y)
+						{	//人为消除波动
+							psFlexuousCode->EndPoint.Y = psFlexuousCode->StartPoint.Y;	//CH0511
+						}
+						else
+						{
+							OverallSign.FlexuousAxisSign.Y = 0;
+						}
+					}	
+				}
+				if(OverallSign.FlexuousAxisSign.Z)
+				{
+					if(psFlexuousCode->EndPoint.Z > psFlexuousCode->StartPoint.Z)
+					{
+						if(psNowCode->EndPoint.Z <= psNowCode->StartPoint.Z)
+						{	//人为消除波动
+							psFlexuousCode->EndPoint.Z = psFlexuousCode->StartPoint.Z;
+						}
+						else
+						{
+							OverallSign.FlexuousAxisSign.Z = 0;
+						}
+					}
+					else
+					{
+						if(psNowCode->EndPoint.Z >= psNowCode->StartPoint.Z)
+						{	//人为消除波动
+							psFlexuousCode->EndPoint.Z = psFlexuousCode->StartPoint.Z;
+						}
+						else
+						{
+							OverallSign.FlexuousAxisSign.Z = 0;
+						}
+					}	
+				}
+				if((OverallSign.FlexuousAxisSign.X) || (OverallSign.FlexuousAxisSign.Y) ||(OverallSign.FlexuousAxisSign.Z))
+				{	
+					//做过波动坐标处理则重新计算转向速度
+					OverallSign.FlexuousAxisSign.X = 0;
+					OverallSign.FlexuousAxisSign.Y = 0;
+					OverallSign.FlexuousAxisSign.Z = 0; 	
+					psFlexuousCode->FlexuousAxisSign = 0;
+					STD_Deal_DeltaPoint(psFlexuousCode);
+					psFlexuousCode->Stotal = psFlexuousCode->StotalCheck;
+					if(psNowCode->StartPoint.X == psNowCode->EndPoint.X)						
+						psNowCode->EndPoint.X = psFlexuousCode->EndPoint.X;						
+					if(psNowCode->StartPoint.Y == psNowCode->EndPoint.Y)
+						psNowCode->EndPoint.Y = psFlexuousCode->EndPoint.Y;
+					if(psNowCode->StartPoint.Z == psNowCode->EndPoint.Z)						
+						psNowCode->EndPoint.Z = psFlexuousCode->EndPoint.Z;
+					if(psFlexuousCode->Stotal <= FlexuousLimitLength)
+					{
+						//处理过短抖动代码为空代码
+						psFlexuousCode->Stotal = 0;
+						psFlexuousCode->Vveer = psNowCode->Feedrate*2;
+						psFlexuousCode->MoveCodeSign = 1;
+						psFlexuousCode->CMD1 = 0x01;
+						//重新计算传递终点和终点矢量
+						OverallSign.LastMoveCodeEndVector = OverallSign.PreFlexuousVector;
+						OverallSign.STDLastMoveGCode.EndPoint = psFlexuousCode->StartPoint;							
+						//重新计算当前代码特征
+						psNowCode->StartPoint = psFlexuousCode->StartPoint;						
+					}
+					else
+					{
+						psFlexuousCode->EndPointVector.X = divdp( psFlexuousCode->DeltaPoint.X, psFlexuousCode->Stotal );
+						psFlexuousCode->EndPointVector.Y = divdp( psFlexuousCode->DeltaPoint.Y, psFlexuousCode->Stotal );
+						psFlexuousCode->EndPointVector.Z = divdp( psFlexuousCode->DeltaPoint.Z, psFlexuousCode->Stotal );
+						psFlexuousCode->CMD1 = 1;					
+						//重新计算传递终点和终点矢量
+						OverallSign.LastMoveCodeEndVector = psFlexuousCode->EndPointVector;	
+						OverallSign.STDLastMoveGCode.EndPoint = psFlexuousCode->EndPoint;						
+						//重新计算当前代码特征
+						psNowCode->StartPoint = psFlexuousCode->EndPoint;						
+					}
+					STD_Deal_DeltaPoint(psNowCode);
+					if(psNowCode->CMD1 == 1)
+						psNowCode->Stotal = psNowCode->StotalCheck;
+					if(NCAreaGCodeBuffer[ (OverallSign.FlexuousNCAREARealSendCount-1)%STDGCODE_MOD ].FlexuousAxisSign == 1)						
+						NCAreaGCodeBuffer[ (OverallSign.FlexuousNCAREARealSendCount-1)%STDGCODE_MOD ] = *psFlexuousCode;
+					return ;
+				}
+			}			
+			OverallSign.FlexuousAxisSign.X = 0;
+			OverallSign.FlexuousAxisSign.Y = 0;
+			OverallSign.FlexuousAxisSign.Z = 0;
+			psFlexuousCode->FlexuousAxisSign = 0;			
+		}
+	}
+	
+	//如果波动长度小于单轴最大波折长度的一半则修正终点等于起点坐标
+	if(STD_Deal_FlexuousAxis_Reverse(psNowCode))
+	{
+		psNowCode->StotalCheck = powdp(psNowCode->DeltaPoint.X,2)+powdp(psNowCode->DeltaPoint.Y,2)+powdp(psNowCode->DeltaPoint.Z,2);	
+		if(psNowCode->StotalCheck>=0)
+		psNowCode->Stotal=sqrtdp(psNowCode->StotalCheck);
+		if(psNowCode->Stotal < ReverseLimitLength)
+		{
+			//处理过短代码为空代码
+			psNowCode->Stotal = 0;
+			psNowCode->Vveer = psNowCode->Feedrate*2;
+			psNowCode->MoveCodeSign = 0;
+			psNowCode->CMD1 = 0x64;
+			psNowCode->CMD2 = 0xff;		
+			return ;
+		}
+	}
+
+	//判定当前条是否为波动嫌疑线段
+	if(STD_Deal_FlexuousAxis_Judge(psNowCode))
+	{
+		OverallSign.FlexuousRealSendCount = STDNCSign.RealSendCount;
+		OverallSign.PreFlexuousVector = OverallSign.LastMoveCodeEndVector;	
+	}
+	
+	//判定当前条是否为波动嫌疑线段
+	#if 0
+	if(psNowCode->Stotal < FlexuousMaxLength)
+	{
+		if(fabs(psNowCode->DeltaPoint.X) < System.FlexuousAxisLength) 
+		{
+			if(((OverallSign.LastTheoryMoveSign.X==MovePositive)&&(psNowCode->DeltaPoint.X<-0.0005)) ||
+				((OverallSign.LastTheoryMoveSign.X==MoveNegtive)&&(psNowCode->DeltaPoint.X>0.0005)))
+			{
+				OverallSign.FlexuousAxisSign.X = 1;
+				psNowCode->FlexuousAxisSign = 1;
+			}
+		}
+		if(fabs(psNowCode->DeltaPoint.Y) < System.FlexuousAxisLength) 
+		{
+			if(((OverallSign.LastTheoryMoveSign.Y==MovePositive)&&(psNowCode->DeltaPoint.Y<-0.0005)) ||
+				((OverallSign.LastTheoryMoveSign.Y==MoveNegtive)&&(psNowCode->DeltaPoint.Y>0.0005)))
+			{
+				OverallSign.FlexuousAxisSign.Y = 1;
+				psNowCode->FlexuousAxisSign = 1;
+			}
+		}
+		if(fabs(psNowCode->DeltaPoint.Z) < System.FlexuousAxisLength) 
+		{
+			if(((OverallSign.LastTheoryMoveSign.Z==MovePositive)&&(psNowCode->DeltaPoint.Z<-0.0005)) ||
+				((OverallSign.LastTheoryMoveSign.Z==MoveNegtive)&&(psNowCode->DeltaPoint.Z>0.0005)))
+			{
+				OverallSign.FlexuousAxisSign.Z = 1;				
+				psNowCode->FlexuousAxisSign = 1;
+			}
+		}
+		if(psNowCode->FlexuousAxisSign == 1)
+		{
+			OverallSign.FlexuousRealSendCount = STDNCSign.RealSendCount;
+			OverallSign.PreFlexuousVector = OverallSign.LastMoveCodeEndVector;	
+		}
+	}
+	#endif		
+}
+
+// 此处计算NowCode->StPointVector ,NowCode->EndPointVector为 通用途
+// 1.直线或圆弧起点余弦矢量值,用于上条运动代码终点允许速度
+// 2.直线或圆弧终点余弦矢量值,用于下条运动代码起点允许速度
+void STD_Deal_Vveer(tsGCODE *psNowCode)
+{
+	if(psNowCode->Stotal == 0)	//空代码不处理
+		return ;
+	if(STD_Deal_StotalNull(psNowCode))
+		return ;
+	if((psNowCode->CMD1==0)||(psNowCode->CMD1==1))
+	{	
+		psNowCode->StPointVector.X = divdp(psNowCode->DeltaPoint.X, psNowCode->Stotal);
+		psNowCode->StPointVector.Y = divdp(psNowCode->DeltaPoint.Y, psNowCode->Stotal);
+		psNowCode->StPointVector.Z = divdp(psNowCode->DeltaPoint.Z, psNowCode->Stotal);
+		psNowCode->EndPointVector = psNowCode->StPointVector;
+	}
+	else if((psNowCode->CMD1==2)||(psNowCode->CMD1==3)||(psNowCode->CMD1==30)||(psNowCode->CMD1==31))
+	{		
+		FLOAT64 ArcAngle;		// 单位弧度
+		FLOAT64 ArcSample;	// 单位弧度
+		//FLOAT64 ArcLength;	// unit:mm			
+		
+		// 此处为了确定圆弧始部特性，取圆弧2倍插补周期长度
+		ArcSample=divdp( 2*psNowCode->Feedrate*System.Tsample, psNowCode->Radius*System.UnitTo_mm);	
+		if(!((psNowCode->GGroup02+psNowCode->CMD1)&0x1))
+		{
+			ArcAngle = psNowCode->StartAngle+ ArcSample;
+		}
+		else
+		{
+			ArcAngle = psNowCode->StartAngle-ArcSample;
+		}		
+		if(ArcAngle < 0)
+			ArcAngle+=2.0*PI;
+		if(ArcAngle > 2.0*PI)		
+			ArcAngle -= 2.0*PI;		
+		if(psNowCode->GGroup02==17)
+		{	//xy
+			psNowCode->DeltaPoint.X=(psNowCode->CenterPoint.X+psNowCode->Radius*cosdp(ArcAngle))-psNowCode->StartPoint.X; 
+			psNowCode->DeltaPoint.Y=(psNowCode->CenterPoint.Y+psNowCode->Radius*sindp(ArcAngle))-psNowCode->StartPoint.Y; 
+			psNowCode->DeltaPoint.Z=0;
+		}
+		if(psNowCode->GGroup02==18)
+		{	//xz
+			psNowCode->DeltaPoint.X=(psNowCode->CenterPoint.X+psNowCode->Radius*cosdp(ArcAngle))-psNowCode->StartPoint.X; 
+			psNowCode->DeltaPoint.Y=0;
+			psNowCode->DeltaPoint.Z=(psNowCode->CenterPoint.Z+psNowCode->Radius*sindp(ArcAngle))-psNowCode->StartPoint.Z; 
+		}
+		if(psNowCode->GGroup02==19)
+		{	//yz
+			psNowCode->DeltaPoint.X=0;
+			psNowCode->DeltaPoint.Y=(psNowCode->CenterPoint.Y+psNowCode->Radius*cosdp(ArcAngle))-psNowCode->StartPoint.Y;
+			psNowCode->DeltaPoint.Z=(psNowCode->CenterPoint.Z+psNowCode->Radius*sindp(ArcAngle))-psNowCode->StartPoint.Z; 
+		}		
+		psNowCode->DeltaPoint.X *= System.UnitTo_mm;
+		psNowCode->DeltaPoint.Y *= System.UnitTo_mm;
+		psNowCode->DeltaPoint.Z *= System.UnitTo_mm;	
+		psNowCode->StotalCheck=powdp(psNowCode->DeltaPoint.X,2)+powdp(psNowCode->DeltaPoint.Y,2)+powdp(psNowCode->DeltaPoint.Z,2); 
+		if(psNowCode->StotalCheck>=0)
+			psNowCode->StotalCheck= sqrtdp(psNowCode->StotalCheck);		   
+		if(psNowCode->StotalCheck < 0.001)
+			psNowCode->StotalCheck = 0.001;		
+		psNowCode->StPointVector.X = divdp(psNowCode->DeltaPoint.X, psNowCode->StotalCheck);
+		psNowCode->StPointVector.Y = divdp(psNowCode->DeltaPoint.Y, psNowCode->StotalCheck);
+		psNowCode->StPointVector.Z = divdp(psNowCode->DeltaPoint.Z, psNowCode->StotalCheck); 		
+
+		// 此处为了确定圆弧尾部特性
+		// 实际用于下一条的计算， 取圆弧2倍插补周期长度
+		//if(((psNowCode->GGroup02==17)&&(psNowCode->CMD1==03))||((psNowCode->GGroup02==18)&&(psNowCode->CMD1==02))||((psNowCode->GGroup02==19)&&(psNowCode->CMD1==03)))
+		if(!((psNowCode->GGroup02+psNowCode->CMD1)&0x1))
+		{
+			ArcAngle= psNowCode->EndAngle-ArcSample;					
+		}
+		else
+		{
+			ArcAngle = psNowCode->EndAngle+ArcSample;
+		}
+		if(ArcAngle < 0)
+			ArcAngle+=2.0*PI;
+		if(ArcAngle > 2.0*PI)		
+			ArcAngle -= 2.0*PI;
+		if(psNowCode->GGroup02==17)
+		{	//xy
+			psNowCode->DeltaPoint.X=psNowCode->EndPoint.X-(psNowCode->CenterPoint.X+psNowCode->Radius*cosdp(ArcAngle)); 
+			psNowCode->DeltaPoint.Y=psNowCode->EndPoint.Y-(psNowCode->CenterPoint.Y+psNowCode->Radius*sindp(ArcAngle)); 
+			psNowCode->DeltaPoint.Z=0;
+		}
+		if(psNowCode->GGroup02==18)
+		{	//xz
+			psNowCode->DeltaPoint.X=psNowCode->EndPoint.X-(psNowCode->CenterPoint.X+psNowCode->Radius*cosdp(ArcAngle)); 
+			psNowCode->DeltaPoint.Y=0;
+			psNowCode->DeltaPoint.Z=psNowCode->EndPoint.Z-(psNowCode->CenterPoint.Z+psNowCode->Radius*sindp(ArcAngle)); 
+		}
+		if(psNowCode->GGroup02==19)
+		{	//yz
+			psNowCode->DeltaPoint.X=0;
+			psNowCode->DeltaPoint.Y=psNowCode->EndPoint.Y-(psNowCode->CenterPoint.Y+psNowCode->Radius*cosdp(ArcAngle));
+			psNowCode->DeltaPoint.Z=psNowCode->EndPoint.Z-(psNowCode->CenterPoint.Z+psNowCode->Radius*sindp(ArcAngle)); 
+		}
+		psNowCode->DeltaPoint.X *= System.UnitTo_mm;
+		psNowCode->DeltaPoint.Y *= System.UnitTo_mm;
+		psNowCode->DeltaPoint.Z *= System.UnitTo_mm;	
+		psNowCode->StotalCheck=powdp(psNowCode->DeltaPoint.X,2)+powdp(psNowCode->DeltaPoint.Y,2)+powdp(psNowCode->DeltaPoint.Z,2); 
+		if(psNowCode->StotalCheck>=0)
+			psNowCode->StotalCheck= sqrtdp(psNowCode->StotalCheck);		   
+		if(psNowCode->StotalCheck < 0.001)
+			psNowCode->StotalCheck = 0.001;		
+		psNowCode->EndPointVector.X = divdp(psNowCode->DeltaPoint.X, psNowCode->StotalCheck);
+		psNowCode->EndPointVector.Y = divdp(psNowCode->DeltaPoint.Y, psNowCode->StotalCheck);
+		psNowCode->EndPointVector.Z = divdp(psNowCode->DeltaPoint.Z, psNowCode->StotalCheck); 			
+	}	
+	
+	//确定当前代码的理论运行方向，用于波动代码处理
+	if(psNowCode->DeltaPoint.X)
+	OverallSign.LastTheoryMoveSign.X = (psNowCode->DeltaPoint.X > 0) ? 1:0;
+	if(psNowCode->DeltaPoint.Y)
+	OverallSign.LastTheoryMoveSign.Y = (psNowCode->DeltaPoint.Y > 0) ? 1:0;
+	if(psNowCode->DeltaPoint.Z)
+	OverallSign.LastTheoryMoveSign.Z = (psNowCode->DeltaPoint.Z > 0) ? 1:0;	
+}
+
+void STD_Deal_ArcStotal(tsGCODE  *psNowCode)
+{//计算园弧所夹角度和园弧长度
+    FLOAT64  SEDeltaAngle;
+	
+	SEDeltaAngle = fabs(psNowCode->EndAngle - psNowCode->StartAngle);
+	if(fabs(SEDeltaAngle - 2*PI) < 0.0001)
+	{
+		psNowCode->DeltaAngle = 2.0*PI;
+	}
+	else if(SEDeltaAngle - 2*PI > 0.0001)
+	{
+		Error.InterpolationOver = 5;
+		high_error();		
+		return ;		
+	}
+	else
+	{
+	    if(psNowCode->EndAngle == psNowCode->StartAngle)
+	    {
+	        psNowCode->DeltaAngle = 0;
+			psNowCode->Stotal = 0;
+		    return ;
+	    }
+		if((psNowCode->StartPoint.X==psNowCode->EndPoint.X)&&(psNowCode->StartPoint.Y==psNowCode->EndPoint.Y)&&(psNowCode->StartPoint.Z==psNowCode->EndPoint.Z))
+		{
+		    psNowCode->DeltaAngle = 0;
+			psNowCode->Stotal = 0;
+			return ;
+		}
+		
+		if(!((psNowCode->GGroup02+psNowCode->CMD1)&0x1))
+			psNowCode->DeltaAngle = psNowCode->EndAngle-psNowCode->StartAngle;
+		else
+			psNowCode->DeltaAngle = psNowCode->StartAngle-psNowCode->EndAngle;		
+	}	
+	psNowCode->Stotal = psNowCode->DeltaAngle*psNowCode->Radius*System.UnitTo_mm;//mm   	
+}
+
+void STD_Rec_Arc(tsCODE_G02 *psCodeG02)
+{
+	psGCodeBuffer->Radius = psCodeG02->R;	
+	psGCodeBuffer->StartAngle = divdp(psCodeG02->S*System.UnitTo_d*PI, 180.0 );
+        psGCodeBuffer->EndAngle = divdp(psCodeG02->E*System.UnitTo_d*PI, 180.0 );	
+		
+	if(psCodeG02->CMDSub == 8)
+	{
+		if(!((psGCodeBuffer->GGroup02+psGCodeBuffer->CMD1)&0x1))
+		    psGCodeBuffer->EndAngle = psGCodeBuffer->EndAngle + 2*PI;
+		else
+			psGCodeBuffer->StartAngle = psGCodeBuffer->StartAngle+ 2*PI;
+	}		
+	else
+	{
+		if(!((psGCodeBuffer->GGroup02+psGCodeBuffer->CMD1)&0x1))
+		{
+		    if(psGCodeBuffer->EndAngle < psGCodeBuffer->StartAngle)
+			    psGCodeBuffer->EndAngle = psGCodeBuffer->EndAngle +2*PI;
+		}
+		else
+		{
+		    if(psGCodeBuffer->EndAngle > psGCodeBuffer->StartAngle)
+			    psGCodeBuffer->StartAngle = psGCodeBuffer->StartAngle +2*PI;
+		}		
+	}                        
+		
+	if(System.FunctionSelectionSwitch_01 & 0x01)
+	{
+		psGCodeBuffer->RadiusCheck=(powdp((psCodeG02->X - psCodeG02->I),2)) + (powdp((psCodeG02->Y - psCodeG02->J),2));
+		if(psGCodeBuffer->RadiusCheck>=0)
+		psGCodeBuffer->RadiusCheck = fabs(sqrtdp(psGCodeBuffer->RadiusCheck));
+		if(fabs((psGCodeBuffer->RadiusCheck - psGCodeBuffer->Radius)*System.UnitTo_mm)> 0.2)
+		{
+			Error.InterpolationOver = 1;
+			high_error();		
+			return ;
+		}
+	}
+
+	psGCodeBuffer->GGroup15 = STDNCSign.GGroup15;	//准停模态
+	if(STDNCSign.GGroup00 == 9)
+	{
+		psGCodeBuffer->GGroup15 = 61;	//只做一次准停定位
+		STDNCSign.GGroup00 = 0;
+	}		
+	if(STDNCSign.ProgramPreRunSign)
+	{	// 程式预演功能
+		psGCodeBuffer->Feedrate = STDNCSign.FG0 * System.STDShakeSign;
+	}
+	else
+	{
+		psGCodeBuffer->Feedrate = STDNCSign.F * System.STDShakeSign;
+	}
+	if(psGCodeBuffer->GGroup15 == 61)
+	{
+		if(System.ArcFeedDownRatio != 0)
+		{
+			psGCodeBuffer->Feedrate = divdp( psGCodeBuffer->Feedrate, System.ArcFeedDownRatio );
+		}
+	}
+	
+	//计算园弧所夹角度和园弧长度
+	STD_Deal_ArcStotal(psGCodeBuffer);
+	STD_Deal_DeltaPoint(psGCodeBuffer);
+	//圆弧特殊情况处理段(大直径小角度)
+	if(!(System.FunctionSelectionSwitch_10 & 0x08))
+	{
+		if((psGCodeBuffer->Radius*System.UnitTo_mm) > 100)
+		{
+			if(psGCodeBuffer->DeltaAngle < 0.02)
+			{
+				psGCodeBuffer->CMD1 = 1;
+				psGCodeBuffer->CMD2 = 0;
+				psGCodeBuffer->Stotal = psGCodeBuffer->StotalCheck;							
+			}
+		}
+	}
+	//圆弧特殊情况处理段(圆弧逼近直线)
+	if(!(System.FunctionSelectionSwitch_10 & 0x10))
+	{
+		if(psGCodeBuffer->Stotal < psGCodeBuffer->StotalCheck)
+		{
+			psGCodeBuffer->CMD1 = 1;
+			psGCodeBuffer->CMD2 = 0;
+			psGCodeBuffer->Stotal = psGCodeBuffer->StotalCheck;			
+		}
+	}
+	//圆弧特殊情况处理段(圆弧弧长过小)
+	if(!(System.FunctionSelectionSwitch_10 & 0x20))
+	{
+		if(psGCodeBuffer->Stotal < 0.003)	
+		{
+			psGCodeBuffer->CMD1 = 0x64;
+			psGCodeBuffer->CMD2 = 0xff;		
+			psGCodeBuffer->MoveCodeSign = 0;
+			psGCodeBuffer->Vveer = psGCodeBuffer->Feedrate*2;
+		}
+	}
+	
+	//STD_Deal_FlexuousAxis(psGCode);	
+	OverallSign.FlexuousAxisSign.X = 0;
+	OverallSign.FlexuousAxisSign.Y = 0;
+	OverallSign.FlexuousAxisSign.Z = 0;	
+	psGCodeBuffer->FlexuousAxisSign = 0;
+	
+	STD_Deal_Vveer(psGCodeBuffer);
+
+	//CH0906 被优化的短线段不能作为衔接终点
+	if(psGCodeBuffer->CMD1 == 0x64)	
+		return ;	
+	
+	OverallSign.LastMoveCodeEndVector = psGCodeBuffer->EndPointVector;	
+	OverallSign.STDLastMoveGCode.EndPoint = psGCodeBuffer->EndPoint;
+	OverallSign.LastGCodePointer = psGCodeBuffer;
+}
+
+INT16U STD_Rec_Length(tsCODE_SUB *psCode)
+{
+	INT16U CodeLength;
+	switch(psCode->CMDMain)
+	{
+		case  0:		
+		case  1: 
+			CodeLength=sizeof(tsCODE_G00);
+			break;
+		case  2: 
+		case  3: 
+			CodeLength=sizeof(tsCODE_G02);
+			break;
+		case  4: 
+			CodeLength=sizeof(tsCODE_G04);
+			break; 
+		case 30: 
+		case 31: 
+			CodeLength=sizeof(tsCODE_G30);
+			break;
+		case 43: 
+			CodeLength=sizeof(tsCODE_G43);
+			break;	
+		case 0x64: 
+			if(psCode->CMDSub==0x04)
+				CodeLength=sizeof(tsCODE_F);
+			else
+				CodeLength=sizeof(tsCODE_S);
+			break; 	
+		case 0x65:
+			if(psCode->CMDSub==6)
+				CodeLength=sizeof(tsCODE_M06);
+			else if((psCode->CMDSub==251)||(psCode->CMDSub==252)||(psCode->CMDSub==253))
+				CodeLength=sizeof(tsCODE_M251);
+			//else if((psCode->CMDSub==240)||(psCode->CMDSub==241))
+			//	CodeLength=sizeof(tsCODE_M251);
+			else
+				CodeLength=sizeof(tsCODE_MSUB);
+			break;
+		//case 0xff: 		
+		default:	
+			CodeLength=sizeof(tsCODE_SUB);
+			break;
+	}
+	return CodeLength;
+}
+
+void STD_Rec_G00(tsCODE_G00 *psCodeG00)
+{	
+	psGCodeBuffer->EndPoint.X = psCodeG00->X;
+	psGCodeBuffer->EndPoint.Y = psCodeG00->Y;
+	psGCodeBuffer->EndPoint.Z = psCodeG00->Z+OverallSign.Z_CompesationLength;
+	
+	psGCodeBuffer->StartPoint = OverallSign.STDLastMoveGCode.EndPoint;		
+	psGCodeBuffer->GGroup02 = STDNCSign.GGroup02;
+	psGCodeBuffer->GGroup15 = STDNCSign.GGroup15;	//准停模态
+	psGCodeBuffer->Radius = 0;	
+	if((psGCodeBuffer->CMD1 == 0) || (STDNCSign.ProgramPreRunSign))
+	{
+		psGCodeBuffer->Feedrate = STDNCSign.FG0 * System.STDShakeSign;		//G0指令或程式预演功能
+	}
+	else	
+	{
+		psGCodeBuffer->Feedrate = STDNCSign.F * System.STDShakeSign;
+	}
+	if(STDNCSign.GGroup00 == 9)
+	{
+		psGCodeBuffer->GGroup15 = 61;	//只做一次准停定位
+		STDNCSign.GGroup00 = 0;
+	}	
+	STD_Deal_DeltaPoint(psGCodeBuffer);	
+	psGCodeBuffer->Stotal = psGCodeBuffer->StotalCheck;	
+		
+	STD_Deal_FlexuousAxis(psGCodeBuffer);		
+	STD_Deal_Vveer(psGCodeBuffer);
+
+	//CH0906 被优化的短线段不能作为衔接终点
+	if(psGCodeBuffer->CMD1 == 0x64)
+		return ;	
+	OverallSign.LastMoveCodeEndVector = psGCodeBuffer->EndPointVector;	
+	OverallSign.STDLastMoveGCode.EndPoint = psGCodeBuffer->EndPoint;
+	OverallSign.LastGCodePointer = psGCodeBuffer;	
+}
+
+void STD_Rec_G02(tsCODE_G02 *psCodeG02)
+{
+	psGCodeBuffer->GGroup02 = STDNCSign.GGroup02;
+	psGCodeBuffer->StartPoint = OverallSign.STDLastMoveGCode.EndPoint;	
+	if(psGCodeBuffer->GGroup02 == 17) //xy plane
+	{
+		psGCodeBuffer->EndPoint.X = psCodeG02->X;
+		psGCodeBuffer->EndPoint.Y = psCodeG02->Y;
+		psGCodeBuffer->EndPoint.Z = psGCodeBuffer->StartPoint.Z;			
+		psGCodeBuffer->CenterPoint.X = psCodeG02->I;
+		psGCodeBuffer->CenterPoint.Y = psCodeG02->J;
+		psGCodeBuffer->CenterPoint.Z = psGCodeBuffer->StartPoint.Z;	
+	}
+	else if(psGCodeBuffer->GGroup02 == 18) //xz plane
+	{
+		psGCodeBuffer->EndPoint.X = psCodeG02->X;
+		psGCodeBuffer->EndPoint.Y = psGCodeBuffer->StartPoint.Y;			
+		psGCodeBuffer->EndPoint.Z = psCodeG02->Y+OverallSign.Z_CompesationLength;
+		psGCodeBuffer->CenterPoint.X = psCodeG02->I;
+		psGCodeBuffer->CenterPoint.Y = psGCodeBuffer->StartPoint.Y;			
+		psGCodeBuffer->CenterPoint.Z = psCodeG02->J+OverallSign.Z_CompesationLength;	
+	}
+	else if(psGCodeBuffer->GGroup02 == 19) //yz plane
+	{
+		psGCodeBuffer->EndPoint.X = psGCodeBuffer->StartPoint.X;			
+		psGCodeBuffer->EndPoint.Y = psCodeG02->X;
+		psGCodeBuffer->EndPoint.Z = psCodeG02->Y+OverallSign.Z_CompesationLength;
+		psGCodeBuffer->CenterPoint.X = psGCodeBuffer->StartPoint.X;			
+		psGCodeBuffer->CenterPoint.Y = psCodeG02->I;
+		psGCodeBuffer->CenterPoint.Z = psCodeG02->J+OverallSign.Z_CompesationLength;
+	}
+	STD_Rec_Arc(psCodeG02);
+}
+
+void STD_Rec_G04(tsCODE_G04 *psCodeG04)			
+{	
+	psGCodeBuffer->StartPoint.X = psCodeG04->P*System.UnitTo_mm*1000;	//store G04DelayT...temporary use system.UintTo_mm as conversion...}
+}
+
+void STD_Rec_G30(tsCODE_G30 *psCodeG30)
+{
+	psGCodeBuffer->GGroup02 = STDNCSign.GGroup02;
+	psGCodeBuffer->StartPoint = OverallSign.STDLastMoveGCode.EndPoint;	
+	if(psGCodeBuffer->GGroup02 == 17) //xy plane
+	{
+		psGCodeBuffer->EndPoint.X = psCodeG30->X;
+		psGCodeBuffer->EndPoint.Y = psCodeG30->Y;
+		psGCodeBuffer->EndPoint.Z = psCodeG30->Z+OverallSign.Z_CompesationLength;			
+		psGCodeBuffer->CenterPoint.X = psCodeG30->I;
+		psGCodeBuffer->CenterPoint.Y = psCodeG30->J;
+		psGCodeBuffer->CenterPoint.Z = psGCodeBuffer->StartPoint.Z;	
+	}
+	else
+	{
+		Error.NCCodeBreak = 1;		
+		Error.MainErrorSign = 1;
+		high_error();		
+		return ;
+	}	
+	STD_Rec_Arc((tsCODE_G02 *)psCodeG30);
+}
+
+void STD_Rec_64FS(tsCODE_F *psCodeGF)	//处理F AND S 代码
+{
+	psGCodeBuffer->StartPoint = OverallSign.STDLastMoveGCode.EndPoint;	//可优化
+	psGCodeBuffer->StartPoint.X=psCodeGF->F;
+	if(psCodeGF->CMDSub==0x04)		
+		STDNCSign.F  = divdp(psCodeGF->F, 60.0 );	//F code   unit: mm/min->mm/s
+}
+
+void STD_Rec_65M(tsCODE_M251 *psCodeM251)	//处理M代码
+{
+	switch(psCodeM251->CMDSub)
+	{
+		case 251:
+		case 252:
+		case 253:
+			psGCodeBuffer->StartPoint.X = psCodeM251->E;
+			break;
+		case 254:
+		case 255:
+			//M254 M255   记忆进给速度用于比例计算
+			psGCodeBuffer->Feedrate = STDNCSign.F * System.STDShakeSign;
+			break;
+		default:
+			break;
+	}
+}
+
+void STD_Rec_All(tsCODE_SUB *psCode)
+{
+	//该模块用于确保数据包格式
+	if((psCode->Length<8)||(psCode->Length>60))
+	{		
+		Error.NCCodeBreak = 1;		
+		Error.MainErrorSign = 1;
+		high_error();		
+		return ;
+	}
+	if(psCode->Length!=STD_Rec_Length(psCode))
+	{		
+		Error.NCCodeBreak = 1;		
+		Error.MainErrorSign = 1;
+		high_error();		
+		return ;
+	}
+	
+	if(psCode->SendCountD <= STDNCSign.RealSendCount) 
+	{	
+		STDNCSign.ArmAgainSendGcodeSign = 1;		//Arm send gcode again sign.
+		return ;
+	}	
+	STDNCSign.RealSendCount = psCode->SendCountD;
+	psGCodeBuffer = &GCodeBuffer[(STDNCSign.RealSendCount-1) % STDGCODE_MOD];	
+	psGCodeBuffer->CodeLength = psCode->Length;
+	psGCodeBuffer->CMD1 = psCode->CMDMain;
+	psGCodeBuffer->CMD2 = psCode->CMDSub;	
+	psGCodeBuffer->SendCount = psCode->SendCountA;	
+	if(psCode->CMDMain>3)
+	{
+		//此处可优化提高执行效率
+		psGCodeBuffer->Stotal = 0;
+		psGCodeBuffer->EndPoint = OverallSign.STDLastMoveGCode.EndPoint; 	//用于单段功能
+	}	
+	switch(psCode->CMDMain)
+	{
+		case  0: STD_Rec_G00((tsCODE_G00 *)psCode);break;		
+		case  1: STD_Rec_G00((tsCODE_G00 *)psCode);break;
+		case  2: STD_Rec_G02((tsCODE_G02 *)psCode);break;
+		case  3: STD_Rec_G02((tsCODE_G02 *)psCode);break;
+		case  4: STD_Rec_G04((tsCODE_G04 *)psCode);break; 
+		case  9: STDNCSign.GGroup00 = 9;break;
+		case 17: STDNCSign.GGroup02 =17;break;
+		case 18: STDNCSign.GGroup02 =18;break;
+		case 19: STDNCSign.GGroup02 =19;break;
+		case 30: STD_Rec_G30((tsCODE_G30 *)psCode);break;
+		case 31: STD_Rec_G30((tsCODE_G30 *)psCode);break;		
+		case 61: STDNCSign.GGroup15 = 61;break;
+		case 64: STDNCSign.GGroup15 = 64;break;
+		case 0x64: STD_Rec_64FS((tsCODE_F *)psCode);break; 	
+		case 0x65: STD_Rec_65M((tsCODE_M251 *)psCode);break;
+		case 0xff: break;
+		default:	break;
+	}
+}
+
+void STD_Add_Code(void)
+{
+	tsGCODE  *psNowCode; 
+	AddLineNCSign.RealSendCount =0;	
+	AddLineNCSign.RealRunCount = 0;
+	AddLineNCSign.LastRealSendCount = 0;
+	NCRunSign.RealSendCount = 0;
+	NCRunSign.RealRunCount = 0;	
+	STDNCSign.AddLineStep = 0;	
+	psNowCode=&GCodeBuffer[(STDNCSign.RealSendCount-1)%STDGCODE_MOD];
+	if(OverallSign.Z_CompesationLengthDelta != 0)
+	{	
+		NC_AREAControl.SingleAddLineOldPoint.Z = NC_AREAControl.SingleAddLineOldPoint.Z + OverallSign.Z_CompesationLengthDelta;
+		OverallSign.STDLastMoveGCode.EndPoint.Z = psNowCode->EndPoint.Z;
+	}
+	OverallSign.STDLastMoveGCode.EndPoint = psNowCode->EndPoint;	
+	while(AddLineNCSign.RealSendCount < (ADDGCODE_MOD-1))
+	{
+		NCRunSign.VeVmCalCount = 0;
+		psNowCode = &AddLineGCodeBuffer[AddLineNCSign.RealSendCount++];
+		psNowCode->MoveCodeSign=1;
+		switch(++STDNCSign.AddLineStep)
+		{
+			case 1:
+				//第一步:单段功能Z 到安全点
+				psNowCode->CMD1 = 0;
+				psNowCode->CMD2 = 0;
+				psNowCode->Feedrate = STDNCSign.FG0 * System.STDShakeSign;
+				psNowCode->SendCount = 1;
+				psNowCode->StartPoint.X = OverallSign.ABS_Coordinate.X;
+				psNowCode->StartPoint.Y = OverallSign.ABS_Coordinate.Y;
+				psNowCode->StartPoint.Z = OverallSign.ABS_Coordinate.Z;
+				psNowCode->EndPoint.X = psNowCode->StartPoint.X;
+				psNowCode->EndPoint.Y = psNowCode->StartPoint.Y;
+				OverallSign.ZSafeHeightNow = STDNCSign.ZSafeHeight + OverallSign.Z_CompesationLength;
+				if( OverallSign.ZSafeHeightNow <= NC_AREAControl.SingleAddLineOldPoint.Z )
+				{	//单段点Z坐标高于换刀点
+					psNowCode->EndPoint.Z = NC_AREAControl.SingleAddLineOldPoint.Z;		
+				}
+				else
+				{
+					psNowCode->EndPoint.Z = OverallSign.ZSafeHeightNow;
+				}	
+				break;
+				
+			case 2:
+				//第二步:单段功能XY  到目标点
+				psNowCode->CMD1 = 0;
+				psNowCode->CMD2 = 0;
+				psNowCode->Feedrate = STDNCSign.FG0 * System.STDShakeSign;
+				psNowCode->SendCount = 2;
+				psNowCode->StartPoint = AddLineGCodeBuffer[0].EndPoint;
+				psNowCode->EndPoint.X = NC_AREAControl.SingleAddLineOldPoint.X;
+				psNowCode->EndPoint.Y = NC_AREAControl.SingleAddLineOldPoint.Y;
+				psNowCode->EndPoint.Z = psNowCode->StartPoint.Z;
+				break;
+				
+			case 3:
+				//第三步:单段功能 Z 到目标点附近
+				psNowCode->CMD1 = 0;
+				psNowCode->CMD2 = 0;
+				psNowCode->Feedrate = STDNCSign.FG0 * System.STDShakeSign;
+				psNowCode->SendCount = 3;
+				psNowCode->StartPoint = AddLineGCodeBuffer[1].EndPoint;
+				psNowCode->EndPoint.X = psNowCode->StartPoint.X;
+				psNowCode->EndPoint.Y = psNowCode->StartPoint.Y;
+				psNowCode->EndPoint.Z = NC_AREAControl.SingleAddLineOldPoint.Z + divdp(3.0,System.UnitTo_mm);
+				break;
+				
+			case 4:
+				//第四步:单段功能Z  到目标点
+				psNowCode->CMD1 = 1;
+				psNowCode->CMD2 = 0;
+				psNowCode->Feedrate = STDNCSign.F * System.STDShakeSign;
+				psNowCode->SendCount = 4;
+				psNowCode->StartPoint = AddLineGCodeBuffer[2].EndPoint;
+				psNowCode->EndPoint.X = psNowCode->StartPoint.X;
+				psNowCode->EndPoint.Y = psNowCode->StartPoint.Y;				
+				psNowCode->EndPoint.Z = NC_AREAControl.SingleAddLineOldPoint.Z;
+				break;
+				
+			default:
+				psNowCode->MoveCodeSign=0;
+				break;
+		}
+		STD_Deal_DeltaPoint(psNowCode);
+		psNowCode->Stotal=psNowCode->StotalCheck;
+		STD_Deal_FlexuousAxis(psNowCode);		
+		STD_Deal_Vveer(psNowCode);
+		NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ] = *psNowCode;
+	}
+	
+	AddLineNCSign.LastRealSendCount = AddLineNCSign.RealSendCount;
+	
+	//NCRunSign.PrecalCode = 0;
+	NCRunSign.NewAreaSign	= 0;
+	//NCRunSign.VeVmCalCount = 1;
+	NCAreaSingle.GetNextSendCount = 0;
+	
+	//initial NC_AREAControl
+	NC_AREAControl.VNow = 0;
+	NC_AREAControl.Snow = 0;
+	NC_AREAControl.VNowOut = 0;		//CH0512
+	NC_AREAControl.Pointer_StartCode = 0;
+	NC_AREAControl.Pointer_SecondInflexionCode = 0;
+	NC_AREAControl.Pointer_EndCode = 0;
+	NC_AREAControl.DeltaStep.X =0;
+	NC_AREAControl.DeltaStep.Y =0;
+	NC_AREAControl.DeltaStep.Z =0;        
+	NC_AREAControl.OldValue.X = 0;                         
+	NC_AREAControl.OldValue.Y = 0;                         
+	NC_AREAControl.OldValue.Z = 0; 
+
+	STDNCSign.Waitsign = 0;
+	
+	//清插补缓冲区
+	InterpolationBuffer[0] = InterpolationBuffer[OverallSign.InterpolationRunCnt%INTERPOLATIONBUFLENGTH];
+	OverallSign.InterpolationSendCnt = 0;
+	OverallSign.InterpolationRunCnt = 0;	
+}
+
+void SPC_Deal_Line(tsGCODE *psNowCode)
+{
+	//GCODE *psSPCGCode;	
+	//psSPCGCode=&SPCGCodeBuffer[(SPCNCSign.RealSendCount-1) % SPCGCODE_MOD];	
+	STD_Deal_DeltaPoint(psNowCode);
+	psNowCode->Stotal=psNowCode->StotalCheck;
+	if(psNowCode->Stotal<0.00001)
+	{
+		psNowCode->Stotal = 0;		
+		psNowCode->EndPointVector = psNowCode->StPointVector ; 
+		OverallSign.LastMoveCodeEndVector = psNowCode->StPointVector;
+		return ;		
+	}
+	psNowCode->StPointVector.X = divdp(psNowCode->DeltaPoint.X, psNowCode->Stotal);
+	psNowCode->StPointVector.Y = divdp(psNowCode->DeltaPoint.Y, psNowCode->Stotal);
+	psNowCode->StPointVector.Z = divdp(psNowCode->DeltaPoint.Z, psNowCode->Stotal);
+	psNowCode->EndPointVector = psNowCode->StPointVector; 
+	OverallSign.LastMoveCodeEndVector = psNowCode->StPointVector;
+	OverallSign.SPCLastMoveGCode.EndPoint = psNowCode->EndPoint;
+
+	NowPrecalMoveSign.X = (psNowCode->DeltaPoint.X>0)?(1):(0);
+	NowPrecalMoveSign.Y = (psNowCode->DeltaPoint.Y>0)?(1):(0);
+	NowPrecalMoveSign.Z = (psNowCode->DeltaPoint.Z>0)?(1):(0);	
+	LastPrecalMoveSign = NowPrecalMoveSign;
+}
+
+void SPC_JudgeSoftLimit(tsGCODE *psNowCode)
+{
+        INT40AXIS    EndPointMACH;
+		
+	if((Reference.FindRefSign.X)&&(Reference.FindRefSign.Y)&&(Reference.FindRefSign.Z))
+	{
+		NCCoord_WorkToMACToLinear(&psNowCode->EndPoint, &EndPointMACH);
+	
+		if((psNowCode->EndPoint.X > psNowCode->StartPoint.X)&&(EndPointMACH.X >= (System.XLimitPos+50)))
+		{
+		        EndPointMACH.X = System.XLimitPos+50;
+			NCCoord_LinearValueX(&EndPointMACH.X);
+			psNowCode->EndPoint.X =EndPointMACH.X - (OverallSign.ABS_MY_OffsetCoordinate.X+OverallSign.MYORG_M_Coordinate.X);
+		}
+		if((psNowCode->EndPoint.Y > psNowCode->StartPoint.Y)&&(EndPointMACH.Y >= (System.YLimitPos+50)))
+		{
+			EndPointMACH.Y = System.YLimitPos+50;
+			NCCoord_LinearValueY(&EndPointMACH.Y);
+			psNowCode->EndPoint.Y =EndPointMACH.Y - (OverallSign.ABS_MY_OffsetCoordinate.Y+OverallSign.MYORG_M_Coordinate.Y);			
+		}
+		if((psNowCode->EndPoint.Z > psNowCode->StartPoint.Z)&&(EndPointMACH.Z >= (System.ZLimitPos+50)))
+		{
+			EndPointMACH.Z = System.ZLimitPos+50;
+			NCCoord_LinearValueZ(&EndPointMACH.Z);
+			psNowCode->EndPoint.Z =EndPointMACH.Z - (OverallSign.ABS_MY_OffsetCoordinate.Z+OverallSign.MYORG_M_Coordinate.Z);			
+		}
+		if((psNowCode->EndPoint.X < psNowCode->StartPoint.X)&&(EndPointMACH.X <= (System.XLimitNeg-50)))
+		{
+			EndPointMACH.X = System.XLimitNeg-50;
+			NCCoord_LinearValueX(&EndPointMACH.X);
+			psNowCode->EndPoint.X =EndPointMACH.X - (OverallSign.ABS_MY_OffsetCoordinate.X+OverallSign.MYORG_M_Coordinate.X);			
+		}
+		if((psNowCode->EndPoint.Y < psNowCode->StartPoint.Y)&&(EndPointMACH.Y <= (System.YLimitNeg-50)))
+		{
+			EndPointMACH.Y = System.YLimitNeg-50;
+			NCCoord_LinearValueY(&EndPointMACH.Y);
+			psNowCode->EndPoint.Y =EndPointMACH.Y - (OverallSign.ABS_MY_OffsetCoordinate.Y+OverallSign.MYORG_M_Coordinate.Y);			
+		}
+		if((psNowCode->EndPoint.Z < psNowCode->StartPoint.Z)&&(EndPointMACH.Z <= (System.ZLimitNeg-50)))
+		{
+			EndPointMACH.Z = System.ZLimitNeg-50;
+			NCCoord_LinearValueZ(&EndPointMACH.Z);
+			psNowCode->EndPoint.Z =EndPointMACH.Z - (OverallSign.ABS_MY_OffsetCoordinate.Z+OverallSign.MYORG_M_Coordinate.Z);			
+		}
+	}	
+}

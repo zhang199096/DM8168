@@ -1,0 +1,59 @@
+#ifndef _STRUCT_POINT_H_
+#define _STRUCT_POINT_H_
+
+#include "datatype.h"
+
+typedef struct 
+{
+	INT32S X; 	//X坐标值 
+	INT32S Y;	//Y坐标值
+	INT32S Z;	//Z坐标值   
+} tsPOINT3A;
+
+typedef struct 
+{
+	INT32S X; 	//X坐标值 
+	INT32S Y;	//Y坐标值
+	INT32S Z;	//Z坐标值  
+	INT32S IV;	//IV坐标值  
+	INT32S V;	//V坐标值  
+} tsPOINT5A;
+
+typedef struct 
+{
+	INT32S X; 	//X坐标值 
+	INT32S Y;	//Y坐标值
+	INT32S Z;	//Z坐标值  
+	INT32S IV;	//IV坐标值  
+	INT32S V;	//V坐标值  
+	INT32S VI;	//V坐标值  
+} tsPOINT6A;
+
+typedef struct 
+{
+	FLOAT64 X; 	//X坐标值 
+	FLOAT64 Y;	//Y坐标值
+	FLOAT64 Z;	//Z坐标值   
+} tsPOINTF3A;
+
+typedef struct 
+{
+	FLOAT64 X; 	//X坐标值 
+	FLOAT64 Y;	//Y坐标值
+	FLOAT64 Z;	//Z坐标值  
+	FLOAT64 IV;	//IV坐标值  
+	FLOAT64 V;	//V坐标值  
+} tsPOINTF5A;
+
+typedef struct 
+{
+	FLOAT64 X; 	//X坐标值 
+	FLOAT64 Y;	//Y坐标值
+	FLOAT64 Z;	//Z坐标值  
+	FLOAT64 IV;	//IV坐标值  
+	FLOAT64 V;	//V坐标值  
+	FLOAT64 VI;	//V坐标值  
+} tsPOINTF6A;
+
+
+#endif

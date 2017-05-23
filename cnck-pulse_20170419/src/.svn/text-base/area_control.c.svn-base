@@ -1,0 +1,4081 @@
+/****************************************************************/
+/* Name :                                                       */
+/*       NC Area Run  Code...                      				*/
+/* Function:                                                    */
+/*       NCAreaRun()                                            */
+/*  Copyright 2008 by LOKSHUN CNC  Equipment LTD.               */
+/*  All rights reserved LOKSHUN CNC  Equipment LTD.             */
+/*	Designed by: DAVID SHEN										*/
+/*   Modified by :ENJOY LU		                                */
+/****************************************************************/
+
+#include "..\\include\\DEC6713_main.h"
+
+#define DSPFunctionDebug   1
+//#pragma DATA_SECTION(NC_AREAControl,".myData");
+tsAREA_CONTROL	NC_AREAControl;
+tsNC_RUN_SIGN 	STDNCSign_Error;
+tsAREA_CONTROL    NC_AREAControl_Error;
+tsNC_RUN_SIGN		NC_AreaRunNCSign_Error;
+
+tsINTERPOLATION_BUFFER InterpolationBuffer[INTERPOLATIONBUFLENGTH+1];
+	
+//区域曲线 运行输出控制Vnow监控
+FLOAT64 VnowMonitor = 0;	
+
+// 区域曲线写插补缓冲区监控
+INT32S MonitorInterpalationXBuf = 0, MonitorInterpalationYBuf = 0, MonitorInterpalationZBuf = 0, MonitorInterpalationZBuf_Real = 0,MonitorInterpalationABuf = 0,MonitorInterpalationUBuf = 0,MonitorInterpalationUBuf_Real=0;
+INT16S MonitorInterPlationBuf[1000];
+INT16U MonitorBuffer1Cnt=0, MonitorBuffer2Cnt=0, MonitorBuffer3Cnt=0,MonitorBuffer4Cnt=0;
+FLOAT64 TapDeltaS = 0;//伺服主轴攻牙误差。Uint:最小输入单位(ZfollowU);Uint:最小输入单位
+
+//NowValue Deltastep 监控
+INT40AXIS PreMACHCoordinate,BehindMACHCoordinate;
+INT16U	InterpolationOverCounter = 0;
+
+INT16U NCArea_RigidTapTransducer(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign)
+{	
+	if(S_Spindle.RunModeSign != S_RunModeRIGID)
+	{
+		return TRUE;
+	}
+
+	if(System.RunState != 0)
+	{
+		return TRUE;
+	}
+
+	if(System.GearDownRate != 1)
+	{
+		S_Spindle.SpeedHz = 0;
+		return FALSE;
+	}
+
+	psAreaGcodeBuffer +=((psAreaRunNCSign->RealRunCount-1) % STDGCODE_MOD);
+	if(NCArea_RigidTapQuit(psAREAControl, psAreaGcodeBuffer) == FALSE)
+	{	//取消刚性攻牙
+		return FALSE;
+	}	
+	
+	NCArea_RigidTapRun(psAREAControl, psAreaGcodeBuffer, psAreaRunNCSign);	
+	return FALSE;
+}
+
+INT16U NCArea_RigidTapQuit(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode)
+{
+	if(psAreaGcode->CMD1==0)
+	{	
+		S_Spindle.RunModeSign = S_RunModeGeneric;
+		S_Spindle.RunSign = S_CW;		
+		// 考虑到刚性攻牙定位误差，重定位起点坐标  CH0506
+		psAreaGcode->StartPoint = psAREAControl->OldValue;	
+		STD_Deal_DeltaPoint(psAreaGcode);
+		psAreaGcode->Stotal=psAreaGcode->StotalCheck;		
+		return FALSE;
+	}
+	return TRUE;
+}
+
+INT16U NCArea_RigidTapRun(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode, tsNC_RUN_SIGN *psAreaRunNCSign)
+{
+	INT16U MoveSign;
+	FLOAT64 DeltaS; 				// Z 轴补偿 unit:mm 			
+
+	if(psAreaRunNCSign->PrecalCode == 0)	
+	{
+		//刚性攻丝预计算
+		if(!NCArea_RigidTapRunPre(psAREAControl,psAreaGcode,psAreaRunNCSign))
+			return TRUE;		
+	}			   
+
+	//速度计算未稳定则返回
+	if(S_Spindle.CalSpeedOKSign != 2)
+	{	
+		return FALSE;
+	}
+
+	//Z 轴跟踪S 轴周期开始计时
+	Timer0.DeltaInterpolationTimer = get_delta_time(Timer0.Z_LastInterpolationCounter);
+	//Z 轴跟踪S 轴周期S_RigidSampleT
+	if(Timer0.DeltaInterpolationTimer < S_RigidSampleT) 		
+	{
+		return FALSE;
+	}
+
+	//更新Z 轴跟踪S 轴周期计数值
+	Timer0.Z_LastInterpolationCounter = Timer0.GenericCounter;
+
+	if(psAreaGcode->GGroup02 == 17)
+	{
+		if(CPLD_EncoderValue(&Z_Encoder))
+		{
+			NCCoord_MACValue(&Z_Encoder , &Z_Servo); 	
+		}
+	}
+	else if(psAreaGcode->GGroup02 == 18)
+	{
+		if(CPLD_EncoderValue(&Y_Encoder))
+		{
+			NCCoord_MACValue(&Y_Encoder , &Y_Servo); 	
+		}
+	}
+	else 
+	{
+		if(CPLD_EncoderValue(&X_Encoder))
+		{
+			NCCoord_MACValue(&X_Encoder , &X_Servo); 	
+		}
+	}
+		
+	if(CPLD_EncoderValue(&U_Encoder))
+	{
+		NCCoord_MACValue(&U_Encoder , &U_Servo);
+	}
+
+	//根据主轴电机编码器反馈值控制Z轴相应跟随运动
+	//按比例全程跟随控制.edited by enjoy 20090808
+	psAREAControl->Snow = divdp((((FLOAT64)U_Encoder.MACH_PositionValue) * System.UnitTo_d),360)*S_Spindle.Z_S_Scale_A;	//根据S轴比例换算出的Z轴目标值
+	if(S_Spindle.RigidMode==S_REVERSETAP)
+	{
+		psAREAControl->Snow = -psAREAControl->Snow;
+	}
+
+	//原理存在疑问
+	//由Z 轴跟随S 轴误差边界值来处理跟踪补偿
+	if(psAreaGcode->GGroup02 == 17)
+	{
+		DeltaS = OverallSign.ABS_Coordinate.Z - S_Spindle.RigidStartValue.Z;
+		MoveSign=OverallSign.TheoryMoveSign.Z;
+	}
+	else if(psAreaGcode->GGroup02 == 18)
+	{
+		DeltaS = OverallSign.ABS_Coordinate.Y - S_Spindle.RigidStartValue.Y;
+		MoveSign=OverallSign.TheoryMoveSign.Y;
+	}
+	else
+	{
+		DeltaS =OverallSign.ABS_Coordinate.X - S_Spindle.RigidStartValue.X;
+		MoveSign=OverallSign.TheoryMoveSign.X;
+	}
+	
+	DeltaS = psAREAControl->Snow-DeltaS*System.UnitTo_mm;	
+	S_Spindle.DeltaSbyRigidKp = S_Spindle.RigidKp * DeltaS;
+	S_Spindle.DeltaSbyRigidKv = S_Spindle.RigidKv * S_Spindle.RealSpeed_r * S_Spindle.Z_S_Scale_A;
+	S_Spindle.DeltaSbyRigidKa = S_Spindle.RigidKa * S_Spindle.Real_a_r * (S_SpeedSampleT*0.001) * S_Spindle.Z_S_Scale_A;
+	if(MoveSign== 0)
+	{	
+		psAREAControl->Snow = psAREAControl->Snow+ (S_Spindle.DeltaSbyRigidKp-S_Spindle.DeltaSbyRigidKv-S_Spindle.DeltaSbyRigidKa);			
+		if(psAREAControl->Snow > psAREAControl->SnowLast)		
+			psAREAControl->Snow = psAREAControl->SnowLast;		
+	}
+	else
+	{
+		psAREAControl->Snow = psAREAControl->Snow + 1.0*S_Spindle.DeltaSbyRigidKp + S_Spindle.DeltaSbyRigidKv+S_Spindle.DeltaSbyRigidKa;		
+		if(psAREAControl->Snow < psAREAControl->SnowLast)
+			psAREAControl->Snow = psAREAControl->SnowLast;
+	}
+	psAREAControl->SnowLast = psAREAControl->Snow;
+
+	// 刚性攻牙中结尾处理标志:置1.
+	if(S_Spindle.SpinSpeedZeroSign == 1)			
+	{		// 判断主轴有无停止
+		if(S_Spindle.RealSpeed < 600000.0)
+		{
+			if(++S_Spindle.RigidSpindleStopCounter > 200)
+			{
+				psAreaRunNCSign->XYZ_Over = 1;
+				SPCNCSign.XYZ_Over = 1;
+				STDNCSign.XYZ_Over = 1;	
+				S_Spindle.RigidTapStartSign = 0;
+			}
+		}
+		//else if(S_Spindle.RealSpeed > 27000)		//(about 300pulse)
+		else 
+		{
+			S_Spindle.RigidSpindleStopCounter = 0;
+		}
+	}
+
+	NCArea_RigidTapRunBack();
+
+	if(psAreaGcode->GGroup02 == 17)
+	{
+		psAREAControl->NowValue.Z = (INT32S)(divdp(psAREAControl->Snow,System.UnitTo_mm)+S_Spindle.RigidStartValue.Z);
+		NCCoord_WorkToMACToLinearOne(&psAREAControl->NowValue, &psAREAControl->NowPointMACHPulseOut, 17);		
+		psAREAControl->DeltaStep.X = 0;
+		psAREAControl->DeltaStep.Y = 0;
+		psAREAControl->DeltaStep.Z = psAREAControl->NowPointMACHPulseOut.Z-psAREAControl->OldPointMACHPulseOut.Z;   
+		if(NCArea_PulseToServoCheck(&psAREAControl->DeltaStep) == FALSE)
+		{	
+			return FALSE;
+		}
+		psAREAControl->OldPointMACHPulseOut.Z = psAREAControl->NowPointMACHPulseOut.Z;		//coordinate inherit.
+		psAREAControl->OldValue.Z = psAREAControl->NowValue.Z;	
+		//处理GAP 消除, 在起点消除反向间隙
+		if(psAreaRunNCSign->NeedBack.Z)
+		{
+			if(psAreaRunNCSign->NeedBack.Z==1) 		//positive gap compensation
+			{
+				psAREAControl->DeltaStep.Z +=System.Gap.Z;
+				OverallSign.MoveSign.Z = 1;   
+			}
+			else if(psAreaRunNCSign->NeedBack.Z==2)	//negtive gap compensation
+			{
+				psAREAControl->DeltaStep.Z -=System.Gap.Z;
+				OverallSign.MoveSign.Z = 0;   
+			}
+		}
+		else
+		{	// 考虑到S 轴在停止时会有抖动，不只在起点才补间隙
+			if(psAREAControl->DeltaStep.Z>0)
+			{	
+				if(OverallSign.MoveSign.Z==0) 
+				{
+					psAREAControl->DeltaStep.Z += System.Gap.Z;
+					psAreaRunNCSign->NeedBack.Z = 0;
+				}
+
+				OverallSign.MoveSign.Z = 1;
+			}
+			else if(psAREAControl->DeltaStep.Z<0)
+			{	
+				if(OverallSign.MoveSign.Z==1) 
+				{
+					psAREAControl->DeltaStep.Z -= System.Gap.Z;
+					psAreaRunNCSign->NeedBack.Z = 0;
+				}
+
+				OverallSign.MoveSign.Z = 0;
+			}
+		}
+		
+		psAREAControl->VNow =divdp( fabs(psAREAControl->DeltaStep.Z),S_RigidSampleT);
+		if(psAreaRunNCSign->NeedBack.Z != 0)
+		{
+			psAreaRunNCSign->NeedBack.Z = 0;
+			psAREAControl->VNow *= 2;
+		}		
+		if(psAREAControl->VNow<VNowMIN)
+		{
+			psAREAControl->VNow = VNowMIN;
+		}
+		else if(psAREAControl->VNow>psAREAControl->Vm)
+		{
+			psAREAControl->VNow = psAREAControl->Vm;
+		}		
+		//计算Z 轴脉冲发生器的TPR
+		 if(psAREAControl->DeltaStep.Z==0) 
+		 {
+			 Z_Servo.PWM_PeriodRegister= 10;
+		 }
+		 else
+		 {			 
+			 Z_Servo.PWM_PeriodRegister = divdp( FPGA_MAX_F, divdp((psAREAControl->VNow*1e6),System.LinearAxisOutUnitEQU));
+			 if(Z_Servo.PWM_PeriodRegister > System.PWM_PeriodRegister_MAX) 	//fmin
+			 {
+				 Z_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MAX;	 
+			 }
+			 else if(Z_Servo.PWM_PeriodRegister < System.PWM_PeriodRegister_MIN) 	//fmax=500kHz
+			 {
+				 Z_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MIN;
+			 }
+		}
+	}
+	else if(psAreaGcode->GGroup02 == 18)
+	{
+		psAREAControl->NowValue.Y = (INT32S)(divdp(psAREAControl->Snow,System.UnitTo_mm)+S_Spindle.RigidStartValue.Y);
+		NCCoord_WorkToMACToLinearOne(&psAREAControl->NowValue, &psAREAControl->NowPointMACHPulseOut, 18);		
+		psAREAControl->DeltaStep.X = 0;
+		psAREAControl->DeltaStep.Z = 0;
+		psAREAControl->DeltaStep.Y = psAREAControl->NowPointMACHPulseOut.Y-psAREAControl->OldPointMACHPulseOut.Y;   
+		if(NCArea_PulseToServoCheck(&psAREAControl->DeltaStep) == FALSE)
+		{	
+			return FALSE;
+		}
+		psAREAControl->OldPointMACHPulseOut.Y = psAREAControl->NowPointMACHPulseOut.Y;		//coordinate inherit.
+		psAREAControl->OldValue.Y = psAREAControl->NowValue.Y;	
+		//处理GAP 消除, 在起点消除反向间隙
+		if(psAreaRunNCSign->NeedBack.Y)
+		{
+			if(psAreaRunNCSign->NeedBack.Y==1) 		//positive gap compensation
+			{
+				psAREAControl->DeltaStep.Y +=System.Gap.Y;
+				OverallSign.MoveSign.Y = 1;   
+			}
+			else if(psAreaRunNCSign->NeedBack.Y==2)	//negtive gap compensation
+			{
+				psAREAControl->DeltaStep.Y -=System.Gap.Y;
+				OverallSign.MoveSign.Y = 0;   
+			}
+		}
+		else
+		{	// 考虑到S 轴在停止时会有抖动，不只在起点才补间隙
+			if(psAREAControl->DeltaStep.Y>0)
+			{	
+				if(OverallSign.MoveSign.Y==0) 
+				{
+					psAREAControl->DeltaStep.Y += System.Gap.Y;
+					psAreaRunNCSign->NeedBack.Y = 0;
+				}
+				OverallSign.MoveSign.Y = 1;
+			}
+			else if(psAREAControl->DeltaStep.Y<0)
+			{	
+				if(OverallSign.MoveSign.Y==1) 
+				{
+					psAREAControl->DeltaStep.Y -= System.Gap.Y;
+					psAreaRunNCSign->NeedBack.Y = 0;
+				}
+				OverallSign.MoveSign.Y = 0;
+			}
+		}		
+		psAREAControl->VNow =divdp( fabs(psAREAControl->DeltaStep.Y),S_RigidSampleT);	
+		if(psAreaRunNCSign->NeedBack.Y != 0)
+		{
+			psAreaRunNCSign->NeedBack.Y = 0;
+			psAREAControl->VNow *= 2;
+		}		
+		if(psAREAControl->VNow<VNowMIN)
+		{
+			psAREAControl->VNow = VNowMIN;
+		}
+		//计算Z 轴脉冲发生器的TPR
+		 if(psAREAControl->DeltaStep.Y==0) 
+		 {
+			 Y_Servo.PWM_PeriodRegister= 10;
+		 }
+		 else
+		 {			 
+			 Y_Servo.PWM_PeriodRegister = divdp( FPGA_MAX_F, divdp((psAREAControl->VNow*1e6),System.LinearAxisOutUnitEQU));
+			 if(Y_Servo.PWM_PeriodRegister > System.PWM_PeriodRegister_MAX) 	//fmin
+			 {
+				 Y_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MAX;	 
+			 }
+			 else if(Y_Servo.PWM_PeriodRegister < System.PWM_PeriodRegister_MIN) 	//fmax=500kHz
+			 {
+				 Y_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MIN;
+			 }
+		}
+	}
+	else
+	{
+		psAREAControl->NowValue.X = (INT32S)(divdp(psAREAControl->Snow,System.UnitTo_mm)+S_Spindle.RigidStartValue.X);
+		NCCoord_WorkToMACToLinearOne(&psAREAControl->NowValue, &psAREAControl->NowPointMACHPulseOut, 19);		
+		psAREAControl->DeltaStep.Z = 0;
+		psAREAControl->DeltaStep.Y = 0;
+		psAREAControl->DeltaStep.X = psAREAControl->NowPointMACHPulseOut.X-psAREAControl->OldPointMACHPulseOut.X;   
+		if(NCArea_PulseToServoCheck(&psAREAControl->DeltaStep) == FALSE)
+		{	
+			return FALSE;
+		}
+		psAREAControl->OldPointMACHPulseOut.X = psAREAControl->NowPointMACHPulseOut.X;		//coordinate inherit.
+		psAREAControl->OldValue.X = psAREAControl->NowValue.X;	
+		//处理GAP 消除, 在起点消除反向间隙
+		if(psAreaRunNCSign->NeedBack.X)
+		{
+			if(psAreaRunNCSign->NeedBack.X==1) 		//positive gap compensation
+			{
+				psAREAControl->DeltaStep.X +=System.Gap.X;
+				OverallSign.MoveSign.X = 1;   
+			}
+			else if(psAreaRunNCSign->NeedBack.X==2)	//negtive gap compensation
+			{
+				psAREAControl->DeltaStep.X -=System.Gap.X;
+				OverallSign.MoveSign.X = 0;   
+			}
+		}
+		else
+		{	// 考虑到S 轴在停止时会有抖动，不只在起点才补间隙
+			if(psAREAControl->DeltaStep.X>0)
+			{	
+				if(OverallSign.MoveSign.X==0) 
+				{
+					psAREAControl->DeltaStep.X += System.Gap.X;
+					psAreaRunNCSign->NeedBack.X = 0;
+				}
+				OverallSign.MoveSign.X = 1;
+			}
+			else if(psAREAControl->DeltaStep.X<0)
+			{	
+				if(OverallSign.MoveSign.X==1) 
+				{
+					psAREAControl->DeltaStep.X -= System.Gap.X;
+					psAreaRunNCSign->NeedBack.X = 0;
+				}
+				OverallSign.MoveSign.X = 0;
+			}
+		}
+		
+		psAREAControl->VNow =divdp( fabs(psAREAControl->DeltaStep.X),S_RigidSampleT);	
+		if(psAreaRunNCSign->NeedBack.X != 0)
+		{
+			psAreaRunNCSign->NeedBack.X = 0;
+			psAREAControl->VNow *= 2;
+		}		
+		if(psAREAControl->VNow<VNowMIN)
+		{
+			psAREAControl->VNow = VNowMIN;
+		}
+		//计算Z 轴脉冲发生器的TPR
+		 if(psAREAControl->DeltaStep.X==0) 
+		 {
+			 X_Servo.PWM_PeriodRegister= 10;
+		 }
+		 else
+		 {			 
+			 X_Servo.PWM_PeriodRegister = divdp( FPGA_MAX_F, divdp((psAREAControl->VNow*1e6),System.LinearAxisOutUnitEQU));
+			 if(X_Servo.PWM_PeriodRegister > System.PWM_PeriodRegister_MAX) 	//fmin
+			 {
+				 X_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MAX;	 
+			 }
+			 else if(X_Servo.PWM_PeriodRegister < System.PWM_PeriodRegister_MIN) 	//fmax=500kHz
+			 {
+				 X_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MIN;
+			 }
+		}
+	}
+
+	NCArea_JudgeLimit(psAREAControl);			//如到极限位，相应轴输出脉冲清除
+
+	if(NCArea_PulseToServoCheck(&psAREAControl->DeltaStep) == FALSE)
+	{
+		return FALSE;
+	}
+	
+	NCArea_InterpolationBuffer(psAREAControl);
+	
+	//主轴速度处理	
+	if(S_Spindle.SpinSpeedZeroSign)
+	{	// 已到结尾，主轴速度不再处理
+		return TRUE;					
+	}
+
+	//确保不超过范围
+	if(OverallSign.TheoryMoveSign.Z == 0)
+	{	// 负向运动
+		if(OverallSign.ABS_Coordinate.Z < psAreaGcode->EndPoint.Z)
+		{
+			S_Spindle.SpinSpeedSet_A = 0;
+			S_Spindle.SpinSpeedZeroSign = 1;
+			S_Spindle.RigidSpindleStopCounter = 0;	//CH0603
+			return TRUE;	
+		}
+	}
+	else
+	{	// 正向运动
+		if(OverallSign.ABS_Coordinate.Z > psAreaGcode->EndPoint.Z)
+		{
+			S_Spindle.SpinSpeedSet_A = 0;
+			S_Spindle.SpinSpeedZeroSign = 1;
+			S_Spindle.RigidSpindleStopCounter = 0;	//CH0603
+			return TRUE;
+		}
+	}
+	//  轴剩余距离  unit:mm
+	if(psAreaGcode->GGroup02 == 17)
+	{	
+		S_Spindle.S_RemainDistance = (OverallSign.ABS_Coordinate.Z-psAreaGcode->EndPoint.Z);
+	}	
+	else if(psAreaGcode->GGroup02 == 18)
+	{
+		S_Spindle.S_RemainDistance = (OverallSign.ABS_Coordinate.Y-psAreaGcode->EndPoint.Y);
+	}
+	else
+	{
+		S_Spindle.S_RemainDistance = (OverallSign.ABS_Coordinate.X-psAreaGcode->EndPoint.X);
+	}	
+	// 主轴剩余距离unit:r(由  轴剩余距离 得到)
+	S_Spindle.S_RemainDistance = divdp(fabs(S_Spindle.S_RemainDistance*System.UnitTo_mm), S_Spindle.Z_S_Scale_A);	
+	//扩大定位范围，避免冲过头
+	if((S_Spindle.S_RemainDistance*360.0)< (S_Spindle.S_StopDistance+2))
+	{
+		S_Spindle.SpinSpeedSet_A = 0;
+		S_Spindle.SpinSpeedZeroSign = 1;
+		S_Spindle.RigidSpindleStopCounter = 0;	
+		return TRUE;
+	}	
+	
+	S_Spindle.SpinSpeedSet_A = sqrtdp(2*(divdp(S_Spindle.a_de_SET,360.0))*S_Spindle.S_RemainDistance);
+	if((S_Spindle.SpinSpeedSet_A*60.0) > (S_Spindle.SpinSpeedSet*System.STDShakeSign)) 					//unit :r/min
+	{
+		S_Spindle.SpinSpeedSet_A = divdp((S_Spindle.SpinSpeedSet*System.STDShakeSign), 60.0);
+	}
+	if(S_Spindle.SpinSpeedSet_A*360.0 < S_Spindle.S_n_MIN)
+	{
+		S_Spindle.SpinSpeedSet_A = divdp(S_Spindle.S_n_MIN, 360.0);
+	}	
+	//if((S_Spindle.S_RemainDistance*360.0)< (S_Spindle.S_StopDistance+20)) 	
+	if((S_Spindle.S_RemainDistance*360.0) < (5*(1+divdp(S_Spindle.Z_S_Scale_A, 3.0))))
+	{
+		S_Spindle.SpinSpeedSet_A = divdp(S_Spindle.S_n_MIN, 360.0);
+	}	
+	if((System.FunctionSelectionSwitch_04 & 0x20) == 0x20)
+	{
+		if(S_Spindle.SpindleGrade == 0)
+		{
+			S_Spindle.SpinSpeedSet_A = 0;			//刚性攻牙暂停
+		}
+	}
+	return TRUE;
+}
+
+//刚性攻牙开始区
+INT16U NCArea_RigidTapRunPre(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode, tsNC_RUN_SIGN *psAreaRunNCSign)	// 刚性攻牙跟随预计算 
+{
+	INT32S delta_value;
+
+	psAreaRunNCSign->PrecalCode = 1;
+	SPCNCSign.PrecalCode = 1;
+	STDNCSign.PrecalCode = 1;
+	
+	psAREAControl->I = 1;
+
+	if(S_Spindle.RigidBackToolCompleteSign)  //攻丝特殊回退处理  CH0507
+	{
+		if(psAreaGcode->GGroup02 == 17)
+		{
+			if(psAreaGcode->EndPoint.Z >	NCAreaGCodeBuffer[(NCRunSign.RealRunCount-2) % STDGCODE_MOD].EndPoint.Z)
+			{	// 向上运行
+				psAreaGcode->EndPoint.Z = S_Spindle.RigidStartValue.Z;
+				psAreaGcode->Stotal =  fabs(psAreaGcode->EndPoint.Z - psAREAControl->OldValue.Z)* System.UnitTo_mm ;
+			}
+		}
+	}	
+	psAREAControl->Stotal = psAreaGcode->Stotal;
+	if(psAreaGcode->Stotal==0) 
+	{
+		psAreaRunNCSign->XYZ_Over = 1;
+		psAreaRunNCSign->NewAreaSign = 0;
+		SPCNCSign.XYZ_Over = 1;
+		STDNCSign.XYZ_Over = 1;		
+		return FALSE;
+	}
+	
+	S_Spindle.RigidTapStartSign = 1;
+	SpindleOutSignal.bit.ORT = 0;
+	S_Spindle.SpinSpeedZeroSign = 0;
+	S_Spindle.SpinSpeedDecSign = 0;	
+	
+	psAREAControl->Vm = psAreaGcode->Feedrate;	
+
+	NCCoord_WorkToMACToLinear(&psAreaGcode->EndPoint, &psAREAControl->EndPointMachPulseOut);
+	
+	delta_value = psAREAControl->EndPointMachPulseOut.X-psAREAControl->OldPointMACHPulseOut.X;	
+	if((OverallSign.MoveSign.X==0)&&(delta_value>=1))
+		psAreaRunNCSign->NeedBack.X = 1;		//positive gap compensation
+	if((OverallSign.MoveSign.X==1)&&(delta_value<=-1))
+		psAreaRunNCSign->NeedBack.X = 2;		//negtive gap compensation
+	if(delta_value>=1)
+		OverallSign.TheoryMoveSign.X = 1;
+	if(delta_value<=-1)
+		OverallSign.TheoryMoveSign.X = 0;
+
+	delta_value = psAREAControl->EndPointMachPulseOut.Y-psAREAControl->OldPointMACHPulseOut.Y;
+	if((OverallSign.MoveSign.Y==0)&&(delta_value>=1))
+		psAreaRunNCSign->NeedBack.Y = 1;		//positive gap compensation
+	if((OverallSign.MoveSign.Y==1)&&(delta_value<=-1))
+		psAreaRunNCSign->NeedBack.Y = 2;		//negtive gap compensation
+	if(delta_value>=1)
+		OverallSign.TheoryMoveSign.Y = 1;
+	if(delta_value<=-1)
+		OverallSign.TheoryMoveSign.Y = 0;
+
+	delta_value = psAREAControl->EndPointMachPulseOut.Z-psAREAControl->OldPointMACHPulseOut.Z;
+	if((OverallSign.MoveSign.Z==0)&&(delta_value>=1))
+		psAreaRunNCSign->NeedBack.Z = 1;		//positive gap compensation
+	if((OverallSign.MoveSign.Z==1)&&(delta_value<=-1))
+		psAreaRunNCSign->NeedBack.Z = 2;		//negtive gap compensation
+	if(delta_value>=1)
+	{
+		OverallSign.TheoryMoveSign.Z = 1;		//positive 
+	}
+	if(delta_value<=-1)
+	{
+		OverallSign.TheoryMoveSign.Z = 0;		//negtive 
+	}
+	
+	Timer0.Z_LastInterpolationCounter = Timer0.GenericCounter;//更新计数值
+	OverallSign.GapCompensateCnt.X = 0;		//攻牙反向间隙不平摊处理
+	OverallSign.GapCompensateCnt.Y = 0;		//攻牙反向间隙不平摊处理
+	OverallSign.GapCompensateCnt.Z = 0;		//攻牙反向间隙不平摊处理
+
+	return TRUE;
+}
+
+//攻牙断刀回退功能
+void NCArea_RigidTapRunBack(void)
+{
+	if(S_Spindle.RigidBackToolSign == 0)
+	{
+		return ;
+	}
+	
+	if(OverallSign.TheoryMoveSign.Z == 0)
+	{	//Z 轴负向运行
+		if(S_Spindle.RealSpeed < 600000.0)			// 判断主轴有无停止1pulse=360000/4096=88ud.	(about 110pulse)
+		{
+			NCRunSign.XYZ_Over = 1;
+			SPCNCSign.XYZ_Over = 1;
+			STDNCSign.XYZ_Over = 1;
+			S_Spindle.RigidTapStartSign = 0;
+		}			
+	}
+	else
+	{	//Z 轴正向运行
+		if(STDNCSign.XYZ_Over == 1)
+		{
+			if(GCodeBuffer[(STDNCSign.RealRunCount-1) % STDGCODE_MOD].EndPoint.Z == S_Spindle.RigidStartValue.Z)
+			{
+				S_Spindle.RigidBackToolCompleteSign = 1;
+			}
+		}
+	}
+	return ;
+}
+	
+void NCArea_ATCLockStop(tsGCODE *psAreaGcode)
+{	
+	if((AutoAdjustTool.FunctionSign == 0)||(AutoAdjustTool.Style == 1))
+		return ;
+	if((AutoAdjustTool.LockCoordinateSign==1) && (AutoAdjustTool.ZDealEndSign==0))
+	{	
+		//已经锁定坐标但未处理Z 轴终点则停止
+		psAreaGcode->Vm = 0;
+		NC_AREAControl.Vm = 0;		
+		if(NCRunSign.NewAreaSign==1)
+		{
+			NC_AREAControl.VChangeSign = 1;
+		}
+	}
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaGetEndCodeCount()                                   */
+/*  Argument:AREA_CONTROL ,GCODE ,NC_RUN_SIGN   	                                    */
+/*  Return value: EndCodeCount*/
+/*  Function: Get End Code Count                                        */
+/***************************************************************************/
+void NCArea_GetEndCodeCount(tsGCODE *psAreaGcode)
+{//这里使用函数是为了以后扩展为4轴
+	NCRunSign.EndCodeCount = NCRunSign.RealSendCount;	
+	psAreaGcode->Ve = 0;  	//EndCodeCount的Ve必须是0	
+	psAreaGcode->VeCalSign = 9;
+}
+
+INT16U NCArea_FeedrateOverride(tsAREA_CONTROL *psAREAControl, tsGCODE*psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign)
+{		
+	psAreaGcodeBuffer+=((psAreaRunNCSign->RealRunCount-1) % STDGCODE_MOD);
+	NCArea_SpindleStop(psAreaGcodeBuffer);
+	if(NCArea_OverrideChangeFilter(psAREAControl,psAreaGcodeBuffer) == FALSE)
+	{
+		return FALSE;
+	}
+	
+	psAREAControl->VChangeSign = 0;	
+	if( (OverallSign.LastFeedrateOverride != OverallSign.FeedrateOverride) ||(OverallSign.LastRapidFeedrateOverride != OverallSign.RapidFeedrateOverride) )
+	{
+		OverallSign.LastFeedrateOverride = OverallSign.FeedrateOverride;
+		OverallSign.LastRapidFeedrateOverride = OverallSign.RapidFeedrateOverride;
+		psAREAControl->VChangeSign = 1;
+		//if( STDNCSign.SingleModeSign == 0)				
+		NCArea_VmJudge(psAreaGcodeBuffer);		
+	}		
+	return TRUE;
+}
+
+//监控主轴停转问题  CH0701
+void NCArea_SpindleStop(tsGCODE *psAreaGcode)
+{
+	if(OverallSign.NCSign==NCSIGN_STD)
+	{
+		if(S_Spindle.SpindleControlStyle == 3)
+		{
+			return ;
+		}			
+		if((S_Spindle.RunModeSign==S_RunModeGeneric) && (S_Spindle.RunSign!=S_STOP))	
+		{	
+			if((S_Spindle.SpinSpeedSet!=0)&&(S_Spindle.SpeedHz==0))
+			{	//主轴设定转速不为零，但输出为零，XYZ 轴减速停止
+				OverallSign.FeedrateOverride = 0;
+				OverallSign.RapidFeedrateOverride = 0;
+			}
+			
+			if(S_Spindle.UnReachSetSpeedSign == S_SpeedZero)
+			{	//主轴实际速度未达到设定速度最低限则进给暂停
+				OverallSign.FeedrateOverride = 0;
+				OverallSign.RapidFeedrateOverride = 0;
+			}
+			else if(S_Spindle.UnReachSetSpeedSign == S_SpeedAcc)
+			{
+				if((System.FunctionSelectionSwitch_04 & 0x02) == 0x02)
+				{
+					//主轴实际速度未达到设定速度最低限则进给暂停
+					OverallSign.FeedrateOverride = 0;
+					OverallSign.RapidFeedrateOverride = 0;
+				}
+				else
+				{
+					if(psAreaGcode->CMD1 != 0)
+					{
+						//主轴实际速度未达到设定速度最低限则进给暂停
+						OverallSign.FeedrateOverride = 0;
+						OverallSign.RapidFeedrateOverride = 0;
+					}
+				}
+			}
+		}		
+	}
+}
+
+INT16U NCArea_OverrideChangeFilter(tsAREA_CONTROL *psAREAControl,tsGCODE*psAreaGcode)
+{
+	if(AutoAdjustTool.FunctionSign==1)
+	{
+		return TRUE;
+	}	
+
+	if(!(System.FunctionSelectionSwitch_10 & 0x02))
+	{
+		if(psAreaGcode->CMD1 != 0)
+		{
+			return TRUE;
+		}
+	}
+
+	if((psAREAControl->CurrentT > (psAREAControl->T5+divdp(System.Tsample,2)))
+		&&(psAREAControl->CurrentT < (psAREAControl->T9-divdp(System.Tsample,2))))
+	{	//处于减速段
+	    if((OverallSign.FeedrateOverride == 0)||(OverallSign.RapidFeedrateOverride == 0))
+			return TRUE;
+		else
+		    return FALSE;
+	}
+	
+	return TRUE;
+}
+
+void NCArea_VmJudge(tsGCODE*psAreaGcode)
+{		
+	if(psAreaGcode->CMD1 == 0)
+	{
+		if( OverallSign.SPC_HandwheelSim == 1 )
+			psAreaGcode->Vm = 0.01*psAreaGcode->Feedrate*OverallSign.LastRapidFeedrateOverride;
+		else
+			psAreaGcode->Vm = 0.1*psAreaGcode->Feedrate*OverallSign.LastRapidFeedrateOverride;
+	}
+	else
+	{
+		if( OverallSign.SPC_HandwheelSim == 1 )
+			psAreaGcode->Vm = 0.01*psAreaGcode->Feedrate*OverallSign.LastFeedrateOverride;
+		else	
+			psAreaGcode->Vm = 0.1*psAreaGcode->Feedrate*OverallSign.LastFeedrateOverride;
+		//逻辑判断不全面，存在冗余计算降低执行效率(FSnull)
+		if( (psAreaGcode->CMD1 != 1) && (psAreaGcode->CMD1 !=0x65))
+		{	
+			if(System.ArcDownRatio != 0)
+			{
+				FLOAT64 	ARC_MAXFeedrate;			//圆弧最大进给速度,单位:mm/s
+				//处理圆弧定速, 进给速度不能超过ARC_MAXFeedrate
+				ARC_MAXFeedrate=(psAreaGcode->GGroup15 == 61)?(System.a_SET_ARM_Nicety):(System.a_SET_ARM);
+				ARC_MAXFeedrate=divdp( sqrtdp(psAreaGcode->Radius*System.UnitTo_mm*ARC_MAXFeedrate), System.ArcDownRatio );
+				if(psAreaGcode->Vm > ARC_MAXFeedrate)					
+					psAreaGcode->Vm = ARC_MAXFeedrate;					
+			}
+		}
+	}			
+}
+
+INT16U NCArea_FeedrateChangeCheck(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign)
+{
+	if(psAREAControl->VChangeSign==1)
+	{	//如档位有变，则重新计算插补预处理
+		psAREAControl->VChangeSign = 0;		
+		if(psAreaRunNCSign->NewAreaSign)	
+		{
+			NCArea_FeedrateChangeDeal(psAREAControl, psAreaGcodeBuffer, psAreaRunNCSign);
+			return FALSE;
+		}		
+	}
+	
+	if(psAreaRunNCSign->SingleModifyOffsetOrCompesationSign == 1)
+	{
+		psAreaRunNCSign->SingleModifyOffsetOrCompesationSign = 0;		
+		NCArea_FeedrateChangeDeal(psAREAControl, psAreaGcodeBuffer, psAreaRunNCSign);
+		return FALSE;
+	}
+
+	if(AutoAdjustTool.FunctionSign==1)
+	{
+		return TRUE;
+	}
+	
+/*	if(OverallSign.EveryAxisCoinValid)
+	{
+		if((psAreaGcodeBuffer+((psAreaRunNCSign->RealRunCount-1) % STDGCODE_MOD))->CMD1 == 0)
+		{
+			if(OverallSign.RapidFeedrateOverride==0)
+			{
+				return FALSE;
+			}
+		}
+		else
+		{
+			if(OverallSign.FeedrateOverride==0)
+			{
+				return FALSE;
+			}
+		}
+	}*/
+
+	return TRUE;
+}
+
+void NCArea_FeedrateChangeDeal(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign)
+{
+	//for solve big Tolerance.
+	OverallSign.ToleranceBigStep = 0;
+	OverallSign.ToleranceBigCanRunSign = 0;	
+	(psAreaGcodeBuffer+(psAreaRunNCSign->RealRunCount% STDGCODE_MOD))->ToleranceBigSign = 0;
+	psAreaGcodeBuffer+=((psAreaRunNCSign->RealRunCount-1) % STDGCODE_MOD);
+	psAreaGcodeBuffer->ToleranceBigSign = 0;
+
+	//重新计算插补预处理继承			
+	psAreaRunNCSign->NewAreaSign = 0;
+	psAreaRunNCSign->PrecalCode = 0;	
+	psAREAControl->Pointer_EndCode = psAreaRunNCSign->RealRunCount - 1; //start new area
+	psAREAControl->Vs = psAREAControl->VNow; //modified by enjoy 20130509
+
+	NCArea_CoordRenew(psAREAControl, psAreaGcodeBuffer);		
+	psAreaRunNCSign->VeVmCalCount = psAreaRunNCSign->RealRunCount;
+}
+
+void NCArea_CoordRenew(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode)
+{
+	
+	psAreaGcode->StartPoint = psAREAControl->OldValue;
+	psAreaGcode->StartAngle = psAREAControl->CurrentArcAngle;	
+	if( ( psAreaGcode->CMD1 == 2) || (psAreaGcode->CMD1 == 3) ||(psAreaGcode->CMD1 == 30) || (psAreaGcode->CMD1 == 31))
+	{
+		STD_Deal_ArcStotal(psAreaGcode);
+		STD_Deal_Vveer(psAreaGcode); 
+	}	
+	else 
+	{
+		STD_Deal_DeltaPoint(psAreaGcode);
+		psAreaGcode->Stotal = psAreaGcode->StotalCheck;
+		 //直线不需要重新计算矢量
+	}
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaCoordinateRenew()                                   */
+/*  Argument:AREA_CONTROL ,GCODE ,NC_RUN_SIGN   	                                    */
+/*  Return value: 0:VChange cal. not complete;1:VChange cal. complete*/
+/*  Function: VChange cal                                    */
+/***************************************************************************/
+INT16U NCArea_CoordinateRenewSPC(tsGCODE *RiGcodePointer)
+{
+	FLOAT64 	x1,y1,z1;
+		
+	RiGcodePointer->StartPoint = NC_AREAControl.OldValue;
+	RiGcodePointer->StartPoint.X = divdp( NC_AREAControl.OldValue.X , 1);
+	RiGcodePointer->StartPoint.Y = divdp( NC_AREAControl.OldValue.Y , 1);
+	RiGcodePointer->StartPoint.Z = divdp( NC_AREAControl.OldValue.Z , 1);
+
+	x1 = (RiGcodePointer->EndPoint.X-RiGcodePointer->StartPoint.X)*System.UnitTo_mm;	//mm
+	y1 = (RiGcodePointer->EndPoint.Y-RiGcodePointer->StartPoint.Y)*System.UnitTo_mm;	//mm
+	z1 = (RiGcodePointer->EndPoint.Z-RiGcodePointer->StartPoint.Z)*System.UnitTo_mm;	//mm
+	RiGcodePointer->Stotal = sqrtdp(powdp(x1,2)+powdp(y1,2)+powdp(z1,2));
+    return TRUE;
+}
+
+FLOAT64 NCArea_VmGet(tsGCODE *psAreaGcode) 
+{     
+	NCArea_VmJudge(psAreaGcode);
+	NCArea_ATCLockStop(psAreaGcode);	
+	NCArea_VmLimit(psAreaGcode);	
+	return (psAreaGcode->Vm);
+} 
+
+void NCArea_VmLimit(tsGCODE *psAreaGcode)
+{
+	FLOAT64 VX,VY,VZ,VTemp;	//由各轴反算的速度值mm/s
+
+	if(psAreaGcode->Stotal == 0)
+		return ;
+	
+	if(psAreaGcode->CMD1<2)
+	{
+		if(fabs(psAreaGcode->EndPointVector.X) < 0.001)
+		{
+			VX = 1000;
+		}
+		else
+		{
+			VX = divdp( System.MAXSpeed.X, fabs(psAreaGcode->EndPointVector.X) );
+		}
+		if(fabs(psAreaGcode->EndPointVector.Y) < 0.001)
+		{
+			VY = 1000;
+		}
+		else
+		{
+			VY = divdp( System.MAXSpeed.Y, fabs(psAreaGcode->EndPointVector.Y) );
+		}
+		if(fabs(psAreaGcode->EndPointVector.Z) < 0.001)
+		{
+			VZ = 1000;
+		}
+		else
+		{
+			VZ = divdp( System.MAXSpeed.Z, fabs(psAreaGcode->EndPointVector.Z) );
+		}
+		//取最小值
+		VTemp = VX;
+		if(VTemp > VY)
+		{
+			VTemp = VY;
+		}
+		if(VTemp > VZ)
+		{
+			VTemp = VZ;
+		}
+		if(psAreaGcode->Vm > VTemp)	
+			psAreaGcode->Vm = VTemp;
+	}
+	else if((psAreaGcode->CMD1==2) || (psAreaGcode->CMD1==3) ||(psAreaGcode->CMD1==30)|| (psAreaGcode->CMD1==31))
+	{
+		if(psAreaGcode->GGroup02 == 17) //xy plane
+		{
+			VTemp = System.MAXSpeed.X;
+			if(VTemp > System.MAXSpeed.Y)
+			{
+				VTemp = System.MAXSpeed.Y;
+			}
+		}
+		else if(psAreaGcode->GGroup02 == 18) //xz plane
+		{
+			VTemp = System.MAXSpeed.X;
+			if(VTemp > System.MAXSpeed.Z)
+			{
+				VTemp = System.MAXSpeed.Z;
+			}
+		}
+		else if(psAreaGcode->GGroup02 == 19) //yz plane
+		{
+			VTemp = System.MAXSpeed.Y;
+			if(VTemp > System.MAXSpeed.Z)
+			{
+				VTemp = System.MAXSpeed.Z;
+			}
+		}
+		if(psAreaGcode->Vm > VTemp)	
+			psAreaGcode->Vm = VTemp;
+	}	
+
+	if(OverallSign.NCSign != NCSIGN_STD)
+		return ;	
+
+	//判断程序可简化
+	if(psAreaGcode->CMD1 != 0)
+	{
+		if(psAreaGcode->Vm > System.Vclamp)
+		{
+			psAreaGcode->Vm = System.Vclamp;
+		}		
+	}
+}
+
+/***************************************************************************/
+/*  Function name: NCArea_Cal_i1_i2_BowstringError()                                   */
+/*  Argument:GCODE ,i1,i2   	                                    */
+/*  Return value: BowstringError							*/
+/*计算i1线段和i2线段的转角关系				*/
+/*  Function: NCArea_Cal_i1_i2_BowstringError                                       */
+/***************************************************************************/
+FLOAT64	NCArea_Cal_i1_i2_Vveer(FLOAT64 a_de, INT32U i1,INT32U i2, FLOAT32 vset)
+{
+	FLOAT64 		Vveer2,vx,vy,vz,Vveer;
+	VECTOR		I1EndVector,I2StartVector;
+	FLOAT64 		cos_angle,sin_half_angle,Angle,Angle_temp,Maxsine; 
+	tsGCODE		*i1CodePT,*i2CodePT;
+	FLOAT64 		Len;
+	INT32U		i;
+
+	if( i1==NCRunSign.EndCodeCount )
+	{
+		return FALSE;
+	}
+	
+	i1CodePT = &NCAreaGCodeBuffer[(i1-1) % STDGCODE_MOD];
+	i2CodePT = &NCAreaGCodeBuffer[(i2-1) % STDGCODE_MOD];
+	
+	if(i1CodePT->AxisMotionStyle == 4)
+	{
+		return i1CodePT->Vveer;
+	}
+
+	if( fabs( i1CodePT->Stotal ) <= System.Min_CodeStotal  )
+	{
+		Vveer2 = 10000;//不减速
+		return Vveer2;
+	}
+
+	if( fabs( i2CodePT->Stotal )<=System.Min_CodeStotal  )
+	{
+		for( i = i2+1; i<=NCRunSign.EndCodeCount; i++ )
+		{
+			i2CodePT = &NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD];			
+			if( fabs( i2CodePT->Stotal )>System.Min_CodeStotal )
+			{
+				break;
+			}
+		}
+		if( i == NCRunSign.EndCodeCount + 1 )
+		{
+			return FALSE;
+		}
+		i2 = i;
+		i2CodePT = &NCAreaGCodeBuffer[(i2-1) % STDGCODE_MOD];		
+	}
+
+	I1EndVector   = i1CodePT->EndPointVector;
+	I2StartVector = i2CodePT->StPointVector;	
+		
+	if( vset>0 )
+	{
+		Vveer = vset;
+		vx = vset*( I2StartVector.X - I1EndVector.X );//mm/s
+		if( fabs(vx)>System.AxisAngleLimitSpeed.X )
+		{
+			if( fabs( I2StartVector.X - I1EndVector.X )<=0.00000001 )
+			{
+				vset = 0;
+			}
+			else
+			{
+				vset = fabs( divdp( System.AxisAngleLimitSpeed.X , ( I2StartVector.X - I1EndVector.X ) ) );
+			}
+		}
+
+		vy = vset*( I2StartVector.Y - I1EndVector.Y );//mm/s
+		if( fabs(vy)>System.AxisAngleLimitSpeed.Y )
+		{
+			if( fabs( I2StartVector.Y - I1EndVector.Y )<=0.00000001 )
+			{
+				vset = 0;
+			}
+			else
+			{		
+				vset  = fabs( divdp( System.AxisAngleLimitSpeed.Y, ( I2StartVector.Y - I1EndVector.Y ) ) );
+			}
+		}	
+		
+		vz = vset*( I2StartVector.Z - I1EndVector.Z );//mm/s
+		if( fabs(vz)>System.AxisAngleLimitSpeed.Z )
+		{
+			if( fabs( I2StartVector.Z - I1EndVector.Z )<=0.00000001 )
+			{
+				vset = 0;
+			}
+			else
+			{		
+				vset  = fabs( divdp( System.AxisAngleLimitSpeed.Z, ( I2StartVector.Z - I1EndVector.Z ) ) );
+			}
+		}
+		
+		if( vset<0 || vset>Vveer )
+		{
+			vset = 0;
+		}
+		Vveer2 = vset;
+	}
+	else
+	{	
+		//根据交点总矢量变化特征确定合成允许交点速度
+		cos_angle = I1EndVector.X*I2StartVector.X+I1EndVector.Y*I2StartVector.Y+I1EndVector.Z*I2StartVector.Z;
+		sin_half_angle = sqrtdp( divdp( fabs(1-cos_angle), 2) ) ;
+		Angle =  divdp( acosdp( cos_angle )*180,PI );
+
+		if( Angle < ( System.VeerMinAngle + 0.5 ) )
+		{		
+			if( i2CodePT->Stotal > System.Veer2_SearchLen )
+			{
+				Vveer2 = 10000;//不减速
+				return Vveer2;
+			}
+			else
+			{
+				Len = i2CodePT->Stotal;
+				Maxsine = -1.0;
+				for( i = i2+1; i<NCRunSign.EndCodeCount; i++ )
+				{
+					i2CodePT = &NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD];
+					I2StartVector = i2CodePT->StPointVector;	
+					cos_angle = I1EndVector.X*I2StartVector.X+I1EndVector.Y*I2StartVector.Y+I1EndVector.Z*I2StartVector.Z;
+					Angle =  divdp( acosdp( cos_angle )*180,PI );
+					
+					if( fabs( i2CodePT->Stotal )<=System.Min_CodeStotal  )
+					{
+						Len = Len + i2CodePT->Stotal;	
+						continue;
+					}
+					
+					Angle_temp = NCArea3_CodeAngle3( i-1 , i );
+					if( Angle_temp > System.VeerMinAngle )
+					{
+						System.VeerMinAngle = System.VeerMinAngle;
+						break;
+					}
+		
+					if( Angle >= ( System.VeerMinAngle_2 + 0.5 ) )
+					{
+						sin_half_angle = sqrtdp( divdp( fabs(1-cos_angle), 2) ) ;
+						if(sin_half_angle < 0.0001)
+						{
+							sin_half_angle = 0.0001;
+						}	
+						
+						if( Maxsine < sin_half_angle )
+						{
+							Maxsine = sin_half_angle;
+						}
+					}
+					
+					Len = Len + i2CodePT->Stotal;	
+					if( System.Veer2_SearchLen < Len )
+					{					
+						break;
+					}				
+				}
+				if( Maxsine < 0 )
+				{
+					Vveer2 = 10000;//不减速
+					return Vveer2;			
+				}
+				else
+				{
+					sin_half_angle = Maxsine;
+				}
+			}
+		}
+		
+			
+		if(i1CodePT->GGroup15 == 61)
+		{
+			Vveer2 = divdp( System.VeerDecA * System.NicetyVeerDeltaT, (2*sin_half_angle) );
+		}
+		else
+		{
+			Vveer2 = divdp( System.VeerDecA * System.VeerDeltaT, (sin_half_angle) );	
+		}
+
+	}
+
+	////////////////add by le 20140311///////////////
+	if( Vveer2 < 0 || Vveer2 > 10000 )
+	{
+		Vveer2 = 0;
+	}
+	///////////////////////////////////////////////
+
+	return Vveer2;
+}
+
+/********************************************************************************
+*		早期S曲线算法STD_SPC 区域曲线: 	时间对插补周期量化
+*
+* 1. 稳速段: 	不做量化，插补尾巴由区域终点算法处理。
+
+* 2. 加速段: 	做量化，因为实际加速度未知，所以要用S,Vs,Ve
+				定出DeltaT1，再对DeltaT1做量化，修正加速度，修
+				正加速度时，根据公式s=powdp( Vm,2)/a,必须更改Vm。
+				
+* 3. 减速段: 	同加速段。
+
+* 4. 单条代码: 重点是按照公式修正Vm；
+
+* 4. 特殊代码: 单独针对于Vs>Vm的情况。
+
+********************************************************************************/
+
+/***************************************************************************/
+/*  Function name: NCAreaControl()                                   */
+/*  Argument:AREA_CONTROL ,GCODE ,NC_RUN_SIGN   	                                    */
+/*  Return value: 0:AreaControl not complete;1:AreaControl complete*/
+/*  Function: AreaControl                                 */
+/***************************************************************************/
+INT16U NCArea_Control()
+{
+	if( NC_AREAControl.AreaPreCalStep == 1 )
+	{
+		NCArea3_CalSs2(); 
+		NC_AREAControl.AreaPreCalStep = 2;
+		NC_AREAControl.AreaPreCalStep2add = 0;
+	}
+
+	if( NC_AREAControl.AreaPreCalStep == 2 )
+	{
+		NC_AREAControl.AreaPreCalStep2add++;	
+		if( NC_AREAControl.AreaPreCalStep2add > 20 )
+		{
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode;
+			NC_AREAControl.Pointer_FirstInflexionCode = NC_AREAControl.Pointer_EndCode;
+			NC_AREAControl.Pointer_SecondInflexionCode = NC_AREAControl.Pointer_FirstInflexionCode;
+			NC_AREAControl.Ve = System.VeerDeltaV;
+			NC_AREAControl.a_ac = System.NCAreashortA;
+			NC_AREAControl.a_de = System.NCAreashortA;	
+			NC_AREAControl.AreaPreCalStep = 3;
+		}
+		else
+		{
+			if( NCArea3_FirstInflexion2() == FALSE )
+			{
+				return FALSE;
+			}
+			NC_AREAControl.AreaPreCalStep = 3;
+		}
+	}
+	
+	if( NC_AREAControl.AreaPreCalStep == 3 )
+	{
+		NC_AREAControl.AreaPreCalStep2add=0;
+		NC_AREAControl.Pointer_SecondInflexionCode = NC_AREAControl.Pointer_FirstInflexionCode;
+		NCArea_RunPreCal();	
+		NC_AREAControl.AreaPreCalStep = 1;
+	}
+
+	return TRUE;
+}
+
+
+/***************************************************************************/
+/*  Function name: NCAreaVminSet()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaVminSetl.                          */
+/***************************************************************************/
+FLOAT64 NCArea_VminSet (tsGCODE * RiCodePT)
+{
+	FLOAT64 Vmin;
+	
+	//确定当前代码最小速度
+	
+	if(((OverallSign.NCSign == NCSIGN_SPC)&&((System.FunctionSelectionSwitch_08 & 0x02)!=0x02))||
+		(RiCodePT->CMD1 == 0))
+	{
+		Vmin = System.VeerDeltaV;	
+	}
+	else
+	{
+		if( RiCodePT->GGroup15 == 61)
+		{
+			Vmin = System.NicetyVeerDeltaV;
+		}
+		else
+		{
+			Vmin = System.VeerDeltaV;	
+		}
+	}
+	return Vmin;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaAccelerationSet()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: search distance cal.not complete;1: search distance cal. complete*/
+/*  Function: search distance cal.                          */
+/***************************************************************************/
+INT16U	NCArea_AccelerationSet(tsAREA_CONTROL *AREAControl,INT32U i)
+{
+	tsGCODE 			*RiCodePT;
+	FLOAT64 			Vmax;
+			
+	RiCodePT = &NCAreaGCodeBuffer[(i - 1)% STDGCODE_MOD];	
+
+	AREAControl->VMin = NCArea_VminSet(RiCodePT);
+
+	if( AREAControl->Vs > RiCodePT->Vm)
+	{
+		Vmax = AREAControl->Vs;
+	}
+	else
+	{
+		Vmax = RiCodePT->Vm;
+	}
+	
+	if( RiCodePT->GGroup15 == 61)
+	{
+		AREAControl->a_ac = System.a_SET_ARM_Nicety;
+		AREAControl->a_de = System.a_SET_ARM_Nicety;
+		AREAControl->Tao_ac = System.ExponentTimeConstant_Nicety;
+		AREAControl->Tao_de = System.ExponentTimeConstant_Nicety;
+		AREAControl->Tao_ac_line = System.TimeConstant_ac;
+		AREAControl->Tao_de_line = System.TimeConstant_de;
+		AREAControl->Vclamp = System.Vclamp;	
+	}
+	else
+	{
+		System.a_SET = System.a_SET_ARM;
+		AREAControl->a_ac = System.a_SET;
+		AREAControl->a_de = System.a_SET;		
+		AREAControl->Tao_ac = System.ExponentTimeConstant_ac;
+		AREAControl->Tao_de = System.ExponentTimeConstant_de;	
+		AREAControl->Tao_ac_line = System.TimeConstant_ac;
+		AREAControl->Tao_de_line = System.TimeConstant_de;
+		AREAControl->Vclamp = System.Vclamp;	
+
+		if(((OverallSign.NCSign == NCSIGN_SPC)&&((System.FunctionSelectionSwitch_08 & 0x02)!=0x02)))
+		{
+			AREAControl->Vclamp = System.Vclamp_SPC;
+			AREAControl->a_ac = divdp(Vmax,(divdp(AREAControl->Vclamp,System.a_SET_ARM)));
+			AREAControl->a_de = AREAControl->a_ac;	
+		}
+		else if(RiCodePT->CMD1 == 0)
+		{
+			AREAControl->Vclamp = AREAControl->Vclamp;
+		}
+		else
+		{	
+			if((System.AreaControlModle & 0x0F)== 0x00)
+			{
+				if(OverallSign.UsualAccelerateStyle == RatioConstant)
+				{
+					AREAControl->a_ac = System.a_SET_ARM;
+					AREAControl->a_de = System.a_SET_ARM;		
+				}
+				else
+				{	
+					AREAControl->a_ac = divdp(Vmax,(divdp(AREAControl->Vclamp,System.a_SET_ARM)));
+					AREAControl->a_de = AREAControl->a_ac;	
+				}
+			}
+			else if((System.AreaControlModle & 0x0F)== 0x01)
+			{
+				if(OverallSign.UsualAccelerateStyle == RatioConstant)
+				{
+					AREAControl->a_ac = divdp(AREAControl->Vclamp,(AREAControl->Tao_ac_line*0.8));
+					AREAControl->a_de = divdp(AREAControl->Vclamp,(AREAControl->Tao_de_line*0.8));	
+				}
+				else
+				{	
+					AREAControl->a_ac = divdp(Vmax,(AREAControl->Tao_ac_line*0.8));
+					AREAControl->a_de = divdp(Vmax,(AREAControl->Tao_de_line*0.8));	
+				}
+			}
+			else if((System.AreaControlModle & 0x0F)== 0x02)
+			{
+				if(OverallSign.UsualAccelerateStyle == RatioConstant)
+				{
+					AREAControl->a_ac = divdp(AREAControl->Vclamp,AREAControl->Tao_ac_line);	//匀加速加速度(斜率)
+					AREAControl->a_de = divdp(AREAControl->Vclamp,AREAControl->Tao_de_line);	//匀减速加速度(斜率)
+				}
+				else
+				{
+					AREAControl->a_ac = divdp(Vmax,AREAControl->Tao_ac_line);	//匀加速加速度(斜率)
+					AREAControl->a_de = divdp(Vmax,AREAControl->Tao_de_line);	//匀减速加速度(斜率)
+				}
+			}
+			else if((System.AreaControlModle & 0x0F)== 0x04)
+			{
+				if(OverallSign.UsualAccelerateStyle == RatioConstant)
+				{
+					AREAControl->Tao_ac = divdp(AREAControl->Tao_ac_line,logdp(AREAControl->Vclamp));
+					AREAControl->Tao_de = divdp(AREAControl->Tao_de_line,logdp(AREAControl->Vclamp));	
+				}
+				else
+				{
+					if(Vmax < e)
+					{
+						Vmax = e;
+					}
+					AREAControl->Tao_ac = divdp(AREAControl->Tao_ac_line,logdp(Vmax));
+					AREAControl->Tao_de = divdp(AREAControl->Tao_de_line,logdp(Vmax));	
+				}
+			}
+			else if((System.AreaControlModle & 0x0F)== 0x05)
+			{
+				if((System.FunctionSelectionSwitch_06 & 0x02)== 0x02)
+				{
+					if(OverallSign.UsualAccelerateStyle == RatioConstant)
+					{
+						AREAControl->Tao_ac = divdp(0.5*AREAControl->Tao_ac_line,logdp(0.5*AREAControl->Vclamp+0.5));
+						AREAControl->Tao_de = divdp(AREAControl->Tao_de_line,logdp(AREAControl->Vclamp));	
+					}
+					else
+					{
+						if((0.5*Vmax+0.5) < e)
+						{
+							Vmax = e/0.5-1;
+						}
+						AREAControl->Tao_ac = divdp(0.5*AREAControl->Tao_ac_line,logdp(0.5*Vmax+0.5));
+						AREAControl->Tao_de = divdp(AREAControl->Tao_de_line,logdp(Vmax));	
+					}
+				}
+				else
+				{
+					if(OverallSign.UsualAccelerateStyle == RatioConstant)
+					{
+						AREAControl->Tao_ac = System.ExponentTimeConstant_ac;
+						AREAControl->Tao_de = System.ExponentTimeConstant_de;
+					}
+					else
+					{
+						if((0.5*Vmax+0.5) < e)
+						{
+							Vmax = e/0.5-1;
+						}
+
+						AREAControl->Tao_ac = System.ExponentTimeConstant_ac*divdp(logdp(0.5*AREAControl->Vclamp+0.5) , logdp(0.5*Vmax+0.5));
+						AREAControl->Tao_de = System.ExponentTimeConstant_de*divdp(logdp(AREAControl->Vclamp) , logdp(Vmax));
+					}
+				}
+			}
+			else
+			{
+				if(OverallSign.RapidAccelerateStyle == RatioConstant)
+				{
+					AREAControl->a_ac = System.a_SET_ARM;
+					AREAControl->a_de = System.a_SET_ARM;		
+				}
+				else
+				{	
+					AREAControl->a_ac = divdp(Vmax,(divdp(AREAControl->Vclamp,System.a_SET_ARM)));
+					AREAControl->a_de = AREAControl->a_ac;	
+				}
+			}
+		}
+	}
+
+	if( OverallSign.NCSign==NCSIGN_SPC )
+	{
+		if(System.a_SET < 500)
+		{
+			AREAControl->a_ac  = 500;
+			AREAControl->a_de  = 500; 
+		}
+		else if((System.a_SET > 3000)&&((System.FunctionSelectionSwitch_09 & 0x40) == 0x40))
+		{
+			AREAControl->a_ac  = 3000;
+			AREAControl->a_de  = 3000; 
+		}
+
+		if(System.ExponentTimeConstant_ac < 0.010)
+		{
+			AREAControl->Tao_ac = 0.010;
+		}
+		else if(System.ExponentTimeConstant_ac > 0.050)
+		{
+			AREAControl->Tao_ac =  0.050;
+		}
+		if(System.ExponentTimeConstant_de < 0.010)
+		{
+			AREAControl->Tao_de = 0.010;
+		}
+		else if(System.ExponentTimeConstant_de > 0.050)
+		{
+			AREAControl->Tao_de = 0.050;
+		}
+		
+		if((Reference.FindRefSign.X != 1)||(Reference.FindRefSign.Y != 1)||(Reference.FindRefSign.Z != 1))		
+		{
+			if(System.a_SET < 500)
+			{
+				AREAControl->a_ac  = 500;
+				AREAControl->a_de  = 500; 
+			}
+			if(System.ExponentTimeConstant_ac > 0.015)
+			{
+				AREAControl->Tao_ac =  0.015;
+			}
+			if(System.ExponentTimeConstant_de > 0.015)
+			{
+				AREAControl->Tao_de = 0.015;
+			}
+		}
+	}
+
+	if( AREAControl->a_ac>=5000 || AREAControl->a_de >=5000 )
+	{
+		AREAControl->a_ac = 5000;
+		AREAControl->a_de = 5000;
+	}
+	
+	if( AREAControl->a_ac<=0 || AREAControl->a_de <=0 )
+	{
+		AREAControl->a_ac = 200;
+		AREAControl->a_de = 200;
+	}	
+
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaDecDistance()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: search distance cal.not complete;1: search distance cal. complete*/
+/*  Function: search distance cal.                          */
+/***************************************************************************/
+FLOAT64	NCArea_DecDistance(tsAREA_CONTROL *AREAControl, FLOAT64	Vm)
+{	
+	FLOAT64 Vmax;
+		
+	if( AREAControl->Vs > Vm)
+	{
+		Vmax = AREAControl->Vs;
+	}
+	else
+	{
+		Vmax = Vm;
+	}
+	
+	if(((OverallSign.NCSign == NCSIGN_SPC)&&((System.FunctionSelectionSwitch_08 & 0x02)!=0x02)))
+	{
+		AREAControl->Ss = divdp( powdp(Vmax,2), AREAControl->a_de );
+	}
+	else
+	{
+		if((System.AreaControlModle & 0x0F)== 0x00)
+		{
+			AREAControl->Ss = divdp( powdp(Vmax,2), AREAControl->a_de );
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x01)
+		{
+			AREAControl->Ss = 0.625 * divdp( powdp(Vmax,2), AREAControl->a_de );
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x02)
+		{
+			AREAControl->Ss = 0.5 * powdp(Vmax,2)*recipdp(AREAControl->a_de);
+		}
+		else if(((System.AreaControlModle & 0x0F)== 0x04)||((System.AreaControlModle & 0x0F)== 0x05))
+		{
+			AREAControl->Ss = AREAControl->Tao_de * Vmax;
+		}
+		else
+		{
+			AREAControl->Ss = divdp( powdp(Vmax,2), AREAControl->a_de );
+		}
+	}
+	if((System.FunctionSelectionSwitch_07 & 0x40)==0x40)
+	{
+		AREAControl->Ss *= 2;
+	}
+	return AREAControl->Ss;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaSingleState()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: SingleState;1: not SingleState*/
+/*  Function: NCAreaSingleState                       */
+/***************************************************************************/
+INT16U NCArea_SingleState(tsAREA_CONTROL *AREAControl,tsGCODE  *RiCode)
+{	
+	FLOAT64 Vmax;
+	if((OverallSign.NCSign == NCSIGN_STD)&&((RiCode->CMD1 == 0)||(STDNCSign.SingleModeSign == 1)))
+	{			
+		AREAControl->Pointer_EndCode = AREAControl->Pointer_StartCode;
+		if( STDNCSign.SingleModeSign == 1 )
+		{
+		}
+		else
+		{
+			////////////for test///////////////////////////
+			if( AREAControl->Vs > RiCode->Vm)
+			{
+				Vmax = AREAControl->Vs;
+			}
+			else
+			{
+				Vmax = RiCode->Vm;
+			}	
+			
+			if( Vmax > System.G0_V_max )
+			{
+				AREAControl->a_ac = System.G0_A_max;		
+			}
+			else if( Vmax < System.G0_V_min )
+			{
+				AREAControl->a_ac = System.G0_A_min;		
+			}
+			else
+			{
+				AREAControl->a_ac = System.G0_ka * Vmax + System.G0_kb;		
+			}
+			AREAControl->a_de = AREAControl->a_ac;
+
+			if( AREAControl->a_ac>=20000 || AREAControl->a_de >=20000 )
+			{
+				AREAControl->a_ac = 20000;
+				AREAControl->a_de = 20000;
+			}
+
+			if( AREAControl->a_ac<=0 || AREAControl->a_de <=0 )
+			{
+				AREAControl->a_ac = 1000;
+				AREAControl->a_de = 1000;
+			}	
+			/////////////////////////////////////////////////
+		}
+
+		RiCode->Ve = 0;
+		AREAControl->Ve = 0;	
+		return FALSE;
+	}
+
+	if( OverallSign.NCSign==NCSIGN_STD )
+	{
+		if(GCodeBuffer[ (STDNCSign.RealRunCount)%STDGCODE_MOD ].CMD1 == 4)
+		{
+			AREAControl->Pointer_EndCode = AREAControl->Pointer_StartCode;
+			RiCode->Ve = AREAControl->VMin;
+			return FALSE;
+		}
+	}
+	
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCArea_Cal_i1_i2_Angle()                                   */
+/*  Argument:GCODE ,i1,i2   	                                    */
+/*  Return value: NCArea_Cal_i1_i2_Angle							*/
+/*计算i1线段和i2线段的转角关系				*/
+/*  Function: NCArea_Cal_i1_i2_Angle                                       */
+/***************************************************************************/
+FLOAT64	NCArea_Cal_i1_i2_Angle(tsGCODE * i1CodePT, tsGCODE * i2CodePT)
+{
+	FLOAT64			cos_angle;
+	VECTOR 			I1EndVector,I2StartVector;
+	
+	I1EndVector   = i1CodePT->EndPointVector;
+	I2StartVector = i2CodePT->StPointVector;
+
+	//根据交点总矢量变化特征确定合成允许交点速度
+	cos_angle = I1EndVector.X*I2StartVector.X+I1EndVector.Y*I2StartVector.Y+I1EndVector.Z*I2StartVector.Z;
+	
+	return cos_angle;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaRunPreCal()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: Precal AREAControl not complete;1: Precal AREAControl complete*/
+/*  Function: Precal AREAControl                         */
+/***************************************************************************/
+//the fifth step:  Precal AREAControl
+INT16U NCArea_RunPreCal()
+{
+	INT32U 		j;	
+	INT32U 			ri;
+	
+	ri = (NCRunSign.RealRunCount-1) % STDGCODE_MOD;
+	//计算起点到二次假定拐点的长度
+	NC_AREAControl.Stotal = 0;
+	
+	for(j=NC_AREAControl.Pointer_StartCode;j<=NC_AREAControl.Pointer_SecondInflexionCode;j++)
+	{
+		NC_AREAControl.Stotal += NCAreaGCodeBuffer[(j-1) % STDGCODE_MOD].Stotal;
+	}
+		
+	//构造起点到二次假定拐点的区域曲线
+	if(((OverallSign.NCSign == NCSIGN_SPC)&&((System.FunctionSelectionSwitch_08 & 0x02)!=0x02))||
+		(NCAreaGCodeBuffer[ri].CMD1 == 0))
+	{
+		NCArea_HyperbolaPrecalStandardCurve();
+	}
+	else
+	{
+		if((System.AreaControlModle & 0x0F)== 0x00)
+		{
+			NCArea_HyperbolaPrecalStandardCurve();
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x01)
+		{
+			NCArea_QuinticPrecalStandardCurve();		
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x02)
+		{
+			NCArea_LinearPrecalStandardCurve();		
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x04)
+		{
+			NCArea_SoftExponentPrecalStandardCurve();	
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x05)
+		{
+			NCArea_HardExponentPrecalStandardCurve();	
+		}
+		else
+		{
+			NCArea_HyperbolaPrecalStandardCurve();
+		}
+	}
+	
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaHyperbolaPrecalStandardCurve()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: StandardCurve Pre-calculate not complete;1: StandardCurve Pre-calculate complete*/
+/*  Function: StandardCurve Pre-calculate                            */
+/***************************************************************************/
+INT16U NCArea_HyperbolaPrecalStandardCurve()	
+{
+	static FLOAT64 acc_max = 15000;
+
+	//Stable Speed State
+	if( NC_AREAControl.SpeedState == NCAREA_STABLE_STATE )			
+	{
+		if(NC_AREAControl.Vs < NC_AREAControl.Ve)
+		{
+			NC_AREAControl.SpeedState = NCAREA_ACCELERATING_STATE;
+		}
+		else if(NC_AREAControl.Vs > NC_AREAControl.Ve)
+		{
+			NC_AREAControl.SpeedState = NCAREA_DECELERATING_STATE;
+		}
+		else
+		{			
+			NC_AREAControl.Sac		= 0;
+			NC_AREAControl.Sde		= 0;
+			NC_AREAControl.Sm 		= NC_AREAControl.Stotal;
+			NC_AREAControl.VmReal		= NC_AREAControl.Vs;    			
+			NC_AREAControl.DeltaT1 	= 0;
+			NC_AREAControl.DeltaT2 	= 0;	
+			NC_AREAControl.DeltaT5 	= divdp( NC_AREAControl.Stotal, NC_AREAControl.Vs );
+			NC_AREAControl.DeltaT8 	= 0;
+			NC_AREAControl.DeltaT9 	= 0;
+			NC_AREAControl.S1			= 0;
+			NC_AREAControl.S2			= 0;	
+			NC_AREAControl.S5			= NC_AREAControl.Stotal;	
+			NC_AREAControl.S8			= 0;
+			NC_AREAControl.S9			= 0; 
+		}
+	}
+
+	if( NC_AREAControl.SpeedState == NCAREA_ACCELERATING_STATE )	
+	{	
+		//加速区域
+		NC_AREAControl.Sde		= 0;	
+		NC_AREAControl.S8			= 0;
+		NC_AREAControl.S9			= 0;
+		NC_AREAControl.DeltaT8  	= 0;
+		NC_AREAControl.DeltaT9 	= 0;
+		NC_AREAControl.VmReal		= NC_AREAControl.Ve;
+
+		NC_AREAControl.Sac 		= fabs( divdp( (powdp(NC_AREAControl.Ve,2) - powdp(NC_AREAControl.Vs,2)), NC_AREAControl.a_ac) );
+		 
+		if(NC_AREAControl.Sac > NC_AREAControl.Stotal)
+		{
+			NC_AREAControl.VmReal 	= sqrtdp(powdp( NC_AREAControl.Vs, 2 ) + NC_AREAControl.a_ac*NC_AREAControl.Stotal );
+			NC_AREAControl.Ve			= NC_AREAControl.VmReal;
+		}
+
+		NC_AREAControl.DeltaT1 	= divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs), NC_AREAControl.a_ac);
+		NC_AREAControl.DeltaT2 	= NC_AREAControl.DeltaT1;			
+		NC_AREAControl.S1			= divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.DeltaT1,3), 
+									(6*(NC_AREAControl.VmReal-NC_AREAControl.Vs))) + 
+									NC_AREAControl.Vs*NC_AREAControl.DeltaT1;
+		NC_AREAControl.S2 		= divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.DeltaT2,3), 
+									(6*(NC_AREAControl.Vs-NC_AREAControl.VmReal))) +
+									NC_AREAControl.VmReal*NC_AREAControl.DeltaT2;
+		NC_AREAControl.Sac		= NC_AREAControl.S1 + NC_AREAControl.S2;
+		
+
+		NC_AREAControl.Sm 		= NC_AREAControl.Stotal - NC_AREAControl.Sac;	
+		NC_AREAControl.S5			= NC_AREAControl.Sm;
+		NC_AREAControl.DeltaT5 	= divdp(NC_AREAControl.S5, NC_AREAControl.VmReal);	
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_DECELERATING_STATE )
+	{	//Ve<Vs
+		NC_AREAControl.S1			= 0;
+		NC_AREAControl.S2			= 0;
+		NC_AREAControl.Sac		= 0;
+		NC_AREAControl.DeltaT1 	= 0;
+		NC_AREAControl.DeltaT2 	= 0;	
+		NC_AREAControl.VmReal 	= NC_AREAControl.Vs;		
+
+		NC_AREAControl.Sde 		= fabs( divdp( (powdp(NC_AREAControl.VmReal,2) - powdp(NC_AREAControl.Ve,2)), NC_AREAControl.a_de) );
+		 
+		if(NC_AREAControl.Sde > NC_AREAControl.Stotal)
+		{	//不够减速距离，反算时间常数
+			NC_AREAControl.a_de 		= divdp( fabs( powdp( NC_AREAControl.Ve, 2 ) - powdp( NC_AREAControl.VmReal, 2 ) ), NC_AREAControl.Stotal );		
+		}
+		
+		NC_AREAControl.DeltaT8 	= divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Ve), NC_AREAControl.a_de );
+		NC_AREAControl.DeltaT9 	= NC_AREAControl.DeltaT8;	
+		NC_AREAControl.S8 		= divdp( powdp(NC_AREAControl.a_de,2)*powdp(NC_AREAControl.DeltaT8,3), 
+									(6*(NC_AREAControl.Ve-NC_AREAControl.VmReal))) +
+									NC_AREAControl.VmReal*NC_AREAControl.DeltaT8;
+		NC_AREAControl.S9 		= divdp( powdp(NC_AREAControl.a_de,2)*powdp(NC_AREAControl.DeltaT9,3), 
+									(6*(NC_AREAControl.VmReal-NC_AREAControl.Ve))) +
+									NC_AREAControl.Ve*NC_AREAControl.DeltaT9;
+		
+		NC_AREAControl.Sde		= NC_AREAControl.S8 + NC_AREAControl.S9;
+		
+		NC_AREAControl.Sm 		= NC_AREAControl.Stotal - NC_AREAControl.Sde;	
+		NC_AREAControl.S5			= NC_AREAControl.Sm;
+		NC_AREAControl.DeltaT5 	= divdp(NC_AREAControl.S5, NC_AREAControl.VmReal);
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SINGLE_STATE )	
+	{
+		NC_AREAControl.Sac 		= fabs( divdp( (powdp(NC_AREAControl.Vm,2) - powdp(NC_AREAControl.Vs,2)), NC_AREAControl.a_ac) );
+		NC_AREAControl.Sde 		= fabs( divdp( (powdp(NC_AREAControl.Vm,2)-powdp(NC_AREAControl.Ve,2)), NC_AREAControl.a_de) );
+
+		if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 		//这里不能用Ss，要用Stotal
+		{	// 有加速段和减速段
+			NC_AREAControl.VmReal = NC_AREAControl.Vm;
+			NC_AREAControl.Sm 	= NC_AREAControl.Ss-NC_AREAControl.Sac-NC_AREAControl.Sde;
+		}
+		else
+		{	
+			//这里更改了计算VmReal 的方法
+			FLOAT64 acc;
+
+			if( NC_AREAControl.Ve >= NC_AREAControl.Vs )
+			{
+				acc = NC_AREAControl.a_ac;
+			}
+			else
+			{
+				acc = NC_AREAControl.a_de;
+			}
+
+			if( fabs( powdp( NC_AREAControl.Ve, 2 ) - powdp( NC_AREAControl.Vs, 2 ) ) >= (acc*NC_AREAControl.Stotal) )
+			{
+				if( NC_AREAControl.Ve >= NC_AREAControl.Vs )
+				{
+					NC_AREAControl.VmReal 	= sqrtdp(powdp( NC_AREAControl.Vs, 2 ) + NC_AREAControl.a_ac*NC_AREAControl.Stotal );
+					NC_AREAControl.Ve 		= NC_AREAControl.VmReal;
+				}
+				else
+				{
+					NC_AREAControl.VmReal 	= NC_AREAControl.Vs;
+					NC_AREAControl.a_de 		= divdp( fabs( powdp( NC_AREAControl.Ve, 2 ) - powdp( NC_AREAControl.Vs, 2 ) ), NC_AREAControl.Stotal );
+					if(NC_AREAControl.a_de > acc_max)
+					{
+						NC_AREAControl.a_de = NC_AREAControl.a_de;
+					}
+				}
+			}
+			else
+			{
+				NC_AREAControl.VmReal = sqrtdp( divdp( ( NC_AREAControl.a_ac * NC_AREAControl.a_de * NC_AREAControl.Stotal + 
+											NC_AREAControl.a_de * powdp( NC_AREAControl.Vs, 2 ) + NC_AREAControl.a_ac * 
+											powdp( NC_AREAControl.Ve, 2 ) ),  ( NC_AREAControl.a_ac + NC_AREAControl.a_de ) ) );
+				//NC_AREAControl.Sm		= 0;	
+								
+				//NCAreaSpeedWaveFilter(NC_AREAControl.Vs, NC_AREAControl.Ve, NC_AREAControl.Stotal);
+
+			}
+		}	
+
+		NC_AREAControl.DeltaT1 	= divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs), NC_AREAControl.a_ac);
+		NC_AREAControl.DeltaT2 	= NC_AREAControl.DeltaT1;
+
+		if(NC_AREAControl.DeltaT1 == 0)
+		{
+			NC_AREAControl.S1		= 0;
+			NC_AREAControl.S2		= 0;
+			NC_AREAControl.Sac	= 0;
+		}
+		else
+		{	
+			if(fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs) < 1e-6)
+			{
+				NC_AREAControl.S1		= NC_AREAControl.Vs*NC_AREAControl.DeltaT1;
+				NC_AREAControl.S2 	= NC_AREAControl.VmReal*NC_AREAControl.DeltaT2;
+			}
+			else
+			{
+				NC_AREAControl.S1		= divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.DeltaT1,3), 
+										(6*(NC_AREAControl.VmReal-NC_AREAControl.Vs))) + 
+										NC_AREAControl.Vs*NC_AREAControl.DeltaT1;
+				NC_AREAControl.S2 	= divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.DeltaT2,3), 
+										(6*(NC_AREAControl.Vs-NC_AREAControl.VmReal))) +
+										NC_AREAControl.VmReal*NC_AREAControl.DeltaT2;
+			}
+			NC_AREAControl.Sac	= NC_AREAControl.S1 + NC_AREAControl.S2;
+		}		
+		
+		NC_AREAControl.DeltaT8 	= divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Ve), NC_AREAControl.a_de );
+		NC_AREAControl.DeltaT9 	= NC_AREAControl.DeltaT8;
+
+		if(NC_AREAControl.DeltaT8 == 0)
+		{
+			NC_AREAControl.S8 	= 0;
+			NC_AREAControl.S9 	= 0;
+			NC_AREAControl.Sde 	= 0;
+		}
+		else
+		{
+			if(fabs(NC_AREAControl.VmReal-NC_AREAControl.Ve) < 1e-6)
+			{
+				NC_AREAControl.S8		= NC_AREAControl.VmReal*NC_AREAControl.DeltaT8;
+				NC_AREAControl.S9 	= NC_AREAControl.Ve*NC_AREAControl.DeltaT9;
+			}
+			else
+			{
+				NC_AREAControl.S8 	= divdp( powdp(NC_AREAControl.a_de,2)*powdp(NC_AREAControl.DeltaT8,3), 
+										(6*(NC_AREAControl.Ve-NC_AREAControl.VmReal))) +
+										NC_AREAControl.VmReal*NC_AREAControl.DeltaT8;
+				NC_AREAControl.S9 	= divdp( powdp(NC_AREAControl.a_de,2)*powdp(NC_AREAControl.DeltaT9,3), 
+										(6*(NC_AREAControl.VmReal-NC_AREAControl.Ve))) +
+										NC_AREAControl.Ve*NC_AREAControl.DeltaT9;
+			}
+			NC_AREAControl.Sde 	= NC_AREAControl.S8+NC_AREAControl.S9;
+		}
+				
+		NC_AREAControl.S5 		= NC_AREAControl.Stotal-NC_AREAControl.S1-NC_AREAControl.S2-
+									NC_AREAControl.S8-NC_AREAControl.S9;
+	
+		if(NC_AREAControl.VmReal<1e-6) 
+		{
+			NC_AREAControl.DeltaT5 = 3e38;		//趋于无穷
+		}
+		else
+		{
+			if(NC_AREAControl.S5 > 0)
+			{
+				NC_AREAControl.DeltaT5 = divdp(NC_AREAControl.S5, NC_AREAControl.VmReal);
+			}
+			else
+			{
+				NC_AREAControl.S5 = 0;
+				NC_AREAControl.DeltaT5 = 0;
+			}
+		}
+
+		if(NC_AREAControl.DeltaT5 < 1e-6)
+		{
+			NC_AREAControl.S5 	 = 0;
+			NC_AREAControl.DeltaT5 = 0;
+		}
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+	{
+		//如果Vs>Vm，那么应该让区域速度急速减到Vm
+		//这里的Sac和S1,S2都认为是减速段，所以加速度都取a_de
+		if(NC_AREAControl.Ve > NC_AREAControl.Vm)
+		{
+			NC_AREAControl.Ve = NC_AREAControl.Vm;
+		}
+		
+		NC_AREAControl.a_ac 		= NC_AREAControl.a_de;
+		NC_AREAControl.Sac 		= fabs( divdp( (powdp(NC_AREAControl.Vm,2) - powdp(NC_AREAControl.Vs,2)), NC_AREAControl.a_ac) );
+		NC_AREAControl.Sde 		= fabs( divdp( (powdp(NC_AREAControl.Vm,2) - powdp(NC_AREAControl.Ve,2)), NC_AREAControl.a_de) );
+
+		if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 		//这里不能用Ss，要用Stotal
+		{	
+			// 有加速段和减速段
+			NC_AREAControl.VmReal = NC_AREAControl.Vm;
+			NC_AREAControl.Sm 	= NC_AREAControl.Ss-NC_AREAControl.Sac-NC_AREAControl.Sde;
+		}
+		else
+		{
+			NC_AREAControl.a_de = divdp( fabs( powdp( NC_AREAControl.Vs, 2 ) - powdp( NC_AREAControl.Ve, 2 ) ), NC_AREAControl.Stotal);
+			if(NC_AREAControl.a_de > acc_max)
+			{
+				NC_AREAControl.a_de = acc_max;
+			}
+			NC_AREAControl.a_ac = NC_AREAControl.a_de;			
+			NC_AREAControl.VmReal 	= NC_AREAControl.Ve;
+			NC_AREAControl.Sm		= 0;
+		}
+
+		NC_AREAControl.DeltaT1 	= divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs), NC_AREAControl.a_ac);
+		NC_AREAControl.DeltaT2 	= NC_AREAControl.DeltaT1;
+
+		if(NC_AREAControl.DeltaT1 < 1e-6)
+		{
+			NC_AREAControl.S1		= 0;
+			NC_AREAControl.S2		= 0;
+			NC_AREAControl.Sac	= 0;
+		}
+		else
+		{	
+			if(fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs) < 1e-6)
+			{
+				NC_AREAControl.S1		= NC_AREAControl.Vs*NC_AREAControl.DeltaT1;
+				NC_AREAControl.S2 	= NC_AREAControl.VmReal*NC_AREAControl.DeltaT2;
+			}	
+			else
+			{
+				NC_AREAControl.S1		= divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.DeltaT1,3), 
+										(6*(NC_AREAControl.VmReal-NC_AREAControl.Vs))) + 
+										NC_AREAControl.Vs*NC_AREAControl.DeltaT1;
+				NC_AREAControl.S2 	= divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.DeltaT2,3), 
+										(6*(NC_AREAControl.Vs-NC_AREAControl.VmReal))) +
+										NC_AREAControl.VmReal*NC_AREAControl.DeltaT2;
+			}
+			NC_AREAControl.Sac	= NC_AREAControl.S1 + NC_AREAControl.S2;
+		}		
+		
+		NC_AREAControl.DeltaT8 	= divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Ve), NC_AREAControl.a_de );
+		NC_AREAControl.DeltaT9 	= NC_AREAControl.DeltaT8;
+
+		if(NC_AREAControl.DeltaT8 < 1e-6)
+		{
+			NC_AREAControl.S8 	= 0;
+			NC_AREAControl.S9 	= 0;
+			NC_AREAControl.Sde 	= 0;
+		}
+		else
+		{
+			if(fabs(NC_AREAControl.VmReal-NC_AREAControl.Ve) < 1e-6)
+			{
+				NC_AREAControl.S8		= NC_AREAControl.VmReal*NC_AREAControl.DeltaT8;
+				NC_AREAControl.S9 	= NC_AREAControl.Ve*NC_AREAControl.DeltaT9;
+			}
+			else
+			{
+				NC_AREAControl.S8 	= divdp( powdp(NC_AREAControl.a_de,2)*powdp(NC_AREAControl.DeltaT8,3), 
+										(6*(NC_AREAControl.Ve-NC_AREAControl.VmReal))) +
+										NC_AREAControl.VmReal*NC_AREAControl.DeltaT8;
+				NC_AREAControl.S9 	= divdp( powdp(NC_AREAControl.a_de,2)*powdp(NC_AREAControl.DeltaT9,3), 
+										(6*(NC_AREAControl.VmReal-NC_AREAControl.Ve))) +
+										NC_AREAControl.Ve*NC_AREAControl.DeltaT9;
+			}
+			NC_AREAControl.Sde 	= NC_AREAControl.S8+NC_AREAControl.S9;
+		}
+				
+		NC_AREAControl.S5 		= NC_AREAControl.Stotal-NC_AREAControl.S1-NC_AREAControl.S2-
+									NC_AREAControl.S8-NC_AREAControl.S9;
+		
+		if(NC_AREAControl.VmReal < 1e-6) 
+		{
+			NC_AREAControl.DeltaT5 = 3e38;		//趋于无穷
+		}
+		else
+		{
+			if(NC_AREAControl.S5 > 0)
+			{
+				NC_AREAControl.DeltaT5 = divdp(NC_AREAControl.S5, NC_AREAControl.VmReal);
+			}
+			else
+			{
+				NC_AREAControl.S5 	 = 0;
+				NC_AREAControl.DeltaT5 = 0;
+			}
+		}
+		
+		if(NC_AREAControl.DeltaT5 < 1e-6)
+		{
+			NC_AREAControl.S5 	 = 0;
+			NC_AREAControl.DeltaT5 = 0;
+		}
+	}
+
+	NC_AREAControl.S3			= 0;
+	NC_AREAControl.S4			= 0;
+	NC_AREAControl.S6 		= 0;
+	NC_AREAControl.S7 		= 0;
+	NC_AREAControl.DeltaT3 	= 0;
+	NC_AREAControl.DeltaT4 	= 0;	
+	NC_AREAControl.DeltaT6 	= 0;
+	NC_AREAControl.DeltaT7 	= 0;
+	NC_AREAControl.Sm			= NC_AREAControl.S5;
+	
+	NC_AREAControl.T1 	= NC_AREAControl.DeltaT1;
+	NC_AREAControl.T2 	= NC_AREAControl.T1+NC_AREAControl.DeltaT2;
+	NC_AREAControl.T3 	= NC_AREAControl.T2+NC_AREAControl.DeltaT3;
+	NC_AREAControl.T4 	= NC_AREAControl.T3+NC_AREAControl.DeltaT4;
+	NC_AREAControl.T5 	= NC_AREAControl.T4+NC_AREAControl.DeltaT5;
+	NC_AREAControl.T6 	= NC_AREAControl.T5+NC_AREAControl.DeltaT6;
+	NC_AREAControl.T7 	= NC_AREAControl.T6+NC_AREAControl.DeltaT7;
+	NC_AREAControl.T8 	= NC_AREAControl.T7+NC_AREAControl.DeltaT8;
+	NC_AREAControl.T9 	= NC_AREAControl.T8+NC_AREAControl.DeltaT9;
+	NC_AREAControl.TotalN = divdp(NC_AREAControl.T9, System.Tsample);
+	//////////add by le///////////////////////
+	NC_AREAControl.TotalN++;
+	////////////////////////////////////////
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaQuinticPrecalStandardCurve()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: QuinticCurve Pre-calculate not complete;1: QuinticCurve Pre-calculate complete*/
+/*  Function: QuinticCurve Pre-calculate                            */
+/***************************************************************************/
+INT16U NCArea_QuinticPrecalStandardCurve()	
+{
+	//Stable Speed State
+	if( NC_AREAControl.SpeedState == NCAREA_STABLE_STATE )			
+	{
+		NCArea1_StableStateCal();
+	}
+
+	if( NC_AREAControl.SpeedState == NCAREA_ACCELERATING_STATE )	
+	{
+		NCArea1_QuinticAccStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_DECELERATING_STATE )
+	{
+		NCArea1_QuinticDecStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SINGLE_STATE )	
+	{
+		NCArea1_QuinticADSingleCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+	{
+		NCArea1_QuinticSpecialStateCal();
+	}
+	
+	NCArea1_BasicCurve();
+
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaLinearRatioConstantPrecalStandardCurve()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: LinearT Pre-calculate not complete;1: LinearT Pre-calculate complete*/
+/*  Function: ExponentCurve Pre-calculate                            */
+/***************************************************************************/
+INT16U NCArea_LinearPrecalStandardCurve()	
+{
+	if(NC_AREAControl.Vm > NC_AREAControl.Vclamp)
+	{
+		NC_AREAControl.Vm = NC_AREAControl.Vclamp;
+	}
+
+	if( NC_AREAControl.SpeedState == NCAREA_STABLE_STATE )			
+	{
+		NCArea1_StableStateCal();
+	}
+
+	if( NC_AREAControl.SpeedState == NCAREA_ACCELERATING_STATE )	
+	{
+		NCArea1_LinearAccStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_DECELERATING_STATE )
+	{
+		NCArea1_LinearDecStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SINGLE_STATE )	
+	{
+		NCArea1_LinearADSingleCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+	{
+		NCArea1_LinearSpecialStateCal();
+	}
+	
+	NCArea1_BasicCurve();
+
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaSoftExponentPrecalStandardCurve()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: ExponentCurve Pre-calculate not complete;1: ExponentCurve Pre-calculate complete*/
+/*  Function: ExponentCurve Pre-calculate                            */
+/***************************************************************************/
+INT16U NCArea_SoftExponentPrecalStandardCurve()	
+{
+	if( NC_AREAControl.SpeedState == NCAREA_STABLE_STATE )			
+	{
+		NCArea1_StableStateCal();
+	}
+
+	if( NC_AREAControl.SpeedState == NCAREA_ACCELERATING_STATE )	
+	{
+		NCArea1_SoftExponentAccStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_DECELERATING_STATE )
+	{
+		NCArea1_ExponentDecStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SINGLE_STATE )	
+	{
+		NCArea1_SoftExponentADSingleCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+	{
+		NCArea1_ExponentSpecialStateCal();
+	}
+	
+	NCArea1_BasicCurve();
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaHardExponentPrecalStandardCurve()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: ExponentCurve Pre-calculate not complete;1: ExponentCurve Pre-calculate complete*/
+/*  Function: ExponentCurve Pre-calculate                            */
+/***************************************************************************/
+INT16U NCArea_HardExponentPrecalStandardCurve()	
+{
+	if( NC_AREAControl.SpeedState == NCAREA_STABLE_STATE )			
+	{
+		NCArea1_StableStateCal();
+	}
+
+	if( NC_AREAControl.SpeedState == NCAREA_ACCELERATING_STATE )	
+	{
+		NCArea1_HardExponentAccStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_DECELERATING_STATE )
+	{
+		NCArea1_ExponentDecStateCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SINGLE_STATE )	
+	{
+		NCArea1_HardExponentADSingleCal();
+	}
+	else if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+	{
+		NCArea1_ExponentSpecialStateCal();
+	}
+	
+	NCArea1_BasicCurve();
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaRunPrecalculate()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: Pre-calculate not complete;1: Pre-calculate complete*/
+/*  Function: Pre-calculate                            */
+/***************************************************************************/
+INT16U NCArea_RunPrecalculate() 
+{     	
+	if( NC_AREAControl.NewGodeRunSign == 1 )
+	{
+		NC_AREAControl.NewGodeRunSign = 0;
+	}
+
+	if(NCRunSign.PrecalCode == FAIL)	
+	{
+		if( NCArea_RunPre() == FALSE )	
+		{
+			return FALSE;		
+		}	
+
+		if( NC_AREAControl.TotalN == 0 && NC_AREAControl.Stotal>0 )
+		{
+			NC_AREAControl.TotalN = NC_AREAControl.TotalN;
+		}
+		
+		NCRunSign.PrecalCode = OK;
+		SPCNCSign.PrecalCode = OK;
+		STDNCSign.PrecalCode = OK;
+		
+		if(NC_AREAControl.Stotal == 0)
+		{
+			NCRunSign.XYZ_Over = OK;
+			SPCNCSign.XYZ_Over = OK;
+			STDNCSign.XYZ_Over = OK;		
+			NCRunSign.NewAreaSign = FAIL;
+			return FALSE;
+		}
+		
+		if(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal == 0)
+		{
+			NCRunSign.XYZ_Over = OK;
+			SPCNCSign.XYZ_Over = OK;
+			STDNCSign.XYZ_Over = OK;
+			return FALSE;
+		}
+
+		NC_AREAControl.NewGodeRunSign = 1;		
+	}	 
+	
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaRunPre()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: 0: Pre-calculate not complete;1: Pre-calculate complete*/
+/*  Function: Pre-calculate                            */
+/***************************************************************************/
+INT16U NCArea_RunPre() 
+{     
+	INT32S 	   delta_value;		
+	FLOAT64    cosine_angle;
+	INT40AXIS  ScaleStartPointAbsValue,ScaleEndPointAbsValue;
+	
+	if(NCRunSign.NewAreaSign == 0)
+	{	
+		//下一个区域曲线预处理
+		NC_AREAControl.Snow = 0;
+		NC_AREAControl.SnowLast = 0;
+		OverallSign.ToleranceBigCanRunSign = 0;		
+		
+		//filter stotal = 0;
+		if(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal==0) 
+		{
+			NCRunSign.XYZ_Over = 1;
+			SPCNCSign.XYZ_Over = 1;
+			STDNCSign.XYZ_Over = 1;
+			return FALSE;
+		}
+		
+		if( NCArea_Control() == FALSE )
+		{
+			return FALSE;		
+		}
+
+		NC_AREAControl.I = 1;
+		NC_AREAControl.CurrentStotal = 0;
+		NCRunSign.NewAreaSign = 1;
+		OverallSign.ToleranceBigStep = 0;
+	}
+
+	if(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal==0) 
+	{
+		NCRunSign.XYZ_Over = 1;
+		SPCNCSign.XYZ_Over = 1;
+		STDNCSign.XYZ_Over = 1;
+		return FALSE;
+	}
+
+	///////////////for test/////////////////////////////////////
+	cosine_angle = NCArea_Cal_i1_i2_Angle(&NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri], 
+	 									&NCAreaGCodeBuffer[(NCRunSign.RealRunCount) % STDGCODE_MOD]);
+	cosine_angle  =  divdp( acosdp( cosine_angle )*180,PI );
+	NC_AREAControl.Angle_OUT = (INT32U)((180-cosine_angle)*1000);
+	//////////////////////////////////////////////////////////
+
+	//防止缓冲区数据冲掉
+	NC_AREAControl.CurrentStotalLast = NC_AREAControl.CurrentStotal;
+
+	NC_AREAControl.CurrentStotal += NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal;
+	NC_AREAControl.Cosine.X = (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].EndPoint.X-NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartPoint.X)*System.UnitTo_mm;
+	NC_AREAControl.Cosine.X = divdp(NC_AREAControl.Cosine.X,NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal);	//分开,防止浮点运算出错
+	NC_AREAControl.Cosine.Y = (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].EndPoint.Y-NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartPoint.Y)*System.UnitTo_mm;
+	NC_AREAControl.Cosine.Y = divdp(NC_AREAControl.Cosine.Y,NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal);		//分开,防止浮点运算出错
+	NC_AREAControl.Cosine.Z = (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].EndPoint.Z-NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartPoint.Z)*System.UnitTo_mm;
+	NC_AREAControl.Cosine.Z = divdp(NC_AREAControl.Cosine.Z,NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal);	//分开,防止浮点运算出错
+	NC_AREAControl.Cosine.A = (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].EndPoint.A-NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartPoint.A)*System.UnitTo_d;
+	NC_AREAControl.Cosine.A = divdp(NC_AREAControl.Cosine.A,NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].Stotal);	//分开,防止浮点运算出错
+
+	if( (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 2) ||
+		(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 3) ||
+		  (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 30) ||
+		    (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 31)  )
+	{
+		NC_AREAControl.CurrentArcAngle = NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartAngle;
+	}
+
+	// 用于起点反向消除间隙(避免起点插补为零时不动作)
+	NCRunSign.NeedBack.X = 0;
+	NCRunSign.NeedBack.Y = 0;
+	NCRunSign.NeedBack.Z = 0;
+
+	OverallSign.ToleranceBigCanRunSign = 0;
+	if( (System.ToleranceStotalquotiety >= 0.05) &&
+		(System.BowstringError_Max >= 0.0005)&&
+		   (OverallSign.NCSign == NCSIGN_STD) )	
+	{
+		if( NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1==1 ) 
+		{
+			if( NCArea3_VectorInterpolatePreCal( )==TRUE )
+			{
+				OverallSign.ToleranceBigCanRunSign = OverallSign.ToleranceBigCanRunSign;
+			}
+		}	
+	}
+	
+	ScaleEndPointAbsValue.X = (INT32S)(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].EndPoint.X);
+	ScaleEndPointAbsValue.Y = (INT32S)(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].EndPoint.Y );
+	ScaleEndPointAbsValue.Z = (INT32S)(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].EndPoint.Z);	
+	ScaleStartPointAbsValue.X = (INT32S)(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartPoint.X );
+	ScaleStartPointAbsValue.Y = (INT32S)(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartPoint.Y );
+	ScaleStartPointAbsValue.Z = (INT32S)(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].StartPoint.Z );	
+	NCCoord_WorkToMACToLinear(&ScaleEndPointAbsValue, &NC_AREAControl.EndPointMachPulseOut);
+	NCCoord_WorkToMACToLinear(&ScaleStartPointAbsValue, &NC_AREAControl.StartPointMachPulseOut);
+		
+	if( (NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 2)||(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 3)
+		  ||(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 30)||(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 31))
+	{
+		NCRunSign.NeedBack.X = 0;
+		NCRunSign.NeedBack.Y = 0;
+		NCRunSign.NeedBack.Z = 0;
+	}
+	else
+	{		
+		delta_value = NC_AREAControl.EndPointMachPulseOut.X-NC_AREAControl.StartPointMachPulseOut.X;
+		if((OverallSign.MoveSign.X==0)&&(delta_value>=1))
+		{
+			NCRunSign.NeedBack.X = 1;		//positive gap compensation
+		}	
+		if((OverallSign.MoveSign.X==1)&&(delta_value<=-1))
+		{
+			NCRunSign.NeedBack.X = 2;		//negtive gap compensation
+		}	
+		if(delta_value>=1)
+		{	
+			OverallSign.TheoryMoveSign.X = 1;
+		}
+		if(delta_value<=-1)
+		{	
+			OverallSign.TheoryMoveSign.X = 0;
+		}
+
+		delta_value = NC_AREAControl.EndPointMachPulseOut.Y-NC_AREAControl.StartPointMachPulseOut.Y;
+		if((OverallSign.MoveSign.Y==0)&&(delta_value>=1))
+		{
+			NCRunSign.NeedBack.Y = 1;		//positive gap compensation
+		}	
+		if((OverallSign.MoveSign.Y==1)&&(delta_value<=-1))
+		{
+			NCRunSign.NeedBack.Y = 2;		//negtive gap compensation
+		}
+		if(delta_value>=1)
+		{
+			OverallSign.TheoryMoveSign.Y= 1;
+		}
+		if(delta_value<=-1)
+		{
+			OverallSign.TheoryMoveSign.Y = 0;
+		}
+		
+		//delta_value = NC_AREAControl.EndPointMachPulseOut.Z-NC_AREAControl.OldPointMACHPulseOut.Z;
+		delta_value = NC_AREAControl.EndPointMachPulseOut.Z-NC_AREAControl.StartPointMachPulseOut.Z;
+		if((OverallSign.MoveSign.Z==0)&&(delta_value>=1))
+		{
+			NCRunSign.NeedBack.Z = 1;		//positive gap compensation
+		}
+		if((OverallSign.MoveSign.Z==1)&&(delta_value<=-1))
+		{
+			NCRunSign.NeedBack.Z = 2;		//negtive gap compensation
+		}
+		if(delta_value>=1)
+		{
+			OverallSign.TheoryMoveSign.Z = 1;
+		}
+		if(delta_value<=-1)
+		{
+			OverallSign.TheoryMoveSign.Z = 0;
+		}
+	}
+
+	if(System.Gap.X == 0)
+	{
+		NCRunSign.NeedBack.X = 0;
+	}
+	if(System.Gap.Y == 0)
+	{
+		NCRunSign.NeedBack.Y = 0;
+	}
+	if(System.Gap.Z == 0)
+	{
+		NCRunSign.NeedBack.Z = 0;
+	}
+	return TRUE;
+}               
+
+/***************************************************************************/
+/*  Function name: NCAreaRunModle()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: */									
+/*  Function: based on different Modle                              */
+/***************************************************************************/
+INT16U NCArea_RunModle()			
+{
+	if(((OverallSign.NCSign == NCSIGN_SPC)&&((System.FunctionSelectionSwitch_08 & 0x02)!=0x02))||
+		(NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri].CMD1 == 0))
+	{
+		NCArea_HyperbolaRun( );
+	}
+	else
+	{
+		if((System.AreaControlModle & 0x0F)== 0x00)
+		{
+			NCArea_HyperbolaRun( );			
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x01)
+		{
+			NCArea_QuinticRun( );
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x02)
+		{
+			NCArea_LinearRun( );
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x04)
+		{
+			NCArea_SoftExponentRun( );			
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x05)
+		{
+			NCArea_HardExponentRun( );			
+		}
+		else
+		{
+			NCArea_HyperbolaRun( );
+		}
+	}
+
+	NC_AREAControl.A_ac_OUT = (INT32U)(NC_AREAControl.a_ac);
+	NC_AREAControl.A_de_OUT = (INT32U)(NC_AREAControl.a_de);
+	NC_AREAControl.Vnow_OUT = (INT32U)(NC_AREAControl.VNow);
+	NC_AREAControl.Vs_OUT = (INT32U)(NC_AREAControl.Vs);
+	NC_AREAControl.Ve_OUT = (INT32U)(NC_AREAControl.Ve);
+
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaHyperbolaRun()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: based on Hyperbola  output  Vnow and Snow                              */
+/***************************************************************************/
+INT16U NCArea_HyperbolaRun()			
+{	
+	if( NC_AREAControl.CurrentT <= NC_AREAControl.T1 ) 
+	{
+		if(fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs) < 0.01)
+		{
+			NC_AREAControl.VNow = NC_AREAControl.Vs;
+			NC_AREAControl.Snow = NC_AREAControl.Vs*NC_AREAControl.CurrentT;
+		}
+		else
+		{
+			NC_AREAControl.VNow = divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.CurrentT,2), 
+				2*(NC_AREAControl.VmReal-NC_AREAControl.Vs) ) + NC_AREAControl.Vs;
+			NC_AREAControl.Snow = divdp( powdp(NC_AREAControl.a_ac,2)*powdp(NC_AREAControl.CurrentT,3), 
+				6*(NC_AREAControl.VmReal-NC_AREAControl.Vs))+NC_AREAControl.Vs*NC_AREAControl.CurrentT;
+		}
+	}
+
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T1 ) &&
+			(NC_AREAControl.CurrentT <= NC_AREAControl.T2 ) )
+	{
+		if(fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs) < 0.01)
+		{
+			NC_AREAControl.VNow = NC_AREAControl.VmReal;
+			NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T1);
+		}
+		else
+		{
+			NC_AREAControl.VNow = divdp( powdp(NC_AREAControl.a_ac,2)*powdp((NC_AREAControl.CurrentT-NC_AREAControl.T2),2), 
+				2*(NC_AREAControl.Vs-NC_AREAControl.VmReal) )+NC_AREAControl.VmReal;
+			NC_AREAControl.Snow = divdp( (powdp((NC_AREAControl.CurrentT-NC_AREAControl.T2),3)+powdp(NC_AREAControl.T1,3))*powdp(NC_AREAControl.a_ac,2), 
+				6*(NC_AREAControl.Vs-NC_AREAControl.VmReal) ) + NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T1);
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1;
+	}
+	
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T2 ) &&
+			( NC_AREAControl.CurrentT <= NC_AREAControl.T5 ) )
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T2);
+
+		if(NC_AREAControl.Snow > NC_AREAControl.S5)
+		{
+			NC_AREAControl.Snow = NC_AREAControl.S5;
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1+NC_AREAControl.S2;
+	}		
+	else if(NC_AREAControl.T8 == NC_AREAControl.T5)
+	{
+		//加速段和稳速段的尾巴速度不做Ve修正		
+		if( (System.FunctionSelectionSwitch_11 & 0x01) == 0x01 )
+		{		
+			NC_AREAControl.VNow = NC_AREAControl.VNow;
+			NC_AREAControl.Snow += NC_AREAControl.VNow * System.Tsample;		
+		}
+		else
+		{
+			NC_AREAControl.Snow = NC_AREAControl.Stotal;
+		}
+	}
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T5 ) &&
+			(NC_AREAControl.CurrentT <= NC_AREAControl.T8 ) )
+	{
+		if(fabs(NC_AREAControl.Ve-NC_AREAControl.VmReal) < 0.01)
+		{
+			NC_AREAControl.VNow = NC_AREAControl.VmReal;
+			NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T5);
+		}
+		else
+		{	NC_AREAControl.VNow = divdp( powdp(NC_AREAControl.a_de,2)*powdp((NC_AREAControl.CurrentT-NC_AREAControl.T5),2), 
+								2*(NC_AREAControl.Ve-NC_AREAControl.VmReal))+NC_AREAControl.VmReal;
+			NC_AREAControl.Snow = divdp( powdp(NC_AREAControl.a_de,2)*
+								powdp((NC_AREAControl.CurrentT-NC_AREAControl.T5),3), 
+						  		6*(NC_AREAControl.Ve-NC_AREAControl.VmReal)) + 
+						  		NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T5);
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5;
+	}
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T8 ) &&
+			( NC_AREAControl.CurrentT <= NC_AREAControl.T9 ) )
+	{
+		if(fabs(NC_AREAControl.Ve-NC_AREAControl.VmReal) < 0.01)
+		{
+			NC_AREAControl.VNow = NC_AREAControl.Ve;
+			NC_AREAControl.Snow = NC_AREAControl.Ve*(NC_AREAControl.CurrentT-NC_AREAControl.T8);
+		}
+		else
+		{
+			NC_AREAControl.VNow = divdp( powdp(NC_AREAControl.a_de,2)*powdp((NC_AREAControl.CurrentT-NC_AREAControl.T9),2), 
+								2*(NC_AREAControl.VmReal-NC_AREAControl.Ve))+NC_AREAControl.Ve;
+			
+			NC_AREAControl.Snow = divdp( (powdp((NC_AREAControl.CurrentT-NC_AREAControl.T9),3)+powdp((NC_AREAControl.T9-NC_AREAControl.T8),3))*powdp(NC_AREAControl.a_de,2), 
+								6*(NC_AREAControl.VmReal-NC_AREAControl.Ve))+NC_AREAControl.Ve*(NC_AREAControl.CurrentT-NC_AREAControl.T8);
+
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5+NC_AREAControl.S8;
+
+	}
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T9 )		
+	{	
+		//尾巴段(余量段)
+		if( (System.FunctionSelectionSwitch_11 & 0x01) == 0x01 )
+		{
+			NC_AREAControl.VNow = NC_AREAControl.VNow;
+			NC_AREAControl.Snow += NC_AREAControl.VNow * System.Tsample;
+		}		
+		else
+		{
+			NC_AREAControl.VNow = NC_AREAControl.Ve;
+			NC_AREAControl.Snow = NC_AREAControl.Stotal;
+		}
+	}
+	
+	//if(NC_AREAControl.VNow < NC_AREAControl.VMin)	
+	//{
+	//	NC_AREAControl.VNow = NC_AREAControl.VMin;		//the lowest move speed
+	//}
+
+	if((System.FunctionSelectionSwitch_09 & 0x80) == 0x80)
+	{
+		NCArea_ForwardFeedbackCompensate( );		//加入前馈补偿功能
+	}
+	else
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow;		//可能不要对Vnow进行操作
+		NC_AREAControl.Snow = NC_AREAControl.Snow;
+	}
+
+	//NCAreaMonitorBuffer((NC_AREAControl.Snow*1000),NC_AREAControl.VNow,0,0);			
+	NC_AREAControl.VNowOut = NC_AREAControl.VNow;	//after test Exponent
+	return TRUE;	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaQuinticRun()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: based on Cubic  output  Vnow and Snow                              */
+/***************************************************************************/
+INT16U NCArea_QuinticRun()			
+{
+	if( NC_AREAControl.CurrentT <= NC_AREAControl.T1 ) 
+	{
+		if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+		{
+			NCArea1_QuinticSpecialAccCurveRun( );
+		}
+		else
+		{
+			NCArea1_QuinticAccCurveRun( );
+		}
+	}	
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T1 ) &&
+			( NC_AREAControl.CurrentT <= NC_AREAControl.T5 ) )
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T1);
+
+		if(NC_AREAControl.Snow > NC_AREAControl.S5)
+		{
+			NC_AREAControl.Snow = NC_AREAControl.S5;
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1;
+	}		
+	else if(NC_AREAControl.T9 == NC_AREAControl.T5)
+	{
+		//加速段和稳速段的尾巴速度不做Ve修正		
+		if( (System.FunctionSelectionSwitch_11 & 0x01) == 0x01 )
+		{		
+			NC_AREAControl.VNow = NC_AREAControl.VNow;
+			NC_AREAControl.Snow += NC_AREAControl.VNow * System.Tsample;
+		}		
+		else
+		{		
+			NC_AREAControl.Snow = NC_AREAControl.Stotal;
+		}
+	}
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T5 ) &&
+			(NC_AREAControl.CurrentT <= NC_AREAControl.T9 ) )
+	{
+		if(fabs(NC_AREAControl.Ve-NC_AREAControl.VmReal) < 0.01)
+		{
+			NC_AREAControl.VNow = NC_AREAControl.VmReal;
+			NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T5);
+		}
+		else
+		{
+			NCArea1_QuinticDecCurveRun( );
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1+NC_AREAControl.S5;
+	}
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T9 )		
+	{	
+		//尾巴段(余量段)
+		if( (System.FunctionSelectionSwitch_11 & 0x01) == 0x01 )
+		{			
+			NC_AREAControl.VNow = NC_AREAControl.VNow;
+			NC_AREAControl.Snow += NC_AREAControl.VNow * System.Tsample;
+		}	
+		else
+		{		
+			NC_AREAControl.VNow = NC_AREAControl.Ve;
+			NC_AREAControl.Snow = NC_AREAControl.Stotal;
+		}
+	}
+
+	if((System.FunctionSelectionSwitch_09 & 0x80) == 0x80)
+	{
+		NCArea_ForwardFeedbackCompensate( );		//加入前馈补偿功能
+	}
+	else
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow;		//可能不要对Vnow进行操作
+		NC_AREAControl.Snow = NC_AREAControl.Snow;
+	}
+	
+	//NCAreaMonitorBuffer((NC_AREAControl.Snow*1000),NC_AREAControl.VNow,0,0);
+	NC_AREAControl.VNowOut = NC_AREAControl.VNow;
+	
+	return TRUE;	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaLinearRatioConstantRun()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: based on Linear  output  Vnow and Snow                              */
+/***************************************************************************/
+INT16U NCArea_LinearRun()			
+{
+	if( NC_AREAControl.CurrentT <= NC_AREAControl.T1 ) 
+	{
+		if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+		{
+			NCArea1_LinearSpecialAccCurveRun( );
+		}
+		else
+		{
+			NCArea1_LinearAccCurveRun( );
+		}
+	}	
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T1 ) &&
+			( NC_AREAControl.CurrentT <= NC_AREAControl.T5 ) )
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T1);
+
+		if(NC_AREAControl.Snow > NC_AREAControl.S5)
+		{
+			NC_AREAControl.Snow = NC_AREAControl.S5;
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1;
+	}		
+	else if(NC_AREAControl.T9 == NC_AREAControl.T5)
+	{
+		//加速段和稳速段的尾巴速度不做Ve修正		
+		NC_AREAControl.Snow = NC_AREAControl.Stotal;
+		NC_AREAControl.VNowOut = NC_AREAControl.VNow;//for test
+	}
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T5 ) &&
+			(NC_AREAControl.CurrentT <= NC_AREAControl.T9 ) )
+	{
+		NCArea1_LinearDecCurveRun( );	
+		NC_AREAControl.Snow += NC_AREAControl.S1+NC_AREAControl.S5;
+	}
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T9 )		
+	{	//尾巴段(余量段)	
+		NC_AREAControl.VNow = NC_AREAControl.Ve;
+		NC_AREAControl.Snow = NC_AREAControl.Stotal;
+	}
+	
+	if((System.FunctionSelectionSwitch_09 & 0x80) == 0x80)
+	{
+		NCArea_ForwardFeedbackCompensate( );		//加入前馈补偿功能
+	}
+	else
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow;		//可能不要对Vnow进行操作
+		NC_AREAControl.Snow = NC_AREAControl.Snow;
+	}
+	
+	//NCAreaMonitorBuffer((NC_AREAControl.Snow*1000),NC_AREAControl.VNow,0,0);
+	NC_AREAControl.VNowOut = NC_AREAControl.VNow;
+	return TRUE;	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaSoftExponentRun()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: based on Exponent  output  Vnow and Snow                              */
+/***************************************************************************/
+INT16U NCArea_SoftExponentRun()			
+{
+	if( NC_AREAControl.CurrentT <= NC_AREAControl.T1 ) 
+	{
+		if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+		{
+			NCArea1_ExponentSpecialAccCurveRun( );
+		}
+		else
+		{
+			NCArea1_SoftExponentAccCurveRun( );
+		}
+	}	
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T1 ) &&
+			( NC_AREAControl.CurrentT <= NC_AREAControl.T5 ) )
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T1);
+
+		if(NC_AREAControl.Snow > NC_AREAControl.S5)
+		{
+			NC_AREAControl.Snow = NC_AREAControl.S5;
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1;
+	}		
+	else if(NC_AREAControl.T9 == NC_AREAControl.T5)
+	{
+		//加速段和稳速段的尾巴速度不做Ve修正		
+		NC_AREAControl.Snow = NC_AREAControl.Stotal;
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+	}
+
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T5 ) &&
+			(NC_AREAControl.CurrentT <= NC_AREAControl.T9 ) )
+	{
+		NCArea1_ExponentDecCurveRun( );
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1+NC_AREAControl.S5;
+	}
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T9 )		
+	{	
+		//尾巴段(余量段)
+		NC_AREAControl.VNow = NC_AREAControl.Ve;
+		NC_AREAControl.Snow = NC_AREAControl.Stotal;
+	}
+
+	if((System.FunctionSelectionSwitch_09 & 0x80) == 0x80)
+	{
+		NCArea_ForwardFeedbackCompensate( );		//加入前馈补偿功能
+	}
+	else
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow;		//可能不要对Vnow进行操作
+		NC_AREAControl.Snow = NC_AREAControl.Snow;
+	}
+	
+	//NCAreaMonitorBuffer((NC_AREAControl.Snow*1000),NC_AREAControl.VNow,0,0);
+	NC_AREAControl.VNowOut = NC_AREAControl.VNow;
+	
+	return TRUE;	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaHardExponentRun()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: based on Exponent  output  Vnow and Snow                              */
+/***************************************************************************/
+INT16U NCArea_HardExponentRun()			
+{
+	if( NC_AREAControl.CurrentT <= NC_AREAControl.T1 ) 
+	{
+		if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )		
+		{
+			NCArea1_ExponentSpecialAccCurveRun( );
+		}
+		else
+		{
+			NCArea1_HardExponentAccCurveRun( );
+		}	
+	}	
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T1 ) &&
+			( NC_AREAControl.CurrentT <= NC_AREAControl.T5 ) )
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T1);
+
+		if(NC_AREAControl.Snow > NC_AREAControl.S5)
+		{
+			NC_AREAControl.Snow = NC_AREAControl.S5;
+		}
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1;
+	}		
+	else if(NC_AREAControl.T9 == NC_AREAControl.T5)
+	{
+		//加速段和稳速段的尾巴速度不做Ve修正		
+		if( (System.FunctionSelectionSwitch_11 & 0x01) == 0x01 )
+		{		
+			NC_AREAControl.VNow = NC_AREAControl.VNow;
+			NC_AREAControl.Snow += NC_AREAControl.VNow * System.Tsample;
+		}		
+		else
+		{
+			NC_AREAControl.Snow = NC_AREAControl.Stotal;
+			NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		}
+	}
+	
+	else if( ( NC_AREAControl.CurrentT > NC_AREAControl.T5 ) &&
+			(NC_AREAControl.CurrentT <= NC_AREAControl.T9 ) )
+	{
+		NCArea1_ExponentDecCurveRun( );
+		
+		NC_AREAControl.Snow += NC_AREAControl.S1+NC_AREAControl.S5;
+	}
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T9 )		
+	{	
+		//尾巴段(余量段)
+		if( (System.FunctionSelectionSwitch_11 & 0x01) == 0x01 )
+		{			
+			NC_AREAControl.VNow = NC_AREAControl.VNow;
+			NC_AREAControl.Snow += NC_AREAControl.VNow * System.Tsample;
+		}	
+		else
+		{
+			NC_AREAControl.VNow = NC_AREAControl.Ve;
+			NC_AREAControl.Snow = NC_AREAControl.Stotal;
+		}
+	}
+
+	if((System.FunctionSelectionSwitch_09 & 0x80) == 0x80)
+	{
+		NCArea_ForwardFeedbackCompensate( );		//加入前馈补偿功能
+	}
+	else
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow;		//可能不要对Vnow进行操作
+		NC_AREAControl.Snow = NC_AREAControl.Snow;
+	}
+	
+	//NCAreaMonitorBuffer((NC_AREAControl.Snow*1000),NC_AREAControl.VNow,0,0);
+	NC_AREAControl.VNowOut = NC_AREAControl.VNow;
+	
+	return TRUE;	
+}
+
+//区域曲线前馈处理.对DeltaStep进行操作
+INT16U NCArea_ForwardFeedbackCompensate()
+{	
+	double TrackDeltaX,TrackDeltaY,TrackDeltaZ,TrackDeltaS;//unit:mm
+	static FLOAT64 ForwardFeedbackKp=0,ForwardFeedbackKv=0,ForwardFeedbackRatio=0.5;
+
+	get_ABS_coordinate();
+
+	TrackDeltaX = labs(divdp(NC_AREAControl.NowValue.X,1)-OverallSign.ABS_Coordinate.X)*System.UnitTo_mm;  
+	TrackDeltaY = labs(divdp(NC_AREAControl.NowValue.Y,1)-OverallSign.ABS_Coordinate.Y)*System.UnitTo_mm;  
+	TrackDeltaZ = labs(divdp(NC_AREAControl.NowValue.Z,1) -OverallSign.ABS_Coordinate.Z)*System.UnitTo_mm;  
+	TrackDeltaS = sqrtdp(powdp(TrackDeltaX,2)+powdp(TrackDeltaZ,2)+powdp(TrackDeltaY,2));
+
+	//NC_AREAControl.DeltaSKp = System.ForwardFeedbackKp * TrackDeltaS;
+	//NC_AREAControl.DeltaSKv = System.ForwardFeedbackKv * NC_AREAControl.VNow;
+	NC_AREAControl.DeltaSKp = ForwardFeedbackKp * TrackDeltaS;
+	NC_AREAControl.DeltaSKv = ForwardFeedbackKv * NC_AREAControl.VNow;
+	
+	if((NC_AREAControl.DeltaSKp + NC_AREAControl.DeltaSKv) > (ForwardFeedbackRatio * NC_AREAControl.VNow * System.Tsample))
+	{		
+		NC_AREAControl.Snow = NC_AREAControl.Snow + ForwardFeedbackRatio * NC_AREAControl.VNow * System.Tsample;
+	}
+	else
+	{
+		NC_AREAControl.Snow = NC_AREAControl.Snow + NC_AREAControl.DeltaSKp + NC_AREAControl.DeltaSKv;
+	}
+	
+	NC_AREAControl.VNow = NC_AREAControl.VNow + NC_AREAControl.DeltaSKv;		//可能不要对速度进行操作
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaNowvalue()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: cal.  Nowvalue                                 */
+/***************************************************************************/
+INT16U NCArea_Nowvalue()
+{
+	tsGCODE 	*RealRunCodePT;		//当前运行条GcodeBuffer 指针
+	RealRunCodePT = &NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri];
+
+	if((NC_AREAControl.Snow >= NC_AREAControl.Stotal) || fabs(NC_AREAControl.Snow - NC_AREAControl.Stotal) < 0.001)  
+	{	
+		//第一种情况:已到达区域终点
+		//区域终点Nowvalue
+		if(( RealRunCodePT->CMD1 == 0)||
+			((OverallSign.NCSign == NCSIGN_STD) && (NC_AREAControl.SpeedState == NCAREA_SINGLE_STATE)))
+		{
+			if(NC_AREAControl.CurrentT >= NC_AREAControl.TotalN*System.Tsample)
+			{
+				if(NCArea_EndNowvalue() == FALSE)
+				{
+					return FALSE;
+				}			
+			}
+			else
+			{
+				if((NC_AREAControl.Snow > NC_AREAControl.CurrentStotal) &&
+					(NCRunSign.RealRunCount < NC_AREAControl.Pointer_SecondInflexionCode))
+				{	
+					//第二种情况:已到达当前代码终点, 余值不插补转下条代码使用				
+					NCRunSign.XYZ_Over = 1;
+					SPCNCSign.XYZ_Over = 1;
+					STDNCSign.XYZ_Over = 1;
+					return FALSE;
+				}			
+				NCArea_UsualNowvalue();
+			}
+		}
+		else
+		{
+			if(NCArea_EndNowvalue() == FALSE)
+			{
+				return FALSE;
+			}
+		}
+	}
+	else if(NC_AREAControl.Snow > NC_AREAControl.CurrentStotal)
+	{	
+		//第二种情况:已到达当前代码终点, 余值不插补转下条代码使用				
+		NCRunSign.XYZ_Over = 1;
+		SPCNCSign.XYZ_Over = 1;
+		STDNCSign.XYZ_Over = 1;
+		return FALSE;
+	}
+	else
+	{	
+		//第三种情况:既不是区域终点,也不是当前代码终点,计算Nowvalue.
+		NCArea_UsualNowvalue();			
+	}
+
+	#if DSPFunctionDebug
+	if(TestsBufferCnt >= TestBufferMax)
+	{
+		TestsBufferCnt = 0;
+	}
+	TestsBuffer[TestsBufferCnt][0] = NC_AREAControl.NowValue.X;
+	TestsBuffer[TestsBufferCnt][1] = NC_AREAControl.NowValue.Y;
+	TestsBuffer[TestsBufferCnt][2] = NC_AREAControl.NowValue.Z;			
+	TestsBuffer[TestsBufferCnt][3] = NC_AREAControl.Pointer_StartCode;
+	TestsBuffer[TestsBufferCnt][4] = RealRunGCode.StartPoint.X;
+	TestsBuffer[TestsBufferCnt][5] = RealRunGCode.StartPoint.Y;
+	TestsBuffer[TestsBufferCnt][6] = RealRunGCode.StartPoint.Z;
+	TestsBuffer[TestsBufferCnt][7] = RealRunGCode.CMD1;
+	TestsBuffer[TestsBufferCnt][8] = NCRunSign.RealRunCount;
+	TestsBuffer[TestsBufferCnt][9] = OverallSign.ToleranceBigCanRunSign;//NCRunSign.RealRunCount;	
+	TestsBufferCnt++;
+	#endif
+	
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaEndNowvalue()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: cal. EndPoint Nowvalue                                 */
+/***************************************************************************/
+INT16U NCArea_EndNowvalue()
+{
+	INT8S rc = 1;
+	INT32U ri;
+	
+	//第一种情况:已到达区域终点
+	if(NCRunSign.RealRunCount < NC_AREAControl.Pointer_SecondInflexionCode )
+	{	
+		//防止区域最后一条是短代码
+		INT32U 	a;
+		tsGCODE 	*STDGCodePT;
+		
+		a = NC_AREAControl.Pointer_SecondInflexionCode - NCRunSign.RealRunCount;
+		NCRunSign.RealRunCount = NC_AREAControl.Pointer_SecondInflexionCode;
+		SPCNCSign.RealRunCount += a;
+		NC_AREAControl.NCArea_ri = (NCRunSign.RealRunCount-1) % STDGCODE_MOD;	
+		
+		#if DSPFunctionDebug
+		RealRunGCode = NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri];
+		#endif		
+
+		if(OverallSign.NCSign == NCSIGN_STD)
+		{
+			do
+			{
+				STDNCSign.RealRunCount++;
+				STDGCodePT = &GCodeBuffer[ (STDNCSign.RealRunCount-1)%STDGCODE_MOD ];
+
+				if( STDGCodePT->MoveCodeSign != 0 )
+				{
+					a--;
+				}
+				
+			}while(a>0);
+				
+		}
+	}
+
+	if(((System.FunctionSelectionSwitch_06 & 0x40) == 0x40)&&(OverallSign.NCSign == NCSIGN_SPC)&&
+		(NCRunSign.RealRunCount < NCRunSign.RealSendCount))
+	{
+		ri = (NCRunSign.RealRunCount) % STDGCODE_MOD;
+		NCAreaGCodeBuffer[ri].StartPoint.X = divdp( NC_AREAControl.OldValue.X , 1);
+		NCAreaGCodeBuffer[ri].StartPoint.Y = divdp( NC_AREAControl.OldValue.Y , 1);
+		NCAreaGCodeBuffer[ri].StartPoint.Z = divdp( NC_AREAControl.OldValue.Z , 1);
+		ri = NC_AREAControl.NCArea_ri;
+		NCAreaGCodeBuffer[ri].EndPoint.X = divdp( NC_AREAControl.OldValue.X, 1);
+		NCAreaGCodeBuffer[ri].EndPoint.Y = divdp( NC_AREAControl.OldValue.Y, 1);
+		NCAreaGCodeBuffer[ri].EndPoint.Z = divdp( NC_AREAControl.OldValue.Z, 1);
+		NCArea_CoordinateRenewSPC( &NCAreaGCodeBuffer[(NCRunSign.RealRunCount) % STDGCODE_MOD] );
+		rc = 0;
+	}
+	else
+	{
+		if(  (NC_AREAControl.Snow - NC_AREAControl.Stotal > 0) &&
+			( (System.FunctionSelectionSwitch_11 & 0x01) == 0x01 ) && 
+			   ( NCArea3_DealWithTale3()==TRUE ) ) 
+		{			
+			ri = (funtion_v.Uint32_a-1) % STDGCODE_MOD;
+			NC_AREAControl.NowValue.X = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.X);
+			NC_AREAControl.NowValue.Y = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.Y);
+			NC_AREAControl.NowValue.Z = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.Z);
+		}
+		else
+		{
+			NC_AREAControl.Snow = NC_AREAControl.Stotal;
+			ri = NC_AREAControl.NCArea_ri;
+			NC_AREAControl.NowValue.X = (INT32S)(NCAreaGCodeBuffer[ri].EndPoint.X);
+			NC_AREAControl.NowValue.Y = (INT32S)(NCAreaGCodeBuffer[ri].EndPoint.Y);
+			NC_AREAControl.NowValue.Z = (INT32S)(NCAreaGCodeBuffer[ri].EndPoint.Z);
+		}	
+	}
+	
+	NCRunSign.NewAreaSign = 0;	
+	OverallSign.ToleranceBigStep = 0;	//已到达区域终点,ToleranceBigStep置0.
+	NCRunSign.XYZ_Over = 1;
+	SPCNCSign.XYZ_Over = 1;
+	STDNCSign.XYZ_Over = 1;
+	
+	return rc;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaUsualNowvalue()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: cal. UsualNowvalue                                 */
+/***************************************************************************/
+INT16U NCArea_UsualNowvalue()
+{
+	INT32U 	ri;
+	ri = NC_AREAControl.NCArea_ri;
+
+	if( ( NCAreaGCodeBuffer[ri].CMD1==0) || ( NCAreaGCodeBuffer[ri].CMD1==1)|| ( NCAreaGCodeBuffer[ri].CMD1==65) )
+	{
+		NC_AREAControl.DeltaSnow = NC_AREAControl.Snow-NC_AREAControl.CurrentStotalLast;
+
+		NC_AREAControl.NowValue.X = (INT32S)( ( divdp( (NC_AREAControl.DeltaSnow*NC_AREAControl.Cosine.X), System.UnitTo_mm ) + NCAreaGCodeBuffer[ri].StartPoint.X ));
+		NC_AREAControl.NowValue.Y = (INT32S)( ( divdp( (NC_AREAControl.DeltaSnow*NC_AREAControl.Cosine.Y), System.UnitTo_mm ) + NCAreaGCodeBuffer[ri].StartPoint.Y ));
+		NC_AREAControl.NowValue.Z = (INT32S)( ( divdp( (NC_AREAControl.DeltaSnow*NC_AREAControl.Cosine.Z), System.UnitTo_mm ) + NCAreaGCodeBuffer[ri].StartPoint.Z ));
+		NC_AREAControl.NowValue.A = (INT32S)( divdp( (NC_AREAControl.DeltaSnow*NC_AREAControl.Cosine.A), System.UnitTo_d ) )+ NCAreaGCodeBuffer[ri].StartPoint.A;	
+
+		if( ( OverallSign.ToleranceBigCanRunSign == 3 || OverallSign.ToleranceBigCanRunSign == 4 )
+			&& ( NCAreaGCodeBuffer[ri].CMD1==1 ) ) 
+		{
+			if( OverallSign.ToleranceBigCanRunSign == 3 )
+			{
+				NCArea3_VectorInterpolate( );
+			}
+			else
+			{
+				NCArea3_CutGcodeInterpolate();
+			}
+		}
+
+	}
+	else if( ( NCAreaGCodeBuffer[ri].CMD1 == 2 ) || ( NCAreaGCodeBuffer[ri].CMD1 == 3 ) )
+	{
+		NC_AREAControl.DeltaSnow = NC_AREAControl.Snow-NC_AREAControl.CurrentStotalLast;
+		NC_AREAControl.OldArcAngle = NC_AREAControl.CurrentArcAngle;
+		
+		if(!((NCAreaGCodeBuffer[ri].GGroup02+NCAreaGCodeBuffer[ri].CMD1)&0x1))
+		{    
+			 NC_AREAControl.CurrentArcAngle = NCAreaGCodeBuffer[ri].StartAngle+divdp( NC_AREAControl.DeltaSnow, NCAreaGCodeBuffer[ri].Radius*System.UnitTo_mm );
+			 if( NCAreaGCodeBuffer[ri].StartAngle >  NCAreaGCodeBuffer[ri].EndAngle)
+			 	 NCAreaGCodeBuffer[ri].StartAngle =  NCAreaGCodeBuffer[ri].StartAngle;
+		}
+		else
+		{
+			NC_AREAControl.CurrentArcAngle = NCAreaGCodeBuffer[ri].StartAngle-divdp( NC_AREAControl.DeltaSnow, NCAreaGCodeBuffer[ri].Radius*System.UnitTo_mm );
+			 if( NCAreaGCodeBuffer[ri].StartAngle <  NCAreaGCodeBuffer[ri].EndAngle)
+			 	 NCAreaGCodeBuffer[ri].StartAngle =  NCAreaGCodeBuffer[ri].StartAngle;			
+		}
+	
+		if(NCAreaGCodeBuffer[ri].GGroup02==17)
+		{	//xy			
+			NC_AREAControl.NowValue.X = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.X+NCAreaGCodeBuffer[ri].Radius*cosdp(NC_AREAControl.CurrentArcAngle))); 
+			NC_AREAControl.NowValue.Y = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Y+NCAreaGCodeBuffer[ri].Radius*sindp(NC_AREAControl.CurrentArcAngle))); 
+			if(NCAreaGCodeBuffer[ri].StartPoint.Z != NCAreaGCodeBuffer[ri].EndPoint.Z)
+			{
+				NC_AREAControl.NowValue.Z =  (INT32S)((fabs(divdp( (NC_AREAControl.CurrentArcAngle-NCAreaGCodeBuffer[ri].StartAngle), divdp( NCAreaGCodeBuffer[ri].Stotal, (NCAreaGCodeBuffer[ri].Radius*System.UnitTo_mm))) )*
+										(NCAreaGCodeBuffer[ri].EndPoint.Z-NCAreaGCodeBuffer[ri].StartPoint.Z)+NCAreaGCodeBuffer[ri].StartPoint.Z));
+			}
+			else
+			{
+				NC_AREAControl.NowValue.Z = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.Z);			
+			}
+		}
+		else if(NCAreaGCodeBuffer[ri].GGroup02==18)//换了ZX坐标，sin,cos要跟着换 royalqing 20100928
+		{	//xz
+			NC_AREAControl.NowValue.X = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.X+NCAreaGCodeBuffer[ri].Radius*sindp(NC_AREAControl.CurrentArcAngle))); 
+			NC_AREAControl.NowValue.Y = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.Y);
+			NC_AREAControl.NowValue.Z = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Z+NCAreaGCodeBuffer[ri].Radius*cosdp(NC_AREAControl.CurrentArcAngle))); 
+		}
+		else if(NCAreaGCodeBuffer[ri].GGroup02==19)
+		{	//yz
+			NC_AREAControl.NowValue.X = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.X);
+			NC_AREAControl.NowValue.Y = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Y+NCAreaGCodeBuffer[ri].Radius*cosdp(NC_AREAControl.CurrentArcAngle)));
+			NC_AREAControl.NowValue.Z = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Z+NCAreaGCodeBuffer[ri].Radius*sindp(NC_AREAControl.CurrentArcAngle)));
+		}			
+	}
+	else if( ( NCAreaGCodeBuffer[ri].CMD1 == 30 ) || ( NCAreaGCodeBuffer[ri].CMD1 == 31 ) )
+	{
+		NC_AREAControl.DeltaSnow = NC_AREAControl.Snow-NC_AREAControl.CurrentStotalLast;
+
+		if(!((NCAreaGCodeBuffer[ri].GGroup02+NCAreaGCodeBuffer[ri].CMD1)&0x1))
+		{
+			NC_AREAControl.CurrentArcAngle = NCAreaGCodeBuffer[ri].StartAngle+divdp( NC_AREAControl.DeltaSnow, NCAreaGCodeBuffer[ri].Radius*System.UnitTo_mm );		
+		}
+		else
+		{
+			NC_AREAControl.CurrentArcAngle = NCAreaGCodeBuffer[ri].StartAngle-divdp( NC_AREAControl.DeltaSnow, NCAreaGCodeBuffer[ri].Radius*System.UnitTo_mm );			
+		}
+		
+		if(NCAreaGCodeBuffer[ri].GGroup02==17)
+		{	//xy
+			NC_AREAControl.NowValue.X =  (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.X+NCAreaGCodeBuffer[ri].Radius*cosdp(NC_AREAControl.CurrentArcAngle)));
+			NC_AREAControl.NowValue.Y = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Y+NCAreaGCodeBuffer[ri].Radius*sindp(NC_AREAControl.CurrentArcAngle)));
+		
+			//处理螺旋线
+			if(NCAreaGCodeBuffer[ri].StartPoint.Z != NCAreaGCodeBuffer[ri].EndPoint.Z)
+			{
+				NC_AREAControl.NowValue.Z = (INT32S)((fabs(divdp( (NC_AREAControl.CurrentArcAngle-NCAreaGCodeBuffer[ri].StartAngle), divdp( NCAreaGCodeBuffer[ri].Stotal, (NCAreaGCodeBuffer[ri].Radius*System.UnitTo_mm))) )*
+										(NCAreaGCodeBuffer[ri].EndPoint.Z-NCAreaGCodeBuffer[ri].StartPoint.Z)+NCAreaGCodeBuffer[ri].StartPoint.Z));
+			}
+			else
+			{
+				NC_AREAControl.NowValue.Z = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.Z);
+			}
+		}
+		else if(NCAreaGCodeBuffer[ri].GGroup02==18)//G30\G31 G18平面同样要换
+		{	//xz
+			NC_AREAControl.NowValue.X = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.X+NCAreaGCodeBuffer[ri].Radius*sindp(NC_AREAControl.CurrentArcAngle)));
+			NC_AREAControl.NowValue.Y = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.Y);
+			NC_AREAControl.NowValue.Z = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Z+NCAreaGCodeBuffer[ri].Radius*cosdp(NC_AREAControl.CurrentArcAngle)));
+		}
+		else if(NCAreaGCodeBuffer[ri].GGroup02==19)
+		{	//yz
+			NC_AREAControl.NowValue.X = (INT32S)(NCAreaGCodeBuffer[ri].StartPoint.X);
+			NC_AREAControl.NowValue.Y = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Y+NCAreaGCodeBuffer[ri].Radius*cosdp(NC_AREAControl.CurrentArcAngle)));
+			NC_AREAControl.NowValue.Z = (INT32S)((NCAreaGCodeBuffer[ri].CenterPoint.Z+NCAreaGCodeBuffer[ri].Radius*sindp(NC_AREAControl.CurrentArcAngle)));		
+		}			
+	}
+
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NcAreaDeltaStep()                                   */
+/*  Argument:AREA_CONTROL .	GCODE  ,NC_RUN_SIGN                                  */
+/*  Return value: NO									*/
+/*  Function: cal. DeltaStep                                 */
+/***************************************************************************/
+//工件坐标->名义坐标->机床坐标->DeltaStep	->坐标继承
+INT16U NCArea_DeltaStep(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBufferPointer, tsNC_RUN_SIGN *psAreaRunNCSign)
+{
+	
+	NCCoord_WorkToMACToLinear(&psAREAControl->NowValue, &psAREAControl->NowPointMACHPulseOut);
+	NCArea_CheckEndpointValue(psAREAControl);
+	NCArea_CheckPointDirection(psAREAControl);
+
+	psAREAControl->DeltaStep.X = psAREAControl->NowPointMACHPulseOut.X-psAREAControl->OldPointMACHPulseOut.X; 
+	psAREAControl->DeltaStep.Y = psAREAControl->NowPointMACHPulseOut.Y-psAREAControl->OldPointMACHPulseOut.Y; 
+	psAREAControl->DeltaStep.Z = psAREAControl->NowPointMACHPulseOut.Z-psAREAControl->OldPointMACHPulseOut.Z; 
+		
+	if(NCArea_PulseToServoCheck(&psAREAControl->DeltaStep) == FALSE)
+		return FALSE;
+	
+	psAREAControl->OldPointMACHPulseOut.X = psAREAControl->NowPointMACHPulseOut.X; 
+	psAREAControl->OldPointMACHPulseOut.Y = psAREAControl->NowPointMACHPulseOut.Y; 
+	psAREAControl->OldPointMACHPulseOut.Z = psAREAControl->NowPointMACHPulseOut.Z;	
+	psAREAControl->OldValue.X = psAREAControl->NowValue.X;
+	psAREAControl->OldValue.Y = psAREAControl->NowValue.Y;
+	psAREAControl->OldValue.Z = psAREAControl->NowValue.Z;
+	
+	System.SystemSimulationRunSign = 1;
+	
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaCheckEndpointValue()                                   */
+/*  Argument:AREA_CONTROL .	                                    */
+/*  Return value: NO									*/
+/*  Function: check_endpoint_value                                 */
+/***************************************************************************/
+void NCArea_CheckEndpointValue(tsAREA_CONTROL *AREAControl)	//检查插补点有无超出终点范围
+{
+	INT32U 	ri;
+	ri = NC_AREAControl.NCArea_ri;
+
+	if((NCAreaGCodeBuffer[ri].CMD1==2)||(NCAreaGCodeBuffer[ri].CMD1==3)||(NCAreaGCodeBuffer[ri].CMD1==30)||(NCAreaGCodeBuffer[ri].CMD1==31))
+	{
+	    if(((!((NCAreaGCodeBuffer[ri].GGroup02+NCAreaGCodeBuffer[ri].CMD1)&0x1))&&(NC_AREAControl.CurrentArcAngle>NCAreaGCodeBuffer[ri].EndAngle))
+			||(((NCAreaGCodeBuffer[ri].GGroup02+NCAreaGCodeBuffer[ri].CMD1)&0x1)&&(NC_AREAControl.CurrentArcAngle<NCAreaGCodeBuffer[ri].EndAngle)))
+	    {
+		    NC_AREAControl.CurrentArcAngle = NCAreaGCodeBuffer[ri].EndAngle;
+			AREAControl->NowPointMACHPulseOut.X = AREAControl->EndPointMachPulseOut.X;
+			AREAControl->NowPointMACHPulseOut.Y = AREAControl->EndPointMachPulseOut.Y;
+			AREAControl->NowPointMACHPulseOut.Z = AREAControl->EndPointMachPulseOut.Z;		    
+	    }
+		return ;
+	}
+
+	if(OverallSign.TheoryMoveSign.X == MovePositive)
+	{
+		if(AREAControl->NowPointMACHPulseOut.X > AREAControl->EndPointMachPulseOut.X)
+		{
+			AREAControl->NowPointMACHPulseOut.X = AREAControl->EndPointMachPulseOut.X;
+		}
+	}
+	else 
+	{
+		if(AREAControl->NowPointMACHPulseOut.X < AREAControl->EndPointMachPulseOut.X)
+		{
+			AREAControl->NowPointMACHPulseOut.X = AREAControl->EndPointMachPulseOut.X;
+		}
+	}
+
+	if(OverallSign.TheoryMoveSign.Y == MovePositive)
+	{
+		if(AREAControl->NowPointMACHPulseOut.Y > AREAControl->EndPointMachPulseOut.Y)
+		{
+			AREAControl->NowPointMACHPulseOut.Y = AREAControl->EndPointMachPulseOut.Y;
+		}
+	}
+	else 
+	{
+		if(AREAControl->NowPointMACHPulseOut.Y < AREAControl->EndPointMachPulseOut.Y)
+		{
+			AREAControl->NowPointMACHPulseOut.Y = AREAControl->EndPointMachPulseOut.Y;
+		}
+	}
+	
+	if(OverallSign.TheoryMoveSign.Z == MovePositive)
+	{
+		if(AREAControl->NowPointMACHPulseOut.Z > AREAControl->EndPointMachPulseOut.Z)
+		{
+			AREAControl->NowPointMACHPulseOut.Z = AREAControl->EndPointMachPulseOut.Z;
+		}
+	}
+	else 
+	{
+		if(AREAControl->NowPointMACHPulseOut.Z < AREAControl->EndPointMachPulseOut.Z)
+		{
+			AREAControl->NowPointMACHPulseOut.Z = AREAControl->EndPointMachPulseOut.Z;
+		}
+	}
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaCheckPointDirection()                                   */
+/*  Argument:AREA_CONTROL .	                                    */
+/*  Return value: NO									*/
+/*  Function: check_point_direction                                 */
+/***************************************************************************/
+void NCArea_CheckPointDirection(tsAREA_CONTROL *AREAControl)
+{
+	INT32U 	ri;
+	ri = NC_AREAControl.NCArea_ri;
+
+	if((NCAreaGCodeBuffer[ri].CMD1==2)||(NCAreaGCodeBuffer[ri].CMD1==3)||(NCAreaGCodeBuffer[ri].CMD1==30)||(NCAreaGCodeBuffer[ri].CMD1==31))
+	{
+	    if(((!((NCAreaGCodeBuffer[ri].GGroup02+NCAreaGCodeBuffer[ri].CMD1)&0x1))&&(NC_AREAControl.CurrentArcAngle < NC_AREAControl.OldArcAngle))
+			||(((NCAreaGCodeBuffer[ri].GGroup02+NCAreaGCodeBuffer[ri].CMD1)&0x1)&&(NC_AREAControl.CurrentArcAngle > NC_AREAControl.OldArcAngle)))
+	    {
+		    NC_AREAControl.CurrentArcAngle = NC_AREAControl.OldArcAngle;
+			AREAControl->NowPointMACHPulseOut.X = AREAControl->OldPointMACHPulseOut.X;
+			AREAControl->NowPointMACHPulseOut.Y = AREAControl->OldPointMACHPulseOut.Y;
+			AREAControl->NowPointMACHPulseOut.Z = AREAControl->OldPointMACHPulseOut.Z;
+	    }
+		return ;
+	}
+
+	if(OverallSign.TheoryMoveSign.X == MovePositive)
+	{
+		if(AREAControl->NowPointMACHPulseOut.X < AREAControl->OldPointMACHPulseOut.X)
+		{
+			AREAControl->NowPointMACHPulseOut.X = AREAControl->OldPointMACHPulseOut.X;
+		}
+	}
+	else 
+	{
+		if(AREAControl->NowPointMACHPulseOut.X > AREAControl->OldPointMACHPulseOut.X)
+		{
+			AREAControl->NowPointMACHPulseOut.X = AREAControl->OldPointMACHPulseOut.X;
+		}
+	}
+
+	if(OverallSign.TheoryMoveSign.Y == MovePositive)
+	{
+		if(AREAControl->NowPointMACHPulseOut.Y < AREAControl->OldPointMACHPulseOut.Y)
+		{
+			AREAControl->NowPointMACHPulseOut.Y = AREAControl->OldPointMACHPulseOut.Y;
+		}
+	}
+	else 
+	{
+		if(AREAControl->NowPointMACHPulseOut.Y > AREAControl->OldPointMACHPulseOut.Y)
+		{
+			AREAControl->NowPointMACHPulseOut.Y = AREAControl->OldPointMACHPulseOut.Y;
+		}
+	}
+	
+	if(OverallSign.TheoryMoveSign.Z == MovePositive)
+	{
+		if(AREAControl->NowPointMACHPulseOut.Z < AREAControl->OldPointMACHPulseOut.Z)
+		{
+			AREAControl->NowPointMACHPulseOut.Z = AREAControl->OldPointMACHPulseOut.Z;
+		}
+	}
+	else 
+	{
+		if(AREAControl->NowPointMACHPulseOut.Z > AREAControl->OldPointMACHPulseOut.Z)
+		{
+			AREAControl->NowPointMACHPulseOut.Z = AREAControl->OldPointMACHPulseOut.Z;
+		}
+	}
+}
+
+INT16U NCArea_DealWithZeroPulse(tsAREA_CONTROL *psAREAControl)  
+{
+	//三轴都为零时不输出插补
+	if((abs(psAREAControl->DeltaStep.X)+abs(psAREAControl->DeltaStep.Y)+abs(psAREAControl->DeltaStep.Z)) == 0 )
+	{
+	    psAREAControl->I++;
+	    return FALSE;
+	}
+
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaEnsureDirection()                                   */
+/*  Argument:AREA_CONTROL .NC_RUN_SIGN	                                    */
+/*  Return value: NO									*/
+/*  Function: EnsureDirection                                 */
+/***************************************************************************/
+void NCArea_EnsureDirection(tsAREA_CONTROL *psAREAControl, tsNC_RUN_SIGN *psAreaRunNCSign)	
+{
+	OverallSign.GapCompensateCnt.X = 0;
+	OverallSign.GapCompensateCnt.Y = 0;
+	OverallSign.GapCompensateCnt.Z = 0;
+	
+	if(psAREAControl->DeltaStep.X>0)
+	{
+		if(OverallSign.MoveSign.X==0)
+		{
+			psAREAControl->DeltaStep.X = psAREAControl->DeltaStep.X + System.GapPulse.X;
+			OverallSign.GapCompensateCnt.X = System.GapPulse.X;
+			psAreaRunNCSign->NeedBack.X = 0;
+		}		
+		OverallSign.MoveSign.X = 1;   
+	}
+	else if(psAREAControl->DeltaStep.X<0)
+	{
+		if(OverallSign.MoveSign.X==1) 
+		{
+			psAREAControl->DeltaStep.X = psAREAControl->DeltaStep.X - System.GapPulse.X;
+			OverallSign.GapCompensateCnt.X = - System.GapPulse.X;
+			psAreaRunNCSign->NeedBack.X = 0;
+		}		
+		OverallSign.MoveSign.X = 0;
+	}
+	else if(psAreaRunNCSign->NeedBack.X != 0) 		
+	{
+		if(psAreaRunNCSign->NeedBack.X==1)		//positive gap compensation
+		{
+			psAREAControl->DeltaStep.X = System.GapPulse.X;
+			OverallSign.GapCompensateCnt.X = System.GapPulse.X;
+			OverallSign.MoveSign.X = 1;   
+		}
+		else if(psAreaRunNCSign->NeedBack.X==2)	//negtive gap compensation
+		{
+			psAREAControl->DeltaStep.X = -System.GapPulse.X;
+			OverallSign.GapCompensateCnt.X = - System.GapPulse.X;
+			OverallSign.MoveSign.X = 0;   
+		}		
+		psAreaRunNCSign->NeedBack.X = 0;
+		
+	}
+	
+	if(psAREAControl->DeltaStep.Y>0)
+	{	
+		if(OverallSign.MoveSign.Y==0) 
+		{
+			psAREAControl->DeltaStep.Y = psAREAControl->DeltaStep.Y + System.GapPulse.Y;
+			OverallSign.GapCompensateCnt.Y = System.GapPulse.Y;
+			psAreaRunNCSign->NeedBack.Y = 0;
+		}		
+		OverallSign.MoveSign.Y = 1; 				   
+	}
+	else if(psAREAControl->DeltaStep.Y<0)
+	{	
+		if(OverallSign.MoveSign.Y==1) 
+		{
+			psAREAControl->DeltaStep.Y = psAREAControl->DeltaStep.Y - System.GapPulse.Y;
+			OverallSign.GapCompensateCnt.Y = - System.GapPulse.Y;
+			psAreaRunNCSign->NeedBack.Y = 0;
+		}		
+		OverallSign.MoveSign.Y = 0;
+	}
+	else if(psAreaRunNCSign->NeedBack.Y != 0) 		
+	{
+		if(psAreaRunNCSign->NeedBack.Y==1)		//positive gap compensation
+		{
+			psAREAControl->DeltaStep.Y = System.GapPulse.Y;
+			OverallSign.GapCompensateCnt.Y = System.GapPulse.Y;
+			OverallSign.MoveSign.Y = 1;   
+		}
+		else if(psAreaRunNCSign->NeedBack.Y==2)	//negtive gap compensation
+		{
+			psAREAControl->DeltaStep.Y = -System.GapPulse.Y;
+			OverallSign.GapCompensateCnt.Y = - System.GapPulse.Y;
+			OverallSign.MoveSign.Y = 0;   
+		}		
+		psAreaRunNCSign->NeedBack.Y = 0;
+	}
+	
+	if(psAREAControl->DeltaStep.Z>0)
+	{	
+		if(OverallSign.MoveSign.Z==0) 
+		{
+			psAREAControl->DeltaStep.Z = psAREAControl->DeltaStep.Z + System.GapPulse.Z;
+			OverallSign.GapCompensateCnt.Z = System.GapPulse.Z;
+			psAreaRunNCSign->NeedBack.Z = 0;
+		}
+		
+		OverallSign.MoveSign.Z = 1;
+	}
+	else if(psAREAControl->DeltaStep.Z<0)
+	{	
+		if(OverallSign.MoveSign.Z==1) 
+		{
+			psAREAControl->DeltaStep.Z = psAREAControl->DeltaStep.Z - System.GapPulse.Z;
+			OverallSign.GapCompensateCnt.Z = - System.GapPulse.Z;
+			psAreaRunNCSign->NeedBack.Z = 0;
+		}		
+		OverallSign.MoveSign.Z = 0;
+	}
+	else if(psAreaRunNCSign->NeedBack.Z != 0) 		
+	{
+		if(psAreaRunNCSign->NeedBack.Z==1)		//positive gap compensation
+		{
+			psAREAControl->DeltaStep.Z = System.GapPulse.Z;
+			OverallSign.GapCompensateCnt.Z = System.GapPulse.Z;
+			OverallSign.MoveSign.Z = 1;   
+		}
+		else if(psAreaRunNCSign->NeedBack.Z==2)	//negtive gap compensation
+		{
+			psAREAControl->DeltaStep.Z = -System.GapPulse.Z;
+			OverallSign.GapCompensateCnt.Z = -System.GapPulse.Z;
+			OverallSign.MoveSign.Z = 0;   
+		}		
+		psAreaRunNCSign->NeedBack.Z = 0;		
+	}
+	
+    NCAreaBackGapAverage(psAREAControl);
+	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaJudgeLimit()                                   */
+/*  Argument:AREA_CONTROL 	                                    */
+/*  Return value: NO*/
+/*  Function: JudgeLimit                                 */
+/***************************************************************************/
+void NCArea_JudgeLimit(tsAREA_CONTROL *psAREAControl)	//判断有无到极限位，并做相应处理
+{
+	//绝对式编码器版本务必加入软限位判断
+	OverallSign.HardLimitNeedGetPositionSign = 0;
+
+	if(OverallSign.NCSign == NCSIGN_STD)
+	{
+		if(((OverallSign.MoveSign.X==1)&&(GET_XPOS==0)) ||
+			((OverallSign.MoveSign.X==0)&&(GET_XNEG==0))) 
+		{
+			psAREAControl->DeltaStep.X = 0;
+			psAREAControl->DeltaStep.Y = 0;
+			psAREAControl->DeltaStep.Z = 0;		
+			return;
+		}
+		if(((OverallSign.MoveSign.Y==1)&&(GET_YPOS==0)) ||
+			((OverallSign.MoveSign.Y==0)&&(GET_YNEG==0))) 
+		{
+			psAREAControl->DeltaStep.X = 0;
+			psAREAControl->DeltaStep.Y = 0;
+			psAREAControl->DeltaStep.Z = 0;			
+			return;
+		}
+		if(((OverallSign.MoveSign.Z==1)&&(GET_ZPOS==0)) ||
+			((OverallSign.MoveSign.Z==0)&&(GET_ZNEG==0))) 
+		{
+			psAREAControl->DeltaStep.X = 0;
+			psAREAControl->DeltaStep.Y = 0;
+			psAREAControl->DeltaStep.Z = 0;			
+			return;
+		}
+		
+	}
+	else if( OverallSign.NCSign == NCSIGN_SPC )
+	{
+		if(((OverallSign.MoveSign.X==1)&&(GET_XPOS==0)) ||
+			((OverallSign.MoveSign.X==0)&&(GET_XNEG==0))) 
+		{
+			psAREAControl->DeltaStep.X = 0;
+			OverallSign.HardLimitNeedGetPositionSign = 1;
+		}
+
+		if(((OverallSign.MoveSign.Y==1)&&(GET_YPOS==0)) ||
+			((OverallSign.MoveSign.Y==0)&&(GET_YNEG==0))) 
+		{
+			psAREAControl->DeltaStep.Y = 0;
+			OverallSign.HardLimitNeedGetPositionSign = 1;
+		}
+
+		if(((OverallSign.MoveSign.Z==1)&&(GET_ZPOS==0)) ||
+			((OverallSign.MoveSign.Z==0)&&(GET_ZNEG==0))) 
+		{
+			psAREAControl->DeltaStep.Z = 0;
+			OverallSign.HardLimitNeedGetPositionSign = 1;
+		}
+		
+		if( System.FeedAxisBusStyle == 0 )		//脉冲型找参考点用
+		{
+			if((Reference.SearchRefSign) && (Reference.RefStep==0))
+			{
+				if( GET_XPOS && GET_XNEG)
+				{
+					psAREAControl->DeltaStep.X = 0;
+					
+				}
+				if( GET_YPOS && GET_YNEG)
+				{
+					psAREAControl->DeltaStep.Y = 0;
+				}
+				if( GET_ZPOS && GET_ZNEG)
+				{
+					psAREAControl->DeltaStep.Z = 0;
+				}
+			}
+		}		
+	}	
+}
+
+void  NCArea_SoftLimit(tsAREA_CONTROL *psAREAControl)
+{
+	if((Reference.FindRefSign.X)&&(Reference.FindRefSign.Y)&&(Reference.FindRefSign.Z))
+	{	
+		if((OverallSign.MoveSign.X==1)&&(X_Encoder.MACH_PositionValue >= System.XLimitPos))
+		{
+			System.SoftLimit |= BIT(0);
+		    psAREAControl->DeltaStep.X = 0;
+		}
+		if((OverallSign.MoveSign.Y==1)&&(Y_Encoder.MACH_PositionValue >= System.YLimitPos))
+		{
+			System.SoftLimit |= BIT1;
+			psAREAControl->DeltaStep.Y = 0;
+		}
+		if((OverallSign.MoveSign.Z==1)&&(Z_Encoder.MACH_PositionValue >= System.ZLimitPos))
+		{
+			System.SoftLimit |= BIT2;
+			psAREAControl->DeltaStep.Z = 0;
+		}
+		if((OverallSign.MoveSign.X==0)&&(X_Encoder.MACH_PositionValue <= System.XLimitNeg))
+		{
+			System.SoftLimit |= BIT8;
+			psAREAControl->DeltaStep.X = 0;
+		}
+		if((OverallSign.MoveSign.Y==0)&&(Y_Encoder.MACH_PositionValue <= System.YLimitNeg))
+		{
+			System.SoftLimit |= BIT9;
+			psAREAControl->DeltaStep.Y = 0;
+		}
+		if((OverallSign.MoveSign.Z==0)&&(Z_Encoder.MACH_PositionValue <= System.ZLimitNeg))
+		{
+			System.SoftLimit |= BIT10;	
+			psAREAControl->DeltaStep.Z = 0;
+		}
+	}    
+}
+
+INT16U NCArea_PulseToServoCheck(INT40AXIS *psDeltaPulse)  
+{
+    //return TRUE; // disable check fot test 20140922
+	//改进算法
+	if((abs(psDeltaPulse->X) <= X_Servo.AxisOutUnitEQUSp) &&(abs(psDeltaPulse->Y) <=Y_Servo.AxisOutUnitEQUSp)&&(abs(psDeltaPulse->Z) <=Z_Servo.AxisOutUnitEQUSp))
+		return TRUE;
+	Error.InterpolationOver = 2;
+	high_error();		//CH0904
+	return FALSE;		
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaCal_V_tpr()                                   */
+/*  Argument:AREA_CONTROL 	                                    */
+/*  Return value: NO*/
+/*  Function: Cal_V_tpr                                 */
+/***************************************************************************/
+void NCArea_Cal_V_tpr(tsAREA_CONTROL *psAREAControl)			
+{
+	FLOAT64 	cos_x1,cos_y1,cos_z1,l1;        
+
+	l1 = sqrtdp(powdp((divdp(psAREAControl->DeltaStep.X,X_Servo.AxisOutUnitEQU)),2)+powdp((divdp(psAREAControl->DeltaStep.Y,Y_Servo.AxisOutUnitEQU)),2)+powdp((divdp(psAREAControl->DeltaStep.Z,Z_Servo.AxisOutUnitEQU)),2));    
+
+	if(l1<1)
+	{
+		l1 = 1;
+	}
+
+	cos_x1 = fabs(divdp(psAREAControl->DeltaStep.X,l1*X_Servo.AxisOutUnitEQU));
+	cos_y1 = fabs(divdp(psAREAControl->DeltaStep.Y,l1*Y_Servo.AxisOutUnitEQU));
+	cos_z1 = fabs(divdp(psAREAControl->DeltaStep.Z,l1*Z_Servo.AxisOutUnitEQU));   
+
+	if( abs(psAREAControl->DeltaStep.X)==0 ) 
+	{
+		X_Servo.PWM_PeriodRegister=10;
+	}
+	else
+	{
+		X_Servo.PWM_PeriodRegister = divdp( FPGA_MAX_F, divdp((psAREAControl->VNowOut*cos_x1*1e6),System.LinearAxisOutUnitEQU));
+		X_Servo.PWM_PeriodRegister = divdp( X_Servo.PWM_PeriodRegister, X_Servo.AxisOutUnitEQU);
+
+		if(X_Servo.PWM_PeriodRegister > System.PWM_PeriodRegister_MAX)
+		{
+			X_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MAX;		
+		}
+		if(X_Servo.PWM_PeriodRegister < System.PWM_PeriodRegister_MIN) 
+		{
+			X_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MIN;
+		}
+	}
+
+	if( abs(psAREAControl->DeltaStep.Y)==0 ) 
+	{
+		Y_Servo.PWM_PeriodRegister= 10;
+	}
+	else
+	{
+		Y_Servo.PWM_PeriodRegister = divdp( FPGA_MAX_F, divdp((psAREAControl->VNowOut*cos_y1*1e6),System.LinearAxisOutUnitEQU));
+		Y_Servo.PWM_PeriodRegister = divdp( Y_Servo.PWM_PeriodRegister, Y_Servo.AxisOutUnitEQU);
+
+		if(Y_Servo.PWM_PeriodRegister > System.PWM_PeriodRegister_MAX)
+		{
+			Y_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MAX;		
+		}
+		if(Y_Servo.PWM_PeriodRegister < System.PWM_PeriodRegister_MIN) 
+		{
+			Y_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MIN;
+		}
+	}
+	
+	if( abs(psAREAControl->DeltaStep.Z)==0 ) 
+	{
+		Z_Servo.PWM_PeriodRegister= 10;
+	}
+	else
+	{
+		Z_Servo.PWM_PeriodRegister = divdp( FPGA_MAX_F, divdp((psAREAControl->VNowOut*cos_z1*1e6),System.LinearAxisOutUnitEQU));
+		Z_Servo.PWM_PeriodRegister = divdp( Z_Servo.PWM_PeriodRegister, Z_Servo.AxisOutUnitEQU);
+
+		if(Z_Servo.PWM_PeriodRegister > System.PWM_PeriodRegister_MAX)
+		{
+			Z_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MAX;		
+		}
+		if(Z_Servo.PWM_PeriodRegister < System.PWM_PeriodRegister_MIN) 
+		{
+			Z_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_MIN;
+		}
+	}
+	return;
+}
+
+INT16U NCArea_InterpolationBuffer(tsAREA_CONTROL *psAREAControl) 
+{	
+	tsINTERPOLATION_BUFFER *psInterpolationBuffer;
+	
+	if(System.RunState == 1)
+	{
+		psAREAControl->I++;
+		return TRUE;
+	}	
+	if((psAREAControl->DeltaStep.X==0)&&(psAREAControl->DeltaStep.Y==0)&&(psAREAControl->DeltaStep.Z==0))
+	{
+		X_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_ZeroPeriod;
+		Y_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_ZeroPeriod;
+		Z_Servo.PWM_PeriodRegister = System.PWM_PeriodRegister_ZeroPeriod;
+	}					
+
+	//IRQ_disable(IRQ_EVT_EXTINT4);  
+	//IRQ_disable(IRQ_EVT_EXTINT6); 
+	IRQ_DISABLE(IRQNUM_PLUSE);
+	IRQ_DISABLE(IRQNUM_MBUS);
+
+	psInterpolationBuffer=&InterpolationBuffer[OverallSign.InterpolationSendCnt++%INTERPOLATIONBUFLENGTH];
+	//确定各轴运动方向
+	psInterpolationBuffer->XSIGN = (OverallSign.MoveSign.X != X_Servo.S003)?1:0;
+	psInterpolationBuffer->YSIGN = (OverallSign.MoveSign.Y != Y_Servo.S003)?1:0;
+	psInterpolationBuffer->ZSIGN = (OverallSign.MoveSign.Z != Z_Servo.S003)?1:0;	
+	
+	psInterpolationBuffer->DeltaPulse.X = psAREAControl->DeltaStep.X;
+	psInterpolationBuffer->DeltaPulse.Y = psAREAControl->DeltaStep.Y;
+	psInterpolationBuffer->DeltaPulse.Z = psAREAControl->DeltaStep.Z;
+	
+	psInterpolationBuffer->X_PWM_PeriodRegister = X_Servo.PWM_PeriodRegister;
+	psInterpolationBuffer->Y_PWM_PeriodRegister = Y_Servo.PWM_PeriodRegister;
+	psInterpolationBuffer->Z_PWM_PeriodRegister = Z_Servo.PWM_PeriodRegister;
+
+	psInterpolationBuffer->VNowOut = psAREAControl->VNowOut;
+	psInterpolationBuffer->MoveSign.X = OverallSign.MoveSign.X;
+	psInterpolationBuffer->MoveSign.Y = OverallSign.MoveSign.Y;
+	psInterpolationBuffer->MoveSign.Z = OverallSign.MoveSign.Z;
+
+	psAREAControl->I++;
+	
+    #if DSPFunctionDebug
+	if(MonitorBuffer3Cnt>1)
+	{
+		if(fabs(MonitorBuffer3[MonitorBuffer3Cnt-1]-psAREAControl->DeltaStep.X)> 300)
+		{
+			psAREAControl->DeltaStep.X = psAREAControl->DeltaStep.X;
+		}
+	}
+	MonitorBuffer1[MonitorBuffer1Cnt++] = psAREAControl->NowValue.X;
+	if(MonitorBuffer1Cnt > 1000)
+	{
+		MonitorBuffer1Cnt = 0;
+		MonitorBuffer1[MonitorBuffer1Cnt] = psAREAControl->NowValue.X;
+		//断点以更新MonitorBuffer3Cnt = 0时的值
+		psAREAControl->NowValue.X = psAREAControl->NowValue.X;
+	}
+	MonitorBuffer2[MonitorBuffer2Cnt++] = psAREAControl->NowValue.Y;
+	if(MonitorBuffer2Cnt > 1000)
+	{
+		MonitorBuffer2Cnt = 0;
+		MonitorBuffer2[MonitorBuffer2Cnt] = psAREAControl->NowValue.Y;
+		//断点以更新MonitorBuffer3Cnt = 0时的值
+		psAREAControl->NowValue.Y = psAREAControl->NowValue.Y;
+	}		
+	MonitorBuffer3[MonitorBuffer3Cnt++] = psAREAControl->DeltaStep.X;
+	if(MonitorBuffer3Cnt > 1000)
+	{
+		MonitorBuffer3Cnt = 0;
+		MonitorBuffer3[MonitorBuffer3Cnt] = psAREAControl->DeltaStep.X;
+		//断点以更新MonitorBuffer3Cnt = 0时的值
+		psAREAControl->DeltaStep.X = psAREAControl->DeltaStep.X;
+	}
+	MonitorBuffer4[MonitorBuffer4Cnt++] = psAREAControl->DeltaStep.Y;
+	if(MonitorBuffer4Cnt > 1000)
+	{
+		MonitorBuffer4Cnt = 0;
+		MonitorBuffer4[MonitorBuffer4Cnt] = psAREAControl->DeltaStep.Y;
+		//断点以更新MonitorBuffer3Cnt = 0时的值
+		psAREAControl->DeltaStep.Y = psAREAControl->DeltaStep.Y;
+	}		
+    #endif
+
+	//IRQ_enable(IRQ_EVT_EXTINT4); 
+	IRQ_ENABLE(IRQNUM_PLUSE);
+	return TRUE;
+}
+	
+INT16U NCArea_PulseToServo(void)  
+{
+	tsINTERPOLATION_BUFFER *psInterpolationBuf;
+
+	OverallSign.Int4IdleSign = 0;
+	if(OverallSign.InterpolationRunCnt >= OverallSign.InterpolationSendCnt)
+	{
+		return FALSE;
+	}
+
+	//CPLD_ReadIOIn3();
+	
+	if(OverallSign.EveryAxisOverValid != 1)
+	{
+		return FALSE;	
+	}
+
+	psInterpolationBuf = &InterpolationBuffer[OverallSign.InterpolationRunCnt%INTERPOLATIONBUFLENGTH];
+	if(NCArea_PulseToServoCheck(&psInterpolationBuf->DeltaPulse)== FALSE)
+	{
+		return FALSE;
+	}
+	
+	if(OverallSign.InterpolationRunCnt < OverallSign.InterpolationSendCnt)
+	{
+		OverallSign.InterpolationRunCnt++;
+	}
+	
+	CLR_LPMEN; 
+	WRITE_XSIGN( psInterpolationBuf->XSIGN );
+	WRITE_YSIGN( psInterpolationBuf->YSIGN );
+	WRITE_ZSIGN( psInterpolationBuf->ZSIGN );
+    FLUSH_CPLD_OUT;
+    
+	*(X_Servo.LPM_CounterPort) = abs(psInterpolationBuf->DeltaPulse.X);
+	*(Y_Servo.LPM_CounterPort) = abs(psInterpolationBuf->DeltaPulse.Y);
+	*(Z_Servo.LPM_CounterPort) = abs(psInterpolationBuf->DeltaPulse.Z);
+
+	*(X_Servo.PWM_Port) = psInterpolationBuf->X_PWM_PeriodRegister;
+	*(Y_Servo.PWM_Port) = psInterpolationBuf->Y_PWM_PeriodRegister;
+	*(Z_Servo.PWM_Port) = psInterpolationBuf->Z_PWM_PeriodRegister;
+
+	SET_LPMEN;
+	
+	return TRUE;
+}
+
+INT16U NCAreaBackGapAverage(tsAREA_CONTROL *psAREAControl) 
+{//向后平摊5次
+	static INT40AXIS	  AverageValue={0,0,0,0,0};		//平摊值	
+	INT40AXIS     AverageSurplusValue;      //平摊剩余值
+	
+	if((System.FunctionSelectionSwitch_04 & 0x04) != 0x04)
+		return FALSE;
+		
+	if(OverallSign.CurrentGapSign == 1)
+	{
+		psAREAControl->DeltaStep.X += AverageValue.X;
+		psAREAControl->DeltaStep.Y += AverageValue.Y;
+		psAREAControl->DeltaStep.Z += AverageValue.Z;
+		AverageValue.X = 0;
+		AverageValue.Y = 0;
+		AverageValue.Z = 0;
+		OverallSign.CurrentGapSign = 0;
+	    return FALSE; 		
+	}
+	
+    if((abs(OverallSign.GapCompensateCnt.X)<5)&&(abs(OverallSign.GapCompensateCnt.Y)<5)&&(abs(OverallSign.GapCompensateCnt.Z)<5))	
+		return FALSE;
+	if((NC_AREAControl.TotalN-NC_AREAControl.I)< 5)
+		return FALSE;
+	
+	//增加反向间隙值后的第一个插补周期
+	AverageValue.X = OverallSign.GapCompensateCnt.X/2;
+	AverageValue.Y = OverallSign.GapCompensateCnt.Y/2;
+	AverageValue.Z = OverallSign.GapCompensateCnt.Z/2;
+	AverageSurplusValue.X = OverallSign.GapCompensateCnt.X - AverageValue.X * 2;
+	AverageSurplusValue.Y = OverallSign.GapCompensateCnt.Y - AverageValue.Y * 2;
+	AverageSurplusValue.Z = OverallSign.GapCompensateCnt.Z - AverageValue.Z * 2;	
+    psAREAControl->DeltaStep.X -= (OverallSign.GapCompensateCnt.X - AverageValue.X - AverageSurplusValue.X);
+	psAREAControl->DeltaStep.Y -= (OverallSign.GapCompensateCnt.Y - AverageValue.Y - AverageSurplusValue.Y);
+	psAREAControl->DeltaStep.Z -= (OverallSign.GapCompensateCnt.Z - AverageValue.Z - AverageSurplusValue.Z);	
+	OverallSign.CurrentGapSign = 1;
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaRun()                                   */
+/*  Argument:AREA_CONTROL ,GCODE ,NC_RUN_SIGN   	                                    */
+/*  Return value: 0:AreaRun not complete;1:AreaRun complete*/
+/*  Function: AreaRun                                 */
+/***************************************************************************/
+void NCArea_Run(void)
+{		
+	funtion_v.Int8_a = 0;
+	NC_AREAControl.NCArea_ri = (NCRunSign.RealRunCount-1) % STDGCODE_MOD;	
+    //for test
+	RealRunGCode = NCAreaGCodeBuffer[NC_AREAControl.NCArea_ri];
+
+	if(NCArea_RigidTapTransducer(&NC_AREAControl, NCAreaGCodeBuffer, &NCRunSign) == FALSE)
+	{
+		return ;
+	}
+	NCArea_GetEndCodeCount(&NCAreaGCodeBuffer[(NCRunSign.EndCodeCount-1)%STDGCODE_MOD]);	
+	if(NCArea_RunPrecalculate() == FALSE)
+	{	//区域预计算
+		NC_AREAControl.Snow = NC_AREAControl.Snow;//for break point
+		return ;
+	}
+	
+	NCArea_FeedrateOverride(&NC_AREAControl, NCAreaGCodeBuffer, &NCRunSign);	
+	NCArea_ATCLockStop(&NCAreaGCodeBuffer[(NCRunSign.RealRunCount-1)%STDGCODE_MOD]);
+	if(NCArea_FeedrateChangeCheck(&NC_AREAControl, NCAreaGCodeBuffer, &NCRunSign) == FALSE)
+	{	
+		return ;
+	}
+
+	NC_AREAControl.CurrentT = NC_AREAControl.I*System.Tsample;
+	
+	if( NCRunSign.NewAreaSign == 0 )
+	{
+		return ;
+	}
+
+	if(NCArea_RunModle() == FALSE)
+	{	//区域运行模式(与预计算算法匹配)
+		return ;
+	}
+		
+	if(NC_AREAControl.Snow < 0.000001)
+	{	// 避免负值
+		NC_AREAControl.Snow = 0.000001;
+	}
+	
+	if(NCArea_Nowvalue() == FALSE)
+	{	//求得snow和vnow后,分三种情况讨论,计算输出!	
+		return ;
+	}
+	
+	NC_AREAControl.SnowLast = NC_AREAControl.Snow;
+
+	if(NCArea_DeltaStep(&NC_AREAControl, NCAreaGCodeBuffer, &NCRunSign) == FALSE)
+	{
+		return ;
+	}
+	
+	NCArea_EnsureDirection(&NC_AREAControl,&NCRunSign);		
+	NCArea_JudgeLimit(&NC_AREAControl);			//如到极限位，相应轴输出脉冲清除			
+	NCArea_SoftLimit(&NC_AREAControl);
+	if(NCArea_DealWithZeroPulse(&NC_AREAControl) == FALSE)
+	{
+		return ;
+	}	
+	if(NCArea_PulseToServoCheck(&NC_AREAControl.DeltaStep) == FALSE)
+	{
+		return ;
+	}
+	NCArea_Cal_V_tpr(&NC_AREAControl);
+	NCArea_InterpolationBuffer(&NC_AREAControl);
+}
+

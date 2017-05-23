@@ -1,0 +1,1557 @@
+/*
+*   file name: task3.c
+*   author : vinge
+*   create date: 20080819
+*   version: 20080819--init version,  ;
+*   description: vars and functions used in both tasks should be define here
+*/
+/*
+#include "..\target\2440addr.h"
+#include "..\target\2440lib.h"
+#include "taskglobal.h"
+*/
+
+#include "taskglobal.h"
+//*******************************************************************
+//debug vars ,should be remove later
+//*******************************************************************
+//statistic
+U32 StatsTunCount=0;
+U8 task1led,task2led,task3led;
+//********************************************************************
+U8 editbuf[EDIT_BUFFER_SIZE] = {0,};
+//********************************************************************
+/*
+U32 UNIFONT16[65536][8];
+U16 U2L[65536];
+U16 L2U[65536];
+*/
+U32 spindleSpotTimer;
+U32 spindleSpotSaveSpeed;
+U16 uartControl=0;
+//********************************************************************
+//some system state s and events
+U32 taskEvent=0;  // EVENT send between tasks, the hight 16 bit is used to save some data like jog key
+U8  taskEventState=0;
+U32 DSPStatisOK=0;           //statis for ARM DSP transation
+U32 DSPStatisFail=0;
+U32 DSPStatisRetrans=0;
+U8  retransFlag=FALSE;
+U32 whellTestCT;               //whell test counter for DGN
+//*********************************************************************
+//test key board and lcd
+U8 ledlcdTestOnFlag;
+//U8 ledlcdTestStep;
+U8 ledlcdTestStepTimer;  //unit :ms cycle
+U32 DNGmsgNUM[3];
+U8 DNGmsgBuf[3][50];
+U8 DNGmsgPtr;
+//----------------------------------------------------------------------
+TDGBarc assistenCode;
+U8  assistenFlag=FALSE;
+U8  assistStart=FALSE;
+U32 assistenTimer=0;
+U8  autoAssistenPlcRequest=0;  //0 no req ,1 ask plc to precess 2 pcl has done
+U16 curTool=0;
+U16 nextTool=0;
+U16 resetFlag=0;
+U16 O9XXXchangeFlag=1;
+U8  useToolWearFlag=0;
+//*********************************************************************
+U8  sysUnit=0; // 0 3 digit tail in g code and showing,1 4digit ; use in exec ,in compile use unitmode
+U8  sysShowUnit=0;  //0 show value in meter mode, 1 inch
+U8  showDigit=3; //how many digit should we show , decided by sysUnit and sysShowUnit
+U8  sysState=SYS_STATE_RST;    //
+U8  sysModePrev=SYS_MODE_MDI;
+U8  sysMode=SYS_MODE_MDI;
+
+U8 dimMode=MODE_RADIU;
+//*********************************************************************
+U8 gexecState=GEXEC_RESET;  //gcode execution state
+U8 gexecError=GERR_OK;
+U8 gexecErrInsend=FALSE;
+//some flags that efect the gcode execution process
+U8 gexecReq=FALSE;
+U8  gcodeAll=FALSE;    // gcode is compile once at all
+U32 gCompiledCt=0; // gcode in compiled buffer
+U32 preO9XXXgCt=0;
+U8  TCodeUseSub=0;
+U32 gPreProgCt=0;
+U32 grunPtr=0;
+U32 sourceCT=0;
+U32 MDI_sourceCT=0;
+
+U32 O9XXXsrc;
+U32 O9XXXrunptr;
+U32 O9XXXruning;
+//*********************************************************************
+// buffers used in system
+// key board package buffer
+
+// ARM and DSP exchange buffer
+
+U16 arm2dspBufLen=0;
+U8  ARM2DSPBUF[ARMDSP_BUF_SIZE]={0,};
+//U8  dsp2armFilled=0;
+//U8  arm2dspFilled=0;
+U8  DSP2ARMBUF[ARMDSP_BUF_SIZE]={0,};
+U16 dsp2armBufLen=0;
+U32 recvtime[40]={0,};
+
+U8  arm2dspREQ=0;
+// ARM send to DSP  pkg
+ U8 arm2dspPKG[ARMDSP_BUF_SIZE];
+ U8 dsp2armACK[ARMDSP_BUF_SIZE];
+U8  dsp2armREQ=0;
+//DSP send to ARM pkg
+ U8 dsp2armPKG[ARMDSP_BUF_SIZE];
+
+U32 armdspPKGCount=0;
+U8  FLAGguiUpdate=0;
+//**********************************************************************
+
+// U8 DSP2ARMBUF[4096];
+
+//U32 SPC_GBUF_FULL=0;   //0 NOT FULL 1 FULL
+//****************************************************************************
+// system vars not relate to the interpolation
+U8 prevGUI=0;
+//U8 prevMenu=0;
+U8 currentGUI=0;   // record which user interface now showing
+U8 currentMenu=0; //which menu the interface is showing
+U8 currentFkey;  //record which F key user had press
+//U8 guiUpdateReq=0;  // request a gui update in the internal operation need
+//U8 guiUpdateMenuReq=0; //just update menu
+U8 guilayer=0;    //main gui or sub gui record.
+U8  currentParamGrp=0;
+U16 currentParam=0;
+U16 currentToolCP=0;
+enum TCOMPSELECTION currentToolCPxz=TCX; //selected x z or r t,in a tool compensation
+U16 currentRef=0;  //selected var in coord offset
+U16 currentG5xrow=0;
+U16 currentG5xcol=0;
+U16 currentVar=0;   //selected var in gui var
+U16 curColourSelMenu=0;
+U16 curColourSelCol=0;
+U16 assure=0;
+////////////////////////////
+U16 curPLCins=0;
+U16 curPLCxy=0;
+U16 curPLCf=0;
+U16 curPLCg=0;
+U16 curPLCc=0;
+U16 curPLCt=0;
+U16 curPLCr=0;
+U16 curPLCd=0;
+U16 curPLCk=0;
+
+U16 curPLCx=0;
+U16 curPLCy=0;
+U16 curPLCTLine=0;
+
+U16 plcTBreakpnt=0;
+U16  curPLCTCol=0;
+U16 StartPLCRow = 0;
+U16 PlcTColour[12]/*={
+
+	COLOR_WHITE,  //图形背景色 白色COLOR_WHITE
+	COLOR_BLACK,  //连接线颜色 黑色COLOR_BLACK
+	COLOR_GREEN, //软元件连通时元件显示颜色COLOR_GREEN
+	COLOR_RED, //软元件断开时元件显示颜色COLOR_RED
+	COLOR_BLUE, //软元件连通时别名显示颜色COLOR_BLUE
+	COLOR_BLACK,//软元件断开时别名显示颜色 COLOR_MAGENTA
+	COLOR_GRAY,// 注释显示颜色COLOR_LIGHTBLUE
+	COLOR_LIGHTBLUE,//选择框显示颜色COLOR_LIGHTRED
+	COLOR_GRAY,// 注释显示颜色COLOR_GRAY
+	COLOR_GRAY,//图形左右两端显示颜色COLOR_MAGENTA
+	COLOR_GRAY,//行数显示颜色COLOR_GRAY
+        COLOR_WHITE//文本背景色COLOR_WHITE
+
+} */;  //add by wqm 2011.12.26
+///////////////////////////////
+U16 curColourMainSel=0;
+S16 curColourSel=0;
+S16 curColourrgbSel=0;
+S16 nowhue=120;
+S16 nowbri=120;
+S16 nowsat=120;
+
+   // 白，灰，绿，蓝， 红，黑
+/*
+HSB HsbValue[] =
+{{0,0,240},{160,0,181},{80,240,180},{141,240,120},
+    {0,240,120},{0,0,0},{40,240,121},{80,240,121},
+    {120,240,120},{160,240,180},{40,240,60},{160,240,65},};
+    */
+//****************************************************************************
+//task 2 and task 3 communicate
+  U8 cmdbuf[CMD_BUF_SIZE];
+U8 cmdbufPtr=0;
+U8 cmdbufDispPtr=0;
+
+U16 cmderr=0;
+U16 showMsg=FALSE;  //for user input or gcode err
+U16 showTime=0;
+//****************************************************************************
+double globalVar[GLOBAL_VAR_MAX]={0,};
+//xyz a4a5 s compensation
+//not linear compensation array for 6 axis
+
+ TaxisCompensationPoint axisCompensationInt[SYS_AXIS][COMP_MAX]={{{0,0},},};
+TtoolComp toolCompensation[TCOMP_MAX]={{0,0,0},};
+TtoolComp toolOffset[TCOMP_MAX];
+TtoolComp toolWear[TCOMP_MAX];
+// toolCompensation = toolOffset+toolWear
+//U8 tool[TOOL_MAX]={TCOMP_MAX,}; // the value of tool is current tool compensation this tool using;
+// Coordinates : work coord, local coord, machine coord ;
+//user was allow to set work coord, local is only set by program
+//TCoord coordGend[200]={{0,0},};
+TCoord coordGend[GCODE_BUF_MAX]={{0,0,0},};
+TCoord coordGendSPC[GCODE_BUF_MAX]={{0,0,0},};
+//TCoord coordMACH={0,0,0,0,0,0};
+TCoord coordWork={0,0,0};
+TCoord coordOrginWork={0,0,0};  //of set of the work coordinate form mach coord origin
+TCoord coordShiftWork={0,0,0};  //shift of work coordinate
+//TCoord coordOrginLocal={0,0,0,0,0,0}; //of set of the local coordinate form work coord origin
+
+TCoord coordSPCGend={0,0,0};
+TCoord coordCurGstart={0,0,0};
+TCoord coordCurGend={0,0,0}; //curent g code start point, end point
+TCoord coordCurGendMach={0,0,0};
+TCoord coordSentedGend={0,0,0};
+//below coord is for showing only
+TCoord coordRelate={0,0,0};
+TCoord coordOrginRelate={0,0,0};
+TCoord coordWorkBack={0,0,0};
+TCoord coordWorkShow={0,0,0};
+TCoord coordMACH={0,0,0};
+TCoord coordMACHShow={0,0,0};
+TCoord coordRemain={0,0,0};   //g code remaining distance
+TCoord lostPwrSave[5];
+TCoord coordRef[REFP_MAX];
+U8 coordShowing; // which coord is showing in coord guis
+//************************************************************
+TCoord coordOrginWorkG5x[G5X_MAX]; //for g54-g59,and 0 is for all offset
+//************************************************************
+//hand whell vars
+U8 whellControlAxis=AXISX;   //hand whell selected axis
+U32 whellFeedRate=50; //mm/minute;
+//override feedrates
+U16 whellGrade=1;
+U16 multiKey=0;
+U8 jogGrade=0;  //jog greade 0 jogfeed=1 1 jogfeed=10 2-4 jog freed form param
+U32 jogFeed=0; //jog speed which == job 1-3 grade and 1 pusle by default
+U8 feedGrade=0;
+U8 rapidGrade=0;
+U8 spindleGrade=0;
+U8 spinRunSign=0;
+U32 spindleRealSpeed=0;
+U8 spindleLoad=0;
+U8 spindleAutoStateBak=5;
+U8 spindleAutoStateChanged=FALSE;
+U8 chuckAutoStateBak=12;
+U8 chuckAutoStateChanged=FALSE;
+U8 tailAutoStateBak=10;
+U8 tailAutoStateChanged=FALSE;
+U32 realFeedSpeed=0;
+U8 goZeroSign=0;
+
+U8  tailSign=0;   //tail state 0 off 1 on
+U8  coolSign=0;  //cool off; 1 cool on
+U8 oilSign=0;    // oil on off ,1 ON 0 OFF
+U32 oilTimer=0;
+
+//U8 lampSign=0;  //lamp on off 1 ON 0 OFF
+U8 TLPOS;
+U8 TLNEG;
+U8 Toolchange;  // 1 swiss tool no mach 2 mach tool tower
+U8 toolChangingFlag=0;
+U32 toolChangeTimer;
+U8 toolReposition=0;
+
+U8 chuckchange=0;
+U8 chuckchanging=0;
+//-----------------------------------------------------
+//mfunctions to plc
+U8 mfuncState=0; //0 no req, 1 reqed, 2 handling
+U8 mfuncNum=0;
+U8 mbufwptr,mbufrptr;
+U8 mfuncBuf[MBUF_MAX]={0,};  //queue of mcode to exec
+U8 G9899,G9697,sendedG9899,sendedG9697;  //this two state is not resetable ,keep it
+//--------------------------------------------------
+/*
+U8 programFeed=0;
+U8 realFeed=0;
+U16 spindleSpeed=0;
+U8   curTool=0;
+*/
+U32 workPieceCT;
+U32 cutTimeReg;
+U32 cutTimePiece;
+U32 cutTimePieceRecord;
+U32 cutTimeCT;
+U8 m20flag;
+//*********************************************************************
+U8 armReqCMD=1;  //arm require DSP to return type can be 1 2 3
+U8 DSPState=0;
+U8 hardLimitPosState=0;
+U8 hardLimitNegState=0;
+U8 softLimitPosState=0;
+U8 softLimitNegState=0;
+U8 locateState=0;
+U8 referenceState=0;
+U8 refFounded=0;
+
+U16 refFindAxis=0; //if 1 find x first 2 z first
+U8 SA4State=0;
+U8 coordStable=FALSE;
+U8 coordStableCheckDelay=0;
+//delay 10 package to check if coord is stable after init of std spc
+U8 singleModeFlag=0;
+U8 singleRunFlag=0;
+U8 jumpSegFlag=0;
+U8 whellRunFlag=0;  //use whell to control the grade of auto run every 50 ms
+U8 whellRunGrade=0; // feed grade in whellRunMode 0-12;
+U8 whellRunState=0;
+U8 programZeroFlag=0;
+U8 machLockFlag;
+TmachLockReg machLockReg;
+U8 MSTLockFlag;
+U8 falseRunFlag;
+U8 pauseFlag;
+U8 safedoorFlag;
+U8 autoAlarmClrFlag;
+
+TbreakPoint autoBreakPoint;
+
+U8 addLineMode=0; //pause auto mode and goto jog mode to do some work
+//********************************************************************
+U32 STDsendcount=0;
+U32 STDrealsendcount=0;
+U32 STDruncount=0;
+//U32 STDrealruncount=0;
+U32 prevSrcLine;
+U32 SPCsendcount=0;
+U32 SPCruncount=1;
+U32 Errsrc;
+U32 Errsrc_Tool;
+U32 UNKNOW_ERR_src;
+//********************************************************************
+//FATFS SDfs;
+//********************************************************************
+TpassWord sysPassWord;
+U8 sysSerNum[13];
+U8 sysPassInited;
+U8 passValid; //0 outdate; 1 ok; 2 unlocked
+//U16 passValidDate; //打开的最后密码日期
+U8 curPassWord;
+U8 keyLock; //use param 219 for password
+U8 opLock;
+U32 opLockChanged;
+U32 opLockVal;
+U8 chuckReaded=0;
+//********************************************************************
+U16 testChar=0x20;
+U16 editHasFile=0;
+
+S8 openFileName[RECORD_FILE_NAME_LEN+1];
+//********************************************************************
+//vars for net work
+S8 sysName[17]={'0',0};
+U8 focus=0; //input focus to switch from inputs
+U8 machMAC[6];
+U32 machIP,machGW,machNM;
+//*********************************************************************
+U8 trace_real_clear=1;
+U8 trace_real_enable=0;
+U8 trace_real_image[TRACE_GWIDTH][TRACE_GHEIGHT]; //the tarce image in drawing
+U16 trace_sim_image[TRACE_GWIDTH*TRACE_GHEIGHT];
+S32 trace_cen_x,trace_cen_z; //the area limit of trace image
+S32 trace_scale=10000;
+U8  trace_virtual_run=0;
+U8  trace_autpfix_run=0;
+S32 trace_autofix_max_x,trace_autofix_max_z,trace_autofix_min_x,trace_autofix_min_z;
+U8  trace_g0_on=1;
+U8  trace_x_symmetry=0;
+TRACEDATA trace_data[TRACE_DATA_MAX];
+U32 trace_data_record=0;
+U32 trace_has_print=0;
+U8  trace_menu=0;
+U8  trace_menu0_sel=0;
+U8  trace_menu1_sel=0;
+U8  trace_menu2_sel=0;
+U16 trace_colour_pool[TRACE_COLOUR_MAX]/*={COLOR_BLACK,COLOR_RED,COLOR_BLUE,COLOR_GREEN,COLOR_YELLOW,COLOR_LIGHTGRAY,COLOR_MAGENTA,COLOR_LIGHTMAGENTA,COLOR_LIGHTCYAN,COLOR_WHITE,COLOR_LIGHTLIGHTGRAY,COLOR_LIGHTGRAY,COLOR_DARKLIGHTGRAY,COLOR_GRAY,COLOR_DARKGRAY,COLOR_DARKDARKGRAY}*/;
+U8  trace_colour_select[TRACE_MENU3_MAX]={9,3,1,7,8,0,11,13};
+S32 trace_cursor_x=0;
+S32 trace_cursor_z=0;
+S32 trace_cursor2_x=0;
+S32 trace_cursor2_z=0;
+U8  trace_zoom_on=0;
+S32 trace_zoom_square_length=50;
+U8  trace_move_on=0;
+//********************************************************************
+U8 fileOPptr=0;
+TfileOperationRecord fileOPrecord[10];
+//********************************************************************
+//MDI mode
+MDIMODE mdimode;
+//********************************************************************
+//Y mode
+U8 Yavailable=0;
+//********************************************************************
+//record the last exception and time
+//31-28 exception 1-15
+//27-0 time stamp (24-27 0-10 year,20-23,month,)
+#define STATIS
+#ifdef STATIS
+U32 statisSTDrun=0;
+U32 errx,erry,errz,errspeed;
+#endif
+
+U8 dbMSG[DBMSG_MAX][DBMSG_LEN];
+U16 dbMSGrptr, dbMSGwptr;
+
+//DEBUGS
+#ifdef DEBUG_DATA
+U32 idlect=0;
+U32 intct=0;
+U32 emptyct=0;
+U32 pulsect=0;
+U32 calct=0;
+U32 DBcount=0;
+U32 DBDSPINT[1000];
+double DBDSPFLOAT[1000];
+U16 *storePulse=(U16*)0x32000004;
+U32 *storeLineS=(U16*)0x33dffff8;
+#endif
+
+#ifdef FAIT_MOTOR
+S32 MOTOR_X=0;
+S32 MOTOR_Z=0;
+#endif
+
+U8 EventSaveEdit=0;
+U8 EventJump;
+U32 EventJumpNum;
+
+U8 EventPLCsetVar;
+U8 EventPLCsetVarType;
+S32 EventPLCsetVarValue;
+//********************************************************************
+U16 manMakeRunKeyDelay;
+U16 modeBackup;
+
+//**************************************************
+
+U32 recvCounter=0;
+U32 sendCounter=0;
+U32 errCounter=0;
+U32 clitCounter=0;
+U16 pkglen=0;
+//********************************************************************
+// global useful functions
+/*
+*------------------------------------------------------------------------------
+* function: softReset
+* parameter: void
+* return   : void
+* description : reset the hold system ,it disable all interrupt and jump to main
+* for a restart
+*------------------------------------------------------------------------------
+*/
+void softReset(void)
+{
+    //U32 i=0x30000000;
+    //IIC_Write4(IICADDR_COORDX, lostPwrSave[4].x);
+    //IIC_Write4(IICADDR_COORDZ, lostPwrSave[4].z);
+    //------------------------------------------
+    //stop any thing we are doing
+    extern U8 task2inited;
+    task2inited=FALSE;
+    //resetFlag=1;
+}
+/*
+*------------------------------------------------------------------------------
+* function: softResetVars
+* parameter: void
+* return   : void
+* description : reset global vars in soft reset
+*------------------------------------------------------------------------------
+*/
+void softResetVars()
+{
+    U8 g5x=gWorkState.GG05,m4x=gWorkState.m4x;
+    //set state and mode
+    U32 regSval=gWorkState.s;
+    sysModePrev=sysMode;
+    sysMode=SYS_MODE_MDI;
+    sysState=SYS_STATE_MDI;
+        //if it reset from auto runing ,need to find ref again
+        //refFounded=0;
+    //reset io out
+    /*if(!PLC_SIG_EMGSTOP)
+    {
+        if(CPLD_IO_Out1Register.bit.XSON == 0)
+            servo_on();
+    }*/
+    //IOinit();
+    //editHasFile=0;
+    //editbuf[0]=0;  //clean up the run state
+    memset(&gWorkState,0,sizeof (Tgstate));
+    memset(&gCompileState,0,sizeof (Tgstate));
+    memset(&gC2TCState,0,sizeof (Tgstate));
+    gWorkState.m4x=m4x;
+    if(g5x>=G5X_MAX||g5x==0)
+    {
+        g5x=1;
+    }
+    gWorkState.GG05=g5x;
+
+    coordOrginWorkG5x[0].x=IIC_Read4(IICADDR_G5X_X);
+    coordOrginWorkG5x[0].y=IIC_Read4(IICADDR_G5X_Y);
+    coordOrginWorkG5x[0].z=IIC_Read4(IICADDR_G5X_Z);
+    coordOrginWorkG5x[gWorkState.GG05].x=IIC_Read4(IICADDR_G5X_X+gWorkState.GG05*4);
+    coordOrginWorkG5x[gWorkState.GG05].y=IIC_Read4(IICADDR_G5X_Y+gWorkState.GG05*4);
+    coordOrginWorkG5x[gWorkState.GG05].z=IIC_Read4(IICADDR_G5X_Z+gWorkState.GG05*4);
+    gWorkState.orgx = coordOrginWork.x = coordOrginWorkG5x[0].x+coordOrginWorkG5x[gWorkState.GG05].x;
+    gWorkState.orgy = coordOrginWork.y = coordOrginWorkG5x[0].y+coordOrginWorkG5x[gWorkState.GG05].y;
+    gWorkState.orgz = coordOrginWork.z = coordOrginWorkG5x[0].z+coordOrginWorkG5x[gWorkState.GG05].z;
+    //gWorkState.shiftx=coordShiftWork.x;  //not used
+    //gWorkState.shiftz=coordShiftWork.z;
+    gWorkState.GG01=0;
+    if(resetFlag==0)
+    {
+        U8 temp;
+        temp=IIC_Read1(IICADDR_G98G99);
+        gWorkState.GG02=97;
+        G9697=97;
+        /*if(temp==99)
+        {
+            extern U8 flagG98;
+            gWorkState.GG03=99; //default g code of group 3
+            G9899=99;
+//        	STDNCSign.FeedtypeSign=1;
+//            OverallSign.SpindleGradeOverride=S_Spindle.SpindleGrade;
+            flagG98=0;
+        }else{*/
+            gWorkState.GG03=98; //default g code of group 3
+        /*    G9899=98;
+        }*/
+        gWorkState.m4x=IIC_Read1(IICADDR_SPIN_M);
+        if((gWorkState.m4x<41)||(gWorkState.m4x>44))
+            gWorkState.m4x=41;
+//        S_Spindle.M4x=gWorkState.m4x-40;
+    }else
+    {
+        gWorkState.GG02=G9697;
+        gWorkState.GG03=G9899; //default g code of group 3
+    }
+    sendedG9697=G9697;
+    sendedG9899=G9899;
+    gWorkState.GG04=40;
+    gWorkState.GG06=21;
+    gWorkState.sdir=5; //stop;
+    gWorkState.f=0; //unit um/min
+    //gWorkState.s=0;
+    if(regSval!=0)
+        gWorkState.s=regSval;
+    else
+        gWorkState.s=DSPparam.sysdword[39];
+    autoBreakPoint.flag=0;
+    autoBreakPoint.codeIndex=0;
+    //gWorkState.f=10000; //unit um/min
+    //gWorkState.s=DSPparam.sysdword[39];
+    gWorkState.t=curTool;
+    autoBreakPoint.t=curTool;
+    {
+        U8 index=curTool/100;
+        toolOffset[index].x = IIC_Read4(IICADDR_TOOLCOMP+index*sizeof(TtoolComp));
+        toolOffset[index].y = IIC_Read4(IICADDR_TOOLCOMP+index*sizeof(TtoolComp)+4);
+        toolOffset[index].z = IIC_Read4(IICADDR_TOOLCOMP+index*sizeof(TtoolComp)+8);
+        toolOffset[index].r = IIC_Read4(IICADDR_TOOLCOMP+index*sizeof(TtoolComp)+12);
+        toolOffset[index].tdir = IIC_Read4(IICADDR_TOOLCOMP+index*sizeof(TtoolComp)+16);
+        useToolWearFlag=SYSparam[95].val;
+        if(useToolWearFlag!=0)
+        {
+            toolWear[index].x = IIC_Read4(IICADDR_TOOLWEAR+index*sizeof(TtoolComp));
+            toolWear[index].y = IIC_Read4(IICADDR_TOOLWEAR+index*sizeof(TtoolComp)+4);
+            toolWear[index].z = IIC_Read4(IICADDR_TOOLWEAR+index*sizeof(TtoolComp)+8);
+            toolWear[index].r = IIC_Read4(IICADDR_TOOLWEAR+index*sizeof(TtoolComp)+12);
+            toolWear[index].tdir = 0;
+        }else{ //not use tool wear ,all set tozero
+            toolWear[index].x = 0;
+            toolWear[index].y = 0;
+            toolWear[index].z = 0;
+            toolWear[index].r = 0;
+            toolWear[index].tdir = 0;
+        }
+        toolCompensation[index].x=toolOffset[index].x+toolWear[index].x;
+        toolCompensation[index].y=toolOffset[index].y+toolWear[index].y;
+        toolCompensation[index].z=toolOffset[index].z+toolWear[index].z;
+        toolCompensation[index].r=toolOffset[index].r+toolWear[index].r;
+        toolCompensation[index].tdir=toolOffset[index].tdir;
+    }
+
+    if(resetFlag==0)
+    {
+        if(SYSparam[172].val&0x2)
+            gWorkState.chuck=13;
+        else
+            gWorkState.chuck=12;
+    }else{
+        if(1)
+            gWorkState.chuck=12;
+        else
+            gWorkState.chuck=13;
+    }
+    //gWorkState.chuck=12;
+    if(1)
+        gWorkState.tail=10;
+    else
+        gWorkState.tail=11;
+    TLPOS = 0;
+	TLNEG = 0;
+	TCodeUseSub=SYSparam[110].val;
+	//Toolchange = 0;
+    /*
+    curTool=0;
+    nextTool=0;
+    coordShiftWork.x=0;
+    coordShiftWork.z=0;
+    */
+    STDsendcount=0;
+    STDruncount=0;
+    STDrealsendcount=0;
+    SPCsendcount=0;
+    SPCruncount=0;
+
+
+    CYCLE_BUF_INIT(TCGwptr, TCGrptr);
+    CYCLE_BUF_INIT(DGwptr, DGrptr);
+    CYCLE_BUF_INIT(SENDEDwptr,SENDEDrptr);
+
+    //sourceCT=0;
+    //gCompiledCt=0;
+    grunPtr=0;
+    callDeep=0;
+    dimMode=DSPparam.sysbyte[80];
+    /*
+    if(DSPparam.sysdword[0]==100)
+        sysUnit=1; //DSPparam.sysbyte[81];
+    else{
+        sysUnit=0;
+    }
+
+    switch(sysUnit)
+    {
+        case(0):
+            compileDigit=3;
+            break;
+        case(1):
+            compileDigit=4;
+            break;
+        default:
+            sysUnit=0;
+            compileDigit=3;
+    }*/
+    sysUnit=0; //now it's all ways 0
+    //compileDigit=3;
+    showDigit=3;
+    sysShowUnit=SYSparam[80].val;
+    //unitMode=sysShowUnit;
+    if(sysShowUnit==1)
+    {
+        sysUnit=1; //when reset , sys unit is equ to parameter 80
+        //compileDigit=4;
+        showDigit=4;
+        gWorkState.GG06=20;
+    }
+    /*
+    if(sysShowUnit)  //if inch add one more digit tail
+    {
+       compileDigit++;
+    }
+    */
+
+    //*/
+    //sysUnit=0;
+    //sysShowUnit=0;
+    //showDigit=3+sysUnit+sysShowUnit;
+    /*
+    if(gexecState>=GEXEC_CMPLE)
+        gexecState=GEXEC_CMPLE;
+    */
+    //if unit is change before the reset, it may case problem,so
+    //reset ervery time
+    gexecState=GEXEC_RESET;
+    //PLC_NCSTAT_AUTOSTOP;
+    taskEventCount=0;
+    taskEventState=EVENT_STATE_DONE;
+    //by vinge 20091210
+    taskEventCount=2;
+    taskEventBuf[0]=TEVENT_MOD_MDI;
+    taskEventBuf[1]=TEVENT_SEND_SYSPARAM;  //reinit params in dsp side
+    //by vinge 20091210
+    assistenFlag=0;
+    assistStart=0;
+    singleModeFlag=0;
+    singleRunFlag=0;
+    whellRunFlag=0;
+    pauseFlag=0;
+    toolReposition=0;
+    //runLockFlag=0;
+    //machLockFlag=0;
+    //machLockReg.refStateBak=0;
+    falseRunFlag=0;
+    goZeroSign=0;
+    //SET IOS
+    spinRunSign=0;
+    gWorkState.sdir=5;
+    spindleAutoStateChanged=FALSE;
+    chuckAutoStateChanged=FALSE;
+    tailAutoStateChanged=FALSE;
+    //PLC_NCSTAT_SSTOP;
+    //setIOOUT(IOOUT_SPIN_RUN, FALSE);
+    coolSign=0;
+    addLineMode=0;
+    //get the cord from dsp side if reset in runing
+    coordStable=FALSE;
+    DSPState&=~(BIT_LOCA_OVER);
+    coordStableCheckDelay=COOORD_STABLE_CHECK_DELAY;
+
+    //PLC_NCCMD_COOL_OFF;
+    //setIOOUT(IOOUT_COOL, FALSE);
+    //oilSign=0;
+    //PLC_NCCMD_OIL_OFF;
+    //setIOOUT(IOOUT_OIL, FALSE);
+
+    //arm2dspFilled=0;
+    FLAGguiUpdate=FALSE;
+    arm2dspREQ=0;
+    //operateDevice=0;
+    //---------------------------------------
+    /*
+    //open the prev opened file if it has
+    {
+        U8 filename[128];
+        memset(openFileName,0,RECORD_FILE_NAME_LEN);
+        IIC_Read(IICADDR_FILE, filename, 128);
+        if(filename[0]!=0)
+        {
+            if(FileManageEdit(filename)==0)
+            {
+                //open the prev file ok, get the file name;
+                IIC_Read(IICADDR_FILE_SHORT, openFileName, RECORD_FILE_NAME_LEN);
+                openFileName[RECORD_FILE_NAME_LEN]=0;
+            }else{
+                editHasFile=0;
+            }
+        }else{
+           showHint(FERR_NOFILE,SHOW_TIME_NORMAL);
+        }
+    }*/
+    //------------------------------------
+    //switch to main gui
+    //currentGUI=GUINUM_MAIN;
+    //currentMenu=0;
+    //get net work setting
+    {
+        //get mach
+        U32 temp;
+        temp=(U32)SYSparam[220].val;
+        machMAC[1]=temp&0xff; //hight 16 bit
+        machMAC[0]=(temp&0xff00)>>8;
+        temp=(U32)SYSparam[221].val;
+        machMAC[5]=temp&0x000000ff; //low 32 bit
+        machMAC[4]=(temp&0X0000ff00)>>8;
+        machMAC[3]=(temp&0X00ff0000)>>16;
+        machMAC[2]=(temp&0Xff000000)>>24;
+
+        machIP=(U32)SYSparam[222].val;
+        machGW=(U32)SYSparam[223].val;
+        machNM=(U32)SYSparam[224].val;
+        //uip_reset();
+    }
+    mdimode.inmdi = 0;
+    #ifdef ALLOW_RUN_IN_MDI_MODE
+    if(mdimode.mdirunning ==1)
+        sysModePrev=SYS_MODE_MDI;
+    #endif
+    mdimode.mdirunning = 0;
+    if(mdimode.runO9XXX==1)
+    {
+        sysModePrev=modeBackup;
+    }
+    mdimode.runO9XXX=0;
+    alarmClear();
+    //cmdbufClear();
+    showMsg=FALSE;
+    trace_virtual_run=0;
+    trace_autpfix_run=0;
+    trace_data_record=0;
+    trace_cursor_x=trace_cursor2_x=trace_cen_x;//光标复位
+    trace_cursor_z=trace_cursor2_z=trace_cen_z;
+    trace_real_clear=1;
+    Trace_Re_Print();
+    if(macro_calldeep_record_index!=0)
+    {
+        memcpy(globalVar,(macro_local_val[0]),MACRO_LOCAL_VAR_MAX*8);
+    }
+    {
+    extern U8 shiftKeyAutoCancle;
+    //shiftKeyAutoCancle=SYSparam[88].val&0x1;
+    //shiftKeyState=0;
+    }
+    resetFlag=1;
+    //recompile the O9XXX if need
+//    if(O9XXXchangeFlag==1)
+//        preCompileO9XXX();
+
+    //for DNG test;
+    /*DNGmsgBuf[0][0]='/0';
+    DNGmsgBuf[1][0]='/0';
+    DNGmsgBuf[2][0]='/0';
+    DNGmsgNUM[0]=0;
+    DNGmsgNUM[1]=0;
+    DNGmsgNUM[2]=0;
+    DNGmsgPtr=0;*/
+    //if(language==1)
+    //    loadStrResFromFile(); it whould case a overflow of stack
+}
+/*
+*------------------------------------------------------------------------------
+* function: openPrevfileOnReset
+* parameter: void
+* return   : void
+* description : open the prev opened file if it has
+*------------------------------------------------------------------------------
+*/
+//
+void openPrevfileOnReset()
+{
+	/*
+    //FILE *fp;
+    int fd;
+    int flen;
+    char filename[128]="./NCfile.txt";
+    memset(openFileName,0,RECORD_FILE_NAME_LEN);
+
+    if(filename[0]!=0)
+    {
+        fd = open(filename,O_RDWR);
+        //fp = fopen(filename,"r");
+        if(fd==-1)
+        {
+            editHasFile=0;
+        }else{
+            memset(editbuf,0,EDIT_BUFFER_SIZE);
+            flen = filelength(filename);
+            read(fd,editbuf,flen);
+            //fread(editbuf,1,65536,fp);
+            if(editbuf[flen-1]!=0X0A)
+            {
+                editbuf[flen]=0X0D;
+                editbuf[flen+1]=0X0A;
+                flen=flen+2;
+            }
+            editbuf[flen]='\0';
+            flen=strlen(editbuf);
+            strcpy(openFileName,filename);
+            editHasFile = 1;
+            close(fd);
+        }
+    }else{
+       //showHint(FERR_NOFILE,SHOW_TIME_NORMAL);
+    }*/
+}
+/*
+*------------------------------------------------------------------------------
+* function: system_init
+* parameter: void
+* return   : void
+* description : all system function init should be put here,
+* it will be call after task1 is create;
+*------------------------------------------------------------------------------
+*/
+void system_init(void)
+{
+    U32 i;
+    CYCLE_BUF_INIT(mbufwptr,mbufrptr);
+    coordOrginWork=coordWork;
+    for(i=0;i<200;i++)
+        coordGend[i]=coordWork;
+}
+/*
+*------------------------------------------------------------------------------
+* function: sysReadIIcInit
+* parameter: void
+* return   : 0 if ok ,1 if error;
+* description : read all data and param form iic
+*------------------------------------------------------------------------------
+*/
+U8 sysReadIIcInit(void)
+{
+    U32 data;
+    U16 i;
+
+    data=IIC_Read4(IICADDR_MAGIC);
+    if(data!=MAGIC_NUM_CNCL)
+    {
+        //first time use of the system, init iic and other thing
+        initIICParam();
+        //initSYSother();
+        //return 0;
+    }
+    //read 2passwords
+    IIC_Read(IICADDR_PASS_USERID,sysSerNum,13);
+    sysPassInited=IIC_Read1(IICADDR_PASS_INITED);
+    sysPassWord.flag=IIC_Read4(IICADDR_PASSFLAG);
+    IIC_Read(IICADDR_PASSDATE,sysPassWord.keyDate,SYS_PASS_MAX*4);
+    IIC_Read(IICADDR_PASSSTRING,sysPassWord.keys,SYS_PASS_MAX*PASSWORD_LEN);
+    // read op password
+    opLockVal=IIC_Read4(IICADDR_PASS_OPKEY);
+    opLock=IIC_Read1(IICADDR_PASS_OPCLASS);
+    //read out all 16  excepton
+/*    excpPtr=0;
+    IIC_Read(IICADDR_EXCEPTION, excpRecord, EXCP_RECORD_MAX);
+    IIC_Read(IICADDR_EXCEPTION_TIME, excpTime, EXCP_RECORD_MAX*4);
+    for(i=0;i<EXCP_RECORD_MAX;i++)
+    {
+        if(excpTime[i]>excpTime[excpPtr])
+            excpPtr=i;
+    } */
+    alarmPtr=IIC_Read1(IICADDR_ALARMPTR);
+    IIC_Read(IICADDR_ALARM,alarmInfo,ALARM_RECORD_MAX*8);
+
+    //read out all setted system param
+    IIC_Read(IICADDR_PARAM_BYTE,DSPparam.sysbyte,DSP_PARAM_BYTE_COUNT);
+    IIC_Read(IICADDR_PARAM_DWORD,DSPparam.sysdword,DSP_PARAM_DWORD_COUNT*4);
+
+    paramInit();
+    //read out all toolCompenstaion Offset data
+    IIC_Read(IICADDR_TOOLCOMP,toolOffset, 20*TCOMP_MAX);
+    toolOffset[0].x=0;
+    toolOffset[0].y=0;
+    toolOffset[0].z=0;
+    toolOffset[0].r=0;
+    toolOffset[0].tdir=0;
+    useToolWearFlag=SYSparam[95].val;
+    //Yavailable=SYSparam[100].val;
+    if(useToolWearFlag!=0) //use too wear
+    {
+        IIC_Read(IICADDR_TOOLWEAR,toolWear, 20*TCOMP_MAX);
+        toolWear[0].x=0;
+        toolWear[0].y=0;
+        toolWear[0].z=0;
+        toolWear[0].r=0;
+        toolWear[0].tdir=0;  //t of wear is useless
+    }else{ //not use tool wear ,all set tozero
+        for(i=0;i<TCOMP_MAX;i++)
+        {
+	        toolWear[i].x=0;
+	        toolWear[i].y=0;
+	        toolWear[i].z=0;
+	        toolWear[i].r=0;
+	        toolWear[i].tdir=0;
+	    }
+    }
+    for(i=0;i<TCOMP_MAX;i++)
+	{
+		toolCompensation[i].x=toolOffset[i].x+toolWear[i].x;
+		toolCompensation[i].y=toolOffset[i].y+toolWear[i].y;
+		toolCompensation[i].z=toolOffset[i].z+toolWear[i].z;
+		toolCompensation[i].r=toolOffset[i].r+toolWear[i].r;
+		toolCompensation[i].tdir=toolOffset[i].tdir;
+	}
+    //recover vars
+    IIC_Read(IICADDR_GVARS,&(globalVar[200]),GLOBAL_VAR_MAX/2*8);
+
+    // recover coord ref points
+    IIC_Read(IICADDR_REFP,&coordRef[0],REFP_MAX*12);
+
+    //GET trace draw param
+    /*traceCenter.x=IIC_Read4(IICADDR_TRACECX);
+
+    traceCenter.z=IIC_Read4(IICADDR_TRACECZ);
+
+    traceScale=IIC_Read4(IICADDR_TRACECS);
+    traceScalez=traceScale/TRACE_GHEIGHT*TRACE_GWIDTH;*/
+    // init sysname
+    IIC_Read(IICADDR_SYSNAME,sysName,17);
+    //read work piece count and cut time sum
+    workPieceCT=IIC_Read4(IICADDR_WORKPIECE);
+    cutTimeCT=IIC_Read4(IICADDR_CUT_TIME);
+
+    //read all plc data's
+    //IIC_Read(IICADDR_PLC_D, plcD, PLC_RES_D_MAX*2);
+    //IIC_Read(IICADDR_PLC_K, plcK, PLC_RES_K_MAX*2);
+
+    //read file operation records
+    fileOPptr=IIC_Read1(IICADDR_FILEOP_PTR)%FILEOP_RECORD_MAX;
+    for(i=0;i<FILEOP_RECORD_MAX;i++)
+    {
+        IIC_Read(IICADDR_FILEOP_NAME+i*128, fileOPrecord[i].filename, 128);
+        fileOPrecord[i].count= IIC_Read4(IICADDR_FILEOP_CT+i*4);
+        fileOPrecord[i].datetime= IIC_Read4(IICADDR_FILEOP_TIME+i*4);
+    }
+    //recover coordinate value
+    curTool=IIC_Read4(IICADDR_TOOL);
+    coordShiftWork.x=toolCompensation[curTool%100].x;
+    coordShiftWork.y=toolCompensation[curTool%100].y;
+    coordShiftWork.z=toolCompensation[curTool%100].z;
+    //coordOrginWorkG5x[0].x=IIC_Read4(IICADDR_ORGWX);
+    //coordOrginWorkG5x[0].z=IIC_Read4(IICADDR_ORGWZ);
+    for(i=0;i<G5X_MAX;i++)
+    {
+        coordOrginWorkG5x[i].x=0;//IIC_Read4(IICADDR_G5X_X+4*i);
+        coordOrginWorkG5x[i].y=0;//IIC_Read4(IICADDR_G5X_Y+4*i);
+        coordOrginWorkG5x[i].z=0;//IIC_Read4(IICADDR_G5X_Z+4*i);
+    }
+    gWorkState.GG05=1;
+    coordOrginWork.x=coordOrginWorkG5x[0].x+coordOrginWorkG5x[gWorkState.GG05].x;
+    coordOrginWork.y=coordOrginWorkG5x[0].y+coordOrginWorkG5x[gWorkState.GG05].y;
+    coordOrginWork.z=coordOrginWorkG5x[0].z+coordOrginWorkG5x[gWorkState.GG05].z;
+//    clear_X_encoder();
+//    clear_Y_encoder();
+//    clear_Z_encoder();
+//        coordOrginWork.x=IIC_Read4(IICADDR_ORGWX);
+//        coordOrginWork.z=IIC_Read4(IICADDR_ORGWZ);
+    coordMACH.x=IIC_Read4(IICADDR_LPWRX);
+    coordMACH.y=IIC_Read4(IICADDR_LPWRY);
+    coordMACH.z=IIC_Read4(IICADDR_LPWRZ);
+    i=IIC_Read4(IICADDR_LPWRMSXZ);
+    /*OverallSign.MoveSign.X=i>>16;
+    OverallSign.MoveSign.Z=i&0xffff;
+    OverallSign.MoveSign.Y=IIC_Read4(IICADDR_LPWRMSY);
+    X_Encoder.MACH_PosRecord=coordMACH.x;
+    Y_Encoder.MACH_PosRecord=coordMACH.y;
+    Z_Encoder.MACH_PosRecord=coordMACH.z;
+    X_Encoder.MACH_PositionValueLast=coordMACH.x;
+    Y_Encoder.MACH_PositionValueLast=coordMACH.y;
+    Z_Encoder.MACH_PositionValueLast=coordMACH.z;*/
+    coordWork.x=coordMACH.x-coordOrginWork.x-coordShiftWork.x;
+    coordWork.y=coordMACH.y-coordOrginWork.y-coordShiftWork.y;
+    coordWork.z=coordMACH.z-coordOrginWork.z-coordShiftWork.z;
+    //IIC_Write4(IICADDR_ORGWX, coordOrginWork.x);
+    //IIC_Write4(IICADDR_ORGWZ, coordOrginWork.z);
+    //coordSPCGend=coordWork;
+    //coordCurGend=coordWork;
+    coordCurGendMach.x=coordCurGend.x+coordOrginWork.x+coordShiftWork.x;
+    coordCurGendMach.y=coordCurGend.y+coordOrginWork.y+coordShiftWork.y;
+    coordCurGendMach.z=coordCurGend.z+coordOrginWork.z+coordShiftWork.z;
+    //if(DSPparam.sysbyte[92]==1)//恢复坐标时，如参数93为1，则不用找参考点
+    {
+        refFounded=(BITX|BITZ|(Yavailable?BITY:0));
+        /*Reference.FindRefSign.X = 1;
+        Reference.FindRefSign.Y = 1;
+        Reference.FindRefSign.Z = 1;*/
+    }
+    coordSPCGend=coordWork;
+    coordGend[0]=coordSPCGend;
+    coordCurGend=coordSPCGend;
+
+    //recover grades
+    rapidGrade=IIC_Read1(IICADDR_GRADER);
+    feedGrade=IIC_Read1(IICADDR_GRADEF);
+    spindleGrade=IIC_Read1(IICADDR_GRADES);
+    whellGrade=IIC_Read1(IICADDR_GRADEW);
+    jogGrade=IIC_Read1(IICADDR_GRADEJ);
+
+    //curTool=IIC_Read4(IICADDR_TOOL);
+
+    if((curTool%100)>=TOOL_MAX)
+        curTool=100;
+    //curTool=curTool-curTool%100;
+    if((curTool/100)>=TOOL_MAX)
+        curTool=100;
+    if(SYSparam[170].val>1)
+    {
+        if((curTool/100)>SYSparam[170].val)
+            curTool=100;
+    }
+    nextTool=curTool;
+    Toolchange=FALSE;
+    {
+    U8 tc=curTool%100;
+    coordShiftWork.x=toolCompensation[tc].x;
+    coordShiftWork.y=toolCompensation[tc].y;
+    coordShiftWork.z=toolCompensation[tc].z;
+    }
+    //check grades
+    switch(jogGrade)
+    {
+        case(0):
+            jogFeed=DSPparam.sysdword[20];
+            break;
+        case(1):
+            jogFeed=DSPparam.sysdword[21];
+            break;
+        case(2 ):
+            jogFeed=DSPparam.sysdword[22];
+            break;
+        default:
+            jogGrade=0;
+            jogFeed=DSPparam.sysdword[20];
+            break;
+    }
+    if(rapidGrade>12)
+    {
+        rapidGrade=0;
+    }
+    if(feedGrade>20)
+    {
+        feedGrade=0;
+    }
+    if(spindleGrade>20)
+    {
+        spindleGrade=0;
+        IIC_Write1(IICADDR_GRADES, spindleGrade);
+    }
+    if((whellGrade!=1)&&(whellGrade!=10)&&(whellGrade!=100))
+    {
+        whellGrade=1;
+        IIC_Write1(IICADDR_GRADEW,whellGrade);
+    }
+
+    gWorkState.orgx = coordOrginWork.x = coordOrginWorkG5x[0].x+coordOrginWorkG5x[gWorkState.GG05].x;
+    gWorkState.orgz = coordOrginWork.z = coordOrginWorkG5x[0].z+coordOrginWorkG5x[gWorkState.GG05].z;
+    gWorkState.orgy = coordOrginWork.y = coordOrginWorkG5x[0].y+coordOrginWorkG5x[gWorkState.GG05].y;
+
+    gWorkState.shiftx=coordShiftWork.x;
+    gWorkState.shiftz=coordShiftWork.z;
+    gWorkState.shifty=coordShiftWork.y;
+    //for test 201409 
+    /*
+    gWorkState.orgx = 0;
+    gWorkState.orgz = 0;
+    gWorkState.orgy = 0;
+
+    gWorkState.shiftx= 0;
+    gWorkState.shiftz= 0;
+    gWorkState.shifty= 0;
+    */
+    //for test 201409
+    gWorkState.GG01=0;
+    gWorkState.GG02=97;
+    {
+        U8 temp=IIC_Read1(IICADDR_G98G99);
+        if(temp==99)
+        {
+            gWorkState.GG03=99; //default g code of group 3
+        }else{
+            gWorkState.GG03=98; //default g code of group 3
+        }
+    }
+    gWorkState.GG04=40;
+    gWorkState.GG05=1;
+    gWorkState.GG06=21;
+    gWorkState.sdir=5; //stop;
+    gWorkState.f=10000;  //um/min
+    gWorkState.s=DSPparam.sysdword[81];
+    gWorkState.t=curTool;
+    gWorkState.m4x=IIC_Read1(IICADDR_SPIN_M);
+    if((gWorkState.m4x<41)||(gWorkState.m4x>44))
+        gWorkState.m4x=41;
+//    setSystemColorPanel();
+    checkPassword();
+    if(passValid==0)
+    {
+        ALARM_GRP2|=ALM_GRP2_OUTDATE;
+    }
+    //tell plc chuck init state
+
+    //if(SYSparam[172].val>4)
+    if(SYSparam[172].val>7)
+        SYSparam[172].val=0;
+    //transmit plc param's to plc
+//    PLC_NCCHUCK_CONF(SYSparam[172].val);
+    //PLC_NCMCODE_TIME_CONF(SYSparam[171].val);
+   // PLC_NCTOOL_CONF(SYSparam[170].val);
+
+    {
+        /*U16 i,j;
+        i=205;
+        j=3015;
+        for(i=205;i<=208;i++)
+        {
+           D[j++].wValue=SYSparam[i].val&0xFFFF;
+           //D[j++].wValue=(SYSparam[i].val>>16)&0xFFFF;
+
+        }
+        if(D[3015].wValue <= 8)
+			D[3015].wValue = 1;
+		else
+			D[3015].wValue = D[3015].wValue>>3; // /8
+
+        if(D[3016].wValue <= 8)
+			D[3016].wValue = 1;
+		else
+			D[3016].wValue = D[3016].wValue>>3; // /8
+
+*/
+		/*D[3205].wValue = SYSparam[205].val&0xFFFF;
+		D[3206].wValue = SYSparam[206].val&0xFFFF;
+		D[3207].wValue = SYSparam[207].val&0xFFFF;
+		D[3208].wValue = SYSparam[208].val&0xFFFF;
+        */
+    }
+    /*if(SYSparam[172].val&0x2)
+        gWorkState.chuck=13;
+    else
+        gWorkState.chuck=12;
+
+    if(SYSparam[85].val==0)
+    {
+        opLock=0;
+    }*/
+    if(IIC_Read1(IICADDR_TRACECOLOUR)!=IIC_Read1(IICADDR_TRACECOLOUR+5))
+    {
+        U8 temp8;
+        for(i=0;i<TRACE_MENU3_MAX;i++)
+        {
+            temp8=IIC_Read1(IICADDR_TRACECOLOUR+i);
+            if(temp8<TRACE_COLOUR_MAX)
+            {
+                trace_colour_select[i]=temp8;
+            }
+        }
+        trace_scale=IIC_Read4(IICADDR_TRACECS);
+        trace_cen_x=IIC_Read4(IICADDR_TRACECX);
+        trace_cen_z=IIC_Read4(IICADDR_TRACECZ);
+    }
+    Trace_Re_Print();
+    /*if(SYSparam[100].val==1)
+    {
+        Yavailable=1;
+    }else{
+        Yavailable=0;
+    }*/
+    //Yavailable=1;
+    return 0;
+    //
+}
+/*
+*------------------------------------------------------------------------------
+* function: initIICParam
+* parameter: void
+* return   : void
+* description : first write of the IIC data, when system is never inited before
+*------------------------------------------------------------------------------
+*/
+void initIICParam()
+{
+	U16 i;
+    //first run of the system,write all init data to IIC
+    IIC_Write4(IICADDR_MAGIC, MAGIC_NUM_CNCL);
+    //write exit info
+    /*IIC_Write1(IICADDR_EXIT, SYS_EXIT_PWROFF);
+    //init excepiont info
+    for(i=0;i<EXCP_RECORD_MAX;i++)
+    {
+        IIC_Write1(IICADDR_EXCEPTION+i, 0);
+        IIC_Write4(IICADDR_EXCEPTION_TIME+i*4, 0);
+        excpRecord[i]=0;
+        excpTime[i]=0;
+    }
+    excpPtr=0;*/
+    //init lost power coord
+    IIC_Write4(IICADDR_LPWRX,0);
+    IIC_Write4(IICADDR_LPWRZ,0);
+    IIC_Write4(IICADDR_LPWRY,0);
+    //reset all alarm warning record
+    for(i=0;i<ALARM_RECORD_MAX*2;i++)
+    {
+        IIC_Write4(IICADDR_ALARM,0);
+    }
+    //init all param
+    IIC_Write(IICADDR_PARAM_BYTE,DSPparamDefault.sysbyte,DSP_PARAM_BYTE_COUNT);
+    IIC_Write(IICADDR_PARAM_DWORD,DSPparamDefault.sysdword,DSP_PARAM_DWORD_COUNT*4);
+    //init op lock
+    IIC_Write4(IICADDR_PASS_OPKEY,0);
+    IIC_Write1(IICADDR_PASS_OPCLASS,0);
+    //init reference point
+
+    for(i=0;i<((REFP_MAX-1)*3);i++)
+    {
+        IIC_Write4(IICADDR_REFP+i*4,0);
+    }
+
+    //init all tool compenstion data
+    for(i=0;i<(20*TCOMP_MAX);i++)
+    {
+        IIC_Write4(IICADDR_TOOLCOMP+i*4,0);
+        IIC_Write4(IICADDR_TOOLWEAR+i*4,0);
+    }
+    //IIC_Write(IICADDR_TOOLCOMP,&toolCompensation, 16*TCOMP_MAX);
+
+    //init all grades
+    rapidGrade=10;
+    IIC_Write1(IICADDR_GRADER,rapidGrade);
+    feedGrade=10;
+    IIC_Write1(IICADDR_GRADEF,feedGrade);
+    spindleGrade=10;
+    IIC_Write1(IICADDR_GRADES,spindleGrade);
+    whellGrade=1;
+    IIC_Write1(IICADDR_GRADEW,whellGrade);
+    jogGrade=0;
+    IIC_Write1(IICADDR_GRADEJ,jogGrade);
+    curTool=100;
+    IIC_Write4(IICADDR_TOOL, curTool);
+    //read work piece count and cut time sum
+    workPieceCT=0;
+    IIC_Write4(IICADDR_WORKPIECE,0);
+    cutTimeCT=0;
+    IIC_Write4(IICADDR_CUT_TIME,0);
+    //init trace param
+    /*traceScale=TRACE_DEFAULT_XS;
+    traceCenter.x=0;
+    traceCenter.z=0;
+    IIC_Write4(IICADDR_TRACECX,0);
+    IIC_Write4(IICADDR_TRACECZ,0);
+    IIC_Write4(IICADDR_TRACECS,traceScale);*/
+    trace_scale=TRACE_MIN_SCALE;
+    trace_cen_x=trace_cen_z=0;
+    IIC_Write4(IICADDR_TRACECX,0);
+    IIC_Write4(IICADDR_TRACECZ,0);
+    IIC_Write4(IICADDR_TRACECS,trace_scale);
+    for(i=0;i<TRACE_MENU3_MAX;i++)
+    {
+        IIC_Write1(IICADDR_TRACECOLOUR+i,trace_colour_select[i]);
+    }
+    //init global vars
+    for(i=0;i<GLOBAL_VAR_MAX;i++)
+    {
+        IIC_Write4(IICADDR_GVARS+i*4,0);
+    }
+    //clear the prev saved file name
+    for(i=0;i<32;i++)
+        IIC_Write4(IICADDR_FILE+i,0);
+    //reset the sysname
+    //for(i=0;i<17;i++)
+    //    sysName[i]=0;
+    memset(sysName,0, 17);
+    snprintf(sysName,16,"LOKSHUN_CNCL");
+    IIC_Write(IICADDR_SYSNAME, sysName, 17);
+    //init the password
+    sysPassWord.flag=0;
+    IIC_Write4(IICADDR_PASSFLAG, 0);
+    for(i=0;i<SYS_PASS_MAX*PASSWORD_LEN;i++)
+    {
+        IIC_Write1(IICADDR_PASSWORD,'0');
+    }
+    for(i=0;i<SYS_PASS_MAX;i++)
+    {
+        IIC_Write4(IICADDR_PASSDATE,0);
+    }
+    //init plc d and k // all zero
+        //read all plc data's
+    /*for(i=0;i<(PLC_RES_D_MAX/2);i++)
+        IIC_Write4(IICADDR_PLC_D+i*4, 0);
+    for(i=0;i<(PLC_RES_K_MAX/2);i++)
+        IIC_Write4(IICADDR_PLC_K+i*4, 0);*/
+    //INIT FILE OPERATION RECORDS
+    IIC_Write4(IICADDR_FILEOP_PTR, 0);
+    for(i=0;i<(10*128/4);i++)
+        IIC_Write4(IICADDR_FILEOP_NAME+i*4, 0);
+    for(i=0;i<10*2;i++)
+        IIC_Write4(IICADDR_FILEOP_CT+i*4, 0);
+
+}
+
+//first use of system init other thing after iic
+void initSYSother()
+{
+   //format the nandfalsh
+  /*  yaffs_unmount('/');
+    ynv_format();
+    yaffs_StartUp();
+    yaffs_mount('/');*/
+
+}
+
+/***************************************************************************
+*FUNCTION: calUnit2ShowUnit
+*PARAMETER :void
+*RETURN : err code
+*DESCRIPTION: conver form inter 4 digti unit to user set val show format
+****************************************************************************
+* /
+
+S32 calUnit2ShowUnit(S32 val)
+{
+    double tempVal=val;
+    S32 result=0;
+    switch(sysUnit)
+    {
+        case(0): //input is meter 3 tail digit
+            result=tempVal/10;
+            break;
+        case(1): //input is meter 4 tail digit
+            //no need to change
+            result=val;
+            break;
+        case(2): //input is inch 4 tail digit
+
+            tempVal=tempVal/25.4l*10;
+            result=tempVal;
+            break;
+        case(3): //input is inch 5 tail digit
+            tempVal=tempVal/25.4l*100;
+            result=tempVal;
+            break;
+         default:
+           // shoulde case a hlt here
+            break;
+    }
+    return result;
+}
+//**************************************************************************
+// Fallow are some function may use system wide.
+/*
+*------------------------------------------------------------------------------
+* function: lightLED
+* parameter: void
+* return   : void
+* description : light some leds
+*------------------------------------------------------------------------------
+*/
+#define LIGHT_FPGA_LED(num) rLED=~(num)
+void lightLED(U8 lednum ,U8 onoff)
+{
+    static U8 ledstate=0x00;
+    if(onoff==LEDON)
+    {
+        ledstate|=(1<<lednum);
+    }else{
+        ledstate&=(~(1<<lednum));
+    }
+    //rGPGDAT = (rGPGDAT & ~(0xf<<12)) | ((~ledstate & 0xf)<<12);
+    //output the port;
+}
+
+void TooLinit()
+{
+	TLPOS = 0;
+	TLNEG = 0;
+	Toolchange = 0;
+}
+
+RECORDMACH recordmach[100];
+RECORDPULSE recordpulse[100];
+void RecordMach(void)
+{
+    static U16 i=0;
+
+    //recordmach[i].machx=X_Encoder.MACH_PositionValue;
+    //recordmach[i].machz=Z_Encoder.MACH_PositionValue;
+    recordmach[i].ostick=OSGetTimeTick();
+    i++;
+    if(i>=100)
+    {
+        i=0;
+    }
+}
+void RecordPulse(U16 axis,U16 pulse,U16 period)
+{
+    static U16 i=0,j=0;
+    if(axis==0)
+    {
+        recordpulse[i].xpulse=pulse;
+        recordpulse[i].xperiod=period;
+    }else if(axis==1){
+        recordpulse[i].zpulse=pulse;
+        recordpulse[i].zperiod=period;
+        recordpulse[i].ostick=OSGetTimeTick();
+        i++;
+        if(i>=100)
+        {
+            i=0;
+        }
+    }
+}
+int mystrcmp(S8 *s1,S8 *s2,U8 fullflag)
+{
+    S8 str1[255],str2[255];
+    U8 i,len;
+    i=0;
+    while(*(s1+i)!=0&&i<255)
+    {
+        if((*(s1+i)>='a')&&(*(s1+i)<='z'))
+        {
+            str1[i]=*(s1+i)-32;
+        }else{
+            str1[i]=*(s1+i);
+        }
+        i++;
+    }
+    str1[i]=0;
+    len=i;
+    i=0;
+    while(*(s2+i)!=0&&i<255)
+    {
+        if((*(s2+i)>='a')&&(*(s2+i)<='z'))
+        {
+            str2[i]=*(s2+i)-32;
+        }else{
+            str2[i]=*(s2+i);
+        }
+        i++;
+    }
+    str2[i]=0;
+    if(i<len)
+    {
+        len = i;
+    }
+    if(fullflag)
+    {
+        return strcmp(str1,str2);
+    }else{
+        return strncmp(str1,str2,len);
+    }
+}
+U32 starttick;
+U32 deltatime;
+void SetStartTick(void)
+{
+    starttick=OSGetTimeTick();
+}
+void GetDeltaTick(void)
+{
+    deltatime=OSGetTimeTick()-starttick;
+}
+
+void DNGmsgPut(U32 index,S8 *msg)
+{
+/*    if((index==DNGmsgNUM[0]) //same msg, not rst yet
+      ||(index==DNGmsgNUM[1])
+      ||(index==DNGmsgNUM[2]))
+        return;
+    if(DNGmsgPtr>2)
+        DNGmsgPtr=0;
+    else
+        DNGmsgPtr++;
+    DNGmsgNUM[DNGmsgPtr]=index;
+    strncpy(DNGmsgBuf[DNGmsgPtr],msg,50);*/
+}
+
+//U8 extOutPutBuf[3];
+U16 spindleOutV;
+U32 taskct[4];
+U32 taskctever[4];
+/////////////////////////////////
+// for bmp showing
+U16 BMPsizexy[BMPSLOT][2];
+U8  BMPfileName[BMPSLOT][128];
+U16 BMPframebuf[BMPSLOT][BMPSIZE];
+U8 BMPfileBuf[BMPSLOT][BMPFILESIZE];
+
+U32 OSGetTimeTick(void)
+{
+    return Clock_getTicks();
+}
+U32 filelength(U8 *name)
+{
+    //struct stat statbuf;
+    //stat(name,&statbuf);
+    return 1000;//statbuf.st_size;
+}

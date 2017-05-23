@@ -1,0 +1,156 @@
+//###########################################################################
+//DSP6713 定时器
+// FILE:    CpuTimers.h
+//
+
+#ifndef CPU_TIMERS_H
+#define CPU_TIMERS_H
+
+//---------------------------------------------------------------------------
+// CPU Timer Register Bit Definitions:
+//
+//
+
+/*
+// TCR: Control register bit definitions:
+struct  TCR_BITS {          // bits  description
+   INT16U    rsvd1:4;       // 3:0   reserved
+   INT16U    TSS:1;         // 4     Timer Start/Stop
+   INT16U    TRB:1;         // 5     Timer reload
+   INT16U    rsvd2:4;       // 9:6   reserved
+   INT16U    SOFT:1;        // 10    Emulation modes
+   INT16U    FREE:1;        // 11
+   INT16U    rsvd3:2;       // 12:13 reserved
+   INT16U    TIE:1;         // 14    Output enable
+   INT16U    TIF:1;         // 15    Interrupt flag
+}; 
+
+union TCR_REG {
+   INT16U           all;
+   struct TCR_BITS  bit;
+};
+
+// TPR: Pre-scale low bit definitions:
+struct  TPR_BITS {        // bits  description
+   INT16U     TDDR:8;     // 7:0   Divide-down low
+   INT16U     PSC:8;      // 15:8  Prescale counter low
+};
+
+union TPR_REG {
+   INT16U           all;
+   struct TPR_BITS  bit;
+};
+
+// TPRH: Pre-scale high bit definitions:
+struct  TPRH_BITS {       // bits  description
+   INT16U     TDDRH:8;      // 7:0   Divide-down high
+   INT16U     PSCH:8;       // 15:8  Prescale counter high
+};
+
+union TPRH_REG {
+   INT16U           all;
+   struct TPRH_BITS bit;
+};
+
+// TIM, TIMH: Timer register definitions:
+struct TIM_REG {
+   INT16U  LSW;
+   INT16U  MSW;
+};
+
+union TIM_GROUP {
+   INT32U          all;
+   struct TIM_REG  half;
+};
+
+// PRD, PRDH: Period register definitions:
+struct PRD_REG {
+   INT16U  LSW;
+   INT16U  MSW;
+};
+
+union PRD_GROUP {
+   INT32U          all;
+   struct PRD_REG  half;
+};
+
+//---------------------------------------------------------------------------
+// CPU Timer Register File:
+//
+struct CPUTIMER_REGS {
+   union TIM_GROUP TIM;   // Timer counter register
+   union PRD_GROUP PRD;   // Period register
+   union TCR_REG   TCR;   // Timer control register
+   INT16U          rsvd1; // reserved
+   union TPR_REG   TPR;   // Timer pre-scale low
+   union TPRH_REG  TPRH;  // Timer pre-scale high
+};
+
+//---------------------------------------------------------------------------
+// CPU Timer Support Variables:
+//
+struct CPUTIMER_VARS {
+   volatile struct  CPUTIMER_REGS  *RegsAddr;
+   INT32U    InterruptCount;
+   FLOAT32   CPUFreqInMHz;
+   FLOAT32   PeriodInUSec;
+};   */
+
+typedef struct
+{
+	FLOAT64 SamplePeriod;					// Timer0 采样周期 单位:us
+	FLOAT64 DeltaInterpolationTimer;		//unit:ms  CH0510
+	INT32U GenericCounter;				// Timer0  全局通用计数器 单位:ms
+	INT32U GetPositionCounter;				// 重新定位开始时的通用计数值
+	INT32U G04StartCounter;				// G04 开始时通用计数值
+	INT32U HardLimitStartCounter;			// 硬限位开始时通用计数值
+	INT32U SciBComCounter;	 
+	INT32U Z_LastInterpolationCounter;		//Z轴上次插补计数值，用于刚性攻牙	
+	INT32U ORTM252Counter;				// 主轴通用定位用计数器
+	INT32U SpindleRealSpeedCounter;		// 用于计算主轴实际速度计数器
+	INT32U AutoToolLockCounter;			// 自动对刀锁定时计数器   CH0601
+	INT32U HandStartCounter;				//SPC功能启动等待,防止启动时频繁加减速，造成震动
+	INT32U JogStartCounter;					//SPC功能启动等待,防止启动时频繁加减速，造成震动
+	INT32U SPCStartCounter;				//SPC功能启动等待,防止启动时频繁加减速，造成震动
+	INT32U SPCRunFiltrateCounter;				//SPC功能运行过滤,防止运行时频繁加减速，造成震动
+	INT32U trackdeflectionCounter;			//运行结束轨迹偏移判断用计数器
+	INT32U ForwardFeedbackCompensateCounter;
+	INT32U ForwardFeedbackCompensateDeltaTimer;
+}TIMER0;
+
+
+//---------------------------------------------------------------------------
+// Function prototypes and external definitions:
+//
+
+extern TIMER0 Timer0;	//定时器0 结构对象
+
+extern FLOAT64 get_delta_time(INT32U StartTime);	//计算由StartTime 起的经历时间
+
+
+void InitCpuTimers(void);
+//void ConfigCpuTimer(struct CPUTIMER_VARS *Timer, FLOAT32 Freq, FLOAT32 Period);
+extern volatile struct CPUTIMER_REGS CpuTimer0Regs;
+
+// Start Timer:
+#define StartCpuTimer0()  CpuTimer0Regs.TCR.bit.TSS = 0
+
+// Stop Timer:
+#define StopCpuTimer0()   CpuTimer0Regs.TCR.bit.TSS = 1
+
+// Reload Timer With period Value:
+#define ReloadCpuTimer0() CpuTimer0Regs.TCR.bit.TRB = 1
+
+// Read 32-Bit Timer Value:
+#define ReadCpuTimer0Counter() CpuTimer0Regs.TIM.all
+
+// Read 32-Bit Period Value:
+#define ReadCpuTimer0Period() CpuTimer0Regs.PRD.all
+
+
+#endif  // end of DSP281x_CPU_TIMERS_H definition
+
+
+//===========================================================================
+// No more.
+//===========================================================================

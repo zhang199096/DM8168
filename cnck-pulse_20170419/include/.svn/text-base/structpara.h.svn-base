@@ -1,0 +1,400 @@
+#ifndef _STRUCT_PARA_H_
+#define _STRUCT_PARA_H_
+
+#include "datatype.h"
+
+//DSP参数组1
+typedef struct
+//typedef __packed struct	
+{
+	INT8U ServoParaModify;		// 0
+	INT8U ServoFeedType;		// 1
+	INT8U ServoSpinType;		// 2
+	INT8U ServoStationsSub;		// 3
+	INT8U ServoStationsAuto;		// 4	
+	INT8U AxisTypeIV;			// 5
+	INT8U AxisTypeV;			// 6
+	INT8U AxisHLimitIV;			// 7
+	INT8U AxisHLimitV;			// 8
+	INT8U AxisAutoCtrlIV;			// 9
+	INT8U AxisAtuoCtrlV;			// 10
+	INT8U AxisDualCtrlType;		// 11
+	INT8U AxisDualCtrlDebug;		// 12
+	INT8U ServoToolLibType;		// 13
+	INT8U ServoToolLibDebug;	// 14
+	INT8U ServoRotateDebug;		// 15
+	INT8U SpindleType;			// 16
+	INT8U SpindleComs;			// 17
+	INT8U SpindleVoltages;		// 18
+	INT8U AxisHlimitTimes;		// 19	
+
+	INT8U InterpolationCycle;		// 20
+	INT8U TrackOverflow;			// 21
+	INT8U CurveSmoothOffset;	// 22
+	INT8U TurnNoDecAngle;		// 23
+	INT8U FeedMin;				// 24
+	INT8U FeedMinNice;			// 25
+	INT8U TimeConstTurn;		// 26
+	INT8U TimeConstTurnNice;	// 27	
+	INT8U ArcDecRatio;			// 28
+	INT8U ArcCalculateScale;		// 29
+	INT8U FittingLineOffset;		// 30 
+	INT8U FittingLineScale;		// 31
+	INT8U SoftBootFeed;			// 32
+	INT8U SoftBootScale;			// 33
+	INT8U SoftFeedScaleJog;		// 34
+	INT8U SoftFeedScaleAuto;		// 35
+	INT8U ResponseScaleHand;	// 36
+	INT8U ResponseScaleJog;		// 37
+	INT8U OffsetScaleJog;		// 38
+	INT8U AreaFeedDealType;	// 39
+
+	INT8U FunctionSelect01;		// 40
+	INT8U FunctionSelect02;		// 41
+	INT8U FunctionSelect03;		// 42
+	INT8U FunctionSelect04;		// 43
+	INT8U FunctionSelect05;		// 44
+	INT8U FunctionSelect06;		// 45
+	INT8U FunctionSelect07;		// 46
+	INT8U FunctionSelect08;		// 47
+	INT8U FunctionSelect09;		// 48
+	INT8U FunctionSelect10;		// 49
+	INT8U FunctionSelect11;		// 50
+	INT8U FunctionSelect12;		// 51
+	INT8U FunctionSelect13;		// 52
+	INT8U FunctionSelect14;		// 53
+	INT8U FunctionSelect15;		// 54
+	INT8U FunctionSelect16;		// 55
+	INT8U FunctionSelect17;		// 56
+	INT8U FunctionSelect18;		// 57
+	INT8U FunctionSelect19;		// 58
+	INT8U FunctionSelect20;		// 59
+	
+	INT8U EncoderCheckX;		// 60 
+	INT8U EncoderCheckY;		// 61	
+	INT8U EncoderCheckZ;		// 62
+	INT8U EncoderCheckIV;		// 63
+	INT8U EncoderCheckV;		// 64
+	INT8U EncoderCheckS;		// 65
+	INT8U EncoderRDDirX;		// 66
+	INT8U EncoderRDDirY;		// 67
+	INT8U EncoderRDDirZ;		// 68
+	INT8U EncoderRDDirIV;		// 69
+	INT8U EncoderRDDirV;		// 70
+	INT8U EncoderRDDirS;		// 71
+	INT8U EncoderRDDirHand;		// 72
+	INT8U SignLevelATCLock;		// 73
+	INT8U SignLevelATCTrack;	// 74
+	INT8U Rsd75;
+	INT8U Rsd76;
+	INT8U AxisLoadScaleL;
+	INT8U AxisLoadScaleR;
+	INT8U AxisLoadScaleS;
+	
+	INT8U Rsd80;   // 80
+	INT8U Rsd81;
+	INT8U Rsd82;
+	INT8U Rsd83;
+	INT8U Rsd84;
+	INT8U Rsd85;
+	INT8U Rsd86;
+	INT8U Rsd87;
+	INT8U Rsd88;
+	INT8U Rsd89;
+	INT8U Rsd90;
+	INT8U Rsd91;
+	INT8U Rsd92;
+	INT8U Rsd93;
+	INT8U Rsd94;
+	INT8U Rsd95;
+	INT8U Rsd96;
+	INT8U Rsd97;
+	INT8U Rsd98;
+	INT8U Rsd99;
+
+	INT8U Rsd100;
+	INT8U Rsd101;
+	INT8U Rsd102;
+	INT8U Rsd103;
+	INT8U Rsd104;
+	INT8U Rsd105;
+	INT8U Rsd106;
+	INT8U Rsd107;
+	INT8U Rsd108;
+	INT8U Rsd109;
+	INT8U Rsd110;
+	INT8U Rsd111;
+	INT8U Rsd112;
+	INT8U Rsd113;
+	INT8U Rsd114;
+	INT8U Rsd115;
+	INT8U Rsd116;
+	INT8U Rsd117;
+	INT8U Rsd118;
+	INT8U Rsd119;
+}tsPARADSPB0_1_BUF;
+
+//DSP参数组2
+typedef struct
+//typedef __packed struct
+{
+	INT32S AxisUnitInLinear;	// 120
+	INT32S AxisUnitInRotate;	// 121
+	INT32S AxisUnitInSpindle; 	// 122
+	INT32S AxisUnitOutLinear;	// 123
+	INT32S AxisUnitOutRotate;	// 124
+	INT32S AxisUnitOutSpindle; 	// 125
+	INT32S AxisOffsetDirLinear;	// 126
+	INT32S AxisOffsetDirRotate;	// 127	
+	INT32S AxisResolutionX; 	// 128
+	INT32S AxisResolutionY; 	// 129
+	INT32S AxisResolutionZ; 	// 130
+	INT32S AxisResolutionIV;	// 131
+	INT32S AxisResolutionV; 	// 132
+	INT32S AxisResolutionS; 	// 133
+	INT32S AxisGapOffsetX;		// 134
+	INT32S AxisGapOffsetY;		// 135
+	INT32S AxisGapOffsetZ;		// 136
+	INT32S AxisGapOffsetIV; 	// 137
+	INT32S AxisGapOffsetV;		// 138
+	INT32S AxisGapOffsetS;		// 139
+	
+	INT32S FeedLJogGrade1;		// 140
+	INT32S FeedLJogGrade2;		// 141
+	INT32S FeedLJogGrade3;		// 142
+	INT32S FeedIVJogGrade1;		// 143
+	INT32S FeedIVJogGrade2;		// 144
+	INT32S FeedIVJogGrade3;		// 145
+	INT32S FeedVJogGrade1;		// 146
+	INT32S FeedVJogGrade2;		// 147
+	INT32S FeedVJogGrade3;		// 148	
+	INT32S FeedLRefPos;			// 149
+	INT32S FeedLRefNeg;			// 150
+	INT32S DistLRefNeg;			// 151
+	INT32S FeedIVRefPos;		// 152
+	INT32S FeedIVRefNeg;		// 153
+	INT32S DistIVRefNeg;		// 154
+	INT32S FeedVRefPos;			// 155
+	INT32S FeedVRefNeg;			// 156
+	INT32S DistVRefNeg;			// 157	
+	INT32S FeedLMax;			// 158
+	INT32S FeelLLimitSign;		// 159		
+
+	INT32S FeedMaxX;			// 160
+	INT32S FeedMaxY;			// 161
+	INT32S FeedMaxZ;			// 162
+	INT32S FeedMaxIV;			// 163
+	INT32S FeedMaxV;			// 164
+	INT32S FeedG0L;				// 165
+	INT32S FeedG0IV;			// 166
+	INT32S FeedG0V;				// 167
+	INT32S AccFeedL;			// 168
+	INT32S AccFeedIV;			// 169
+	INT32S AccFeedV;			// 170
+	INT32S AccFeedNice;			// 171
+	INT32S AccFeedG0;			// 172
+	INT32S TimeConstExponentNice;	//173
+	INT32S TimeConstExponentAcc;	//174
+	INT32S TimeConstExponentDec; 	//175
+	INT32S STDFeedClamp; 			//176
+	INT32S TimeConstCombineAcc; 	//177
+	INT32S TimeConstCombineDec; 	//178
+	INT32S TurnNoDecAngle2; 		//179
+		
+
+	INT32S Veer2_SearchLen;		// 180
+	INT32S VeerDecA;		    // 181
+	INT32S NCAreaSpeedRange;	// 182
+	INT32S NCAreashortLen;		// 183
+	INT32S NCAreashortA;	    // 184
+	INT32S LongCodeLen;	        // 185
+	INT32S LongCodeAngle;	    // 186
+	INT32S LongCodeVm;	        // 187
+	INT32S LongCodeA;	        // 188
+	INT32S Min_CodeStotal;	    // 189
+	INT32S VecterInerpolate_MinLen;	// 190
+	INT32S VecterInerpolate_MaxLen;	// 191	
+	INT32S SpeedClamp1;			// 192
+	INT32S SpeedClamp2;			// 193
+	INT32S SpeedClamp3;			// 194 
+	INT32S SpeedClamp4;			// 195
+	INT32S TimeConstSpindle1;	// 196
+	INT32S TimeConstSpindle2;	// 197
+	INT32S TimeConstSpindle3;	// 198
+	INT32S TimeConstSpindle4;	// 199
+	
+	INT32S SpeedSpindleDec;		// 200
+	INT32S SpeedSpindleSet;		// 201
+	INT32S SpeedSpindleLocMin;	// 202
+	INT32S SpeedSpindleLoc;		// 203
+	INT32S SpeedSpindle10HZ;	// 204
+	INT32S RigidGapMaxSpeed;	// 205
+	INT32S RigidGapSpeedMode;	// 206
+	INT32S RigidGapStopAngle;	// 207
+	INT32S RigidGapFFKP;		// 208
+	INT32S RigidGapFFKV;		// 209
+	INT32S G73BackLength;		// 210
+	INT32S G83SafeLength;		// 211
+	INT32S G76SetupAngle;		// 212
+	INT32S DrillPauseTime;		// 213	
+	INT32S BFGradeChangeSpeed;	// 214
+	INT32S BFGradeLowSpeed;	    // 215
+	INT32S BFGradeHighSpeed;	// 216
+	INT32S BFGradeSwitchSpeed;	// 217
+	INT32S Rsd98;				// 218
+	INT32S Rsd99;				// 219	
+	
+	INT32S LinearOffsetCountX;	// 220
+	INT32S LinearOffsetCountY;	// 221
+	INT32S LinearOffsetCountZ;	// 222
+	INT32S LinearOffsetCountIV;	// 223
+	INT32S LinearOffsetCountV;	// 224	
+	INT32S CoordORGX;			// 225
+	INT32S CoordORGY;			// 226
+	INT32S CoordORGZ;			// 227
+	INT32S CoordORGIV;			// 228
+	INT32S CoordORGV;			// 229
+	INT32S CoordORGS;			// 230
+	INT32S DualAxisOffset;		// 231	
+	INT32S Rsd112;				// 232
+	INT32S Rsd113;				// 233
+	INT32S Rsd114;				// 234
+	INT32S Rsd115;				// 235
+	INT32S Rsd116;				// 236
+	INT32S Rsd117;				// 237
+	INT32S Rsd118;				// 238
+	INT32S Rsd119;				// 239
+}tsPARADSPB0_2_BUF;	
+//Servo数据包参数
+typedef struct
+//typedef __packed struct	
+{
+	INT32S S001;
+	INT32S S002;	
+	INT32S S003;
+	INT32S S004;
+	INT32S S005;
+	INT32S S006;
+	INT32S S007;
+	INT32S S008;
+	INT32S S009;
+	INT32S S010;
+	INT32S S011;
+	INT32S S012;
+	INT32S S013;
+	INT32S S014;
+	INT32S S015;
+	INT32S S016;
+	INT32S S017;
+	INT32S S018;
+	INT32S S019;
+	INT32S S020;
+	
+	INT32S S021;
+	INT32S S022;
+	INT32S S023;
+	INT32S S024;
+	INT32S S025;
+	INT32S S026;
+	INT32S S027;
+	INT32S S028;
+	INT32S S029;
+	INT32S S030;
+	INT32S S031;
+	INT32S S032;
+	INT32S S033;
+	INT32S S034;
+	INT32S S035;
+	INT32S S036;
+	INT32S S037;
+	INT32S S038;
+	INT32S S039;
+	INT32S S040;
+	
+	INT32S S041;
+	INT32S S042;
+	INT32S S043;
+	INT32S S044;
+	INT32S S045;
+	INT32S S046;
+	INT32S S047;
+	INT32S S048;
+	INT32S S049;
+	INT32S S050;
+	INT32S S051;
+	INT32S S052;
+	INT32S S053;
+	INT32S S054;
+	INT32S S055;
+	INT32S S056;
+	INT32S S057;
+	INT32S S058;
+	INT32S S059;	
+	INT32S S060;
+	
+	INT32S S061;
+	INT32S S062;
+	INT32S S063;
+	INT32S S064;
+	INT32S S065;
+	INT32S S066;
+	INT32S S067;
+	INT32S S068;
+	INT32S S069;
+	INT32S S070;
+	INT32S S071;
+	INT32S S072;
+	INT32S S073;
+	INT32S S074;
+	INT32S S075;
+	INT32S S076;
+	INT32S S077;
+	INT32S S078;
+	INT32S S079;	
+	INT32S S080;
+	
+	INT32S S081;
+	INT32S S082;
+	INT32S S083;
+	INT32S S084;
+	INT32S S085;
+	INT32S S086;
+	INT32S S087;
+	INT32S S088;
+	INT32S S089;
+	INT32S S090;
+	INT32S S091;
+	INT32S S092;
+	INT32S S093;
+	INT32S S094;
+	INT32S S095;
+	INT32S S096;
+	INT32S S097;
+	INT32S S098;
+	INT32S S099;
+	INT32S S100;
+	
+	INT32S S101;
+	INT32S S102;
+	INT32S S103;
+	INT32S S104;
+	INT32S S105;
+	INT32S S106;
+	INT32S S107;
+	INT32S S108;
+	INT32S S109;
+	INT32S S110;
+	INT32S S111;
+	INT32S S112;
+	INT32S S113;
+	INT32S S114;
+	INT32S S115;
+	INT32S S116;
+	INT32S S117;
+	INT32S S118;
+	INT32S S119;
+	INT32S S120;
+}tsPARADSPSERVO_BUF;
+
+
+#endif

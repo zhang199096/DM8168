@@ -1,0 +1,57 @@
+#ifndef DSP6713_AREA_CONTROL_EXTEND1_H
+#define DSP6713_AREA_CONTROL_EXTEND1_H
+
+extern void    NCArea1_Test( );	
+
+extern INT16U  NCArea1_BasicCurve();//预计算基本参数
+
+extern void	   NCArea1_SmCal( );	
+extern void    NCArea1_NoSde( );
+extern void    NCArea1_NoSac( );
+
+extern void    NCArea1_QuinticSacCal( );
+extern void    NCArea1_SoftExponentSacCal( );
+extern void    NCArea1_HardExponentSacCal( );
+extern void    NCArea1_LinearSacCal(FLOAT64 Acc_ac_recip);
+extern void    NCArea1_QuinticSdeCal( );
+extern void    NCArea1_ExponentSdeCal( );
+extern void    NCArea1_LinearSdeCal(FLOAT64 Acc_de_recip);
+
+extern INT16U  NCArea1_StableStateCal();
+
+extern INT16U  NCArea1_QuinticAccStateCal();	
+extern INT16U  NCArea1_QuinticDecStateCal();
+extern INT16U  NCArea1_QuinticSpecialStateCal();
+
+extern INT16U  NCArea1_SoftExponentAccStateCal();	
+extern INT16U  NCArea1_HardExponentAccStateCal();	
+extern INT16U  NCArea1_ExponentDecStateCal();
+extern INT16U  NCArea1_ExponentSpecialStateCal();
+
+extern INT16U  NCArea1_LinearAccStateCal();	
+extern INT16U  NCArea1_LinearDecStateCal();
+extern INT16U  NCArea1_LinearSpecialStateCal();
+
+extern void    NCArea1_SingleBasicJudge( );
+
+extern INT16U  NCArea1_QuinticADSingleCal();
+extern INT16U  NCArea1_SoftExponentADSingleCal();
+extern INT16U  NCArea1_HardExponentADSingleCal();
+extern INT16U  NCArea1_LinearADSingleCal();
+			
+extern void	   NCArea1_QuinticAccCurveRun( );
+extern void	   NCArea1_SoftExponentAccCurveRun( );
+extern void	   NCArea1_HardExponentAccCurveRun( );
+extern void	   NCArea1_LinearAccCurveRun( );
+	
+extern void	   NCArea1_QuinticDecCurveRun( );
+extern void	   NCArea1_ExponentDecCurveRun( );
+extern void	   NCArea1_LinearDecCurveRun( );
+
+extern void    NCArea1_QuinticSpecialAccCurveRun( );
+extern void    NCArea1_ExponentSpecialAccCurveRun( );
+extern void    NCArea1_LinearSpecialAccCurveRun( );
+
+#endif  // end of DSP6713_AREA_CONTROL_H definition
+
+

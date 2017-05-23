@@ -1,0 +1,3724 @@
+/****************************************************************/
+/* Name :                                                                   				*/
+/*       NC Area Run  Code...                      							*/
+/* Function:                                                               				*/
+/*       NCAreaRun()                                             						*/
+/*  Copyright 2008 by LOKSHUN CNC  Equipment LTD.                           	*/
+/*  All rights reserved LOKSHUN CNC  Equipment LTD.                 		      */
+/*	Designed by: DAVID SHEN										*/
+/*   Modified by :ENJOY LU		                                                            */
+/****************************************************************/
+#include "..\\include\\DEC6713_main.h"
+
+extern tsAREA_CONTROL	NC_AREAControl;
+
+INT16U  NCArea3_SCurvePreCal()
+{
+	NC_AREAControl.T1_Acc = System.S_T1_Acc;
+	NC_AREAControl.T1_Dec = System.S_T1_Dec;
+	if( NC_AREAControl.Vm >= NC_AREAControl.Vs && NC_AREAControl.Vm >= NC_AREAControl.Ve )
+	{
+		NC_AREAControl.Liner7CurvePreCalStat=1;
+		NCArea3_SCurvePreCalStat1( );
+	}
+	else if( NC_AREAControl.Vs > NC_AREAControl.Vm && NC_AREAControl.Vm >= NC_AREAControl.Ve )
+	{
+		NC_AREAControl.Liner7CurvePreCalStat=2;
+		NCArea3_SCurvePreCalStat2( );
+	}
+	else if( NC_AREAControl.Vs > NC_AREAControl.Vm && NC_AREAControl.Vm < NC_AREAControl.Ve )
+	{
+		NC_AREAControl.Liner7CurvePreCalStat=3;
+		Error.TrackRunOutError = 1;
+		high_error();		
+		return FALSE;		
+	}
+	else if( NC_AREAControl.Vm >= NC_AREAControl.Vs && NC_AREAControl.Vm < NC_AREAControl.Ve )
+	{
+		NC_AREAControl.Liner7CurvePreCalStat=4;
+		Error.TrackRunOutError = 2;
+		high_error();		
+		return FALSE;	
+	}
+	else
+	{
+		Error.TrackRunOutError = 3;
+		high_error();		
+		return FALSE;		
+	}
+
+	return TRUE;
+}
+
+
+INT16U  NCArea3_SCurvePreCalStat1()
+{
+	FLOAT64 V,Vt,T,S[8];
+	FLOAT64 T_acc,T_dec;
+	FLOAT64 dac,dde,St;
+	FLOAT64 vs,ve,vm,Aac,Ade;
+	INT32S i;
+	FLOAT64 K;
+	K = System.S_ce;
+	if( NC_AREAControl.Vm >= NC_AREAControl.Vs && NC_AREAControl.Vm >= NC_AREAControl.Ve )
+	{		
+		///////Sac///////////////////////////////////////////		
+		V = divdp( NC_AREAControl.T1_Acc*NC_AREAControl.a_ac, K );
+		if( fabs( NC_AREAControl.Vm - NC_AREAControl.Vs ) < 2*V )
+		{
+			Vt = divdp( fabs( NC_AREAControl.Vm - NC_AREAControl.Vs ), 2.0 );
+			T = divdp( K*Vt, NC_AREAControl.a_ac );
+			T_acc = 2*T;
+			NC_AREAControl.T1_Acc = T;
+			NC_AREAControl.T_Acc = T_acc; 			
+			if(fabs( T )<0.000001 )
+			{
+				S[1]=0;
+				S[2]=0;
+				S[3]=0;
+			}
+			else
+			{
+				S[1] = NC_AREAControl.Vs*T+divdp( NC_AREAControl.a_ac*powdp(T,K+1), K*(K+1)*powdp(T,K-1) );
+				S[2]=0;
+				S[3] = ( NC_AREAControl.Vm )*T - divdp( NC_AREAControl.a_ac*powdp(T,2),  K*(K+1) );
+			}
+			NC_AREAControl.Sac = S[1]+S[2]+S[3];
+		}
+		else
+		{
+			Vt =  fabs( NC_AREAControl.Vm - NC_AREAControl.Vs ) - 2*V;
+			T = divdp( Vt,	NC_AREAControl.a_ac );
+			T_acc = 2*NC_AREAControl.T1_Acc + T;
+			NC_AREAControl.T_Acc = T_acc; 	
+			NC_AREAControl.Vclampv_ac[1]=NC_AREAControl.Vs+V;
+			NC_AREAControl.Vclampv_ac[2]=NC_AREAControl.Vm-V;				
+			S[1] = NC_AREAControl.Vs*NC_AREAControl.T1_Acc+
+				divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Acc,K-1) );
+			S[2] = divdp( powdp( NC_AREAControl.Vclampv_ac[2], 2 ) - powdp( NC_AREAControl.Vclampv_ac[1] , 2 ) , 2*NC_AREAControl.a_ac );
+			S[3] =	( NC_AREAControl.Vm )*NC_AREAControl.T1_Acc -divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,2),  K*(K+1) );
+			NC_AREAControl.Sac = S[1]+S[2]+S[3];
+		}
+
+		///////Sde///////////////////////////////////////////
+		V = divdp( NC_AREAControl.T1_Dec*NC_AREAControl.a_de, K );		
+		if( fabs( NC_AREAControl.Vm - NC_AREAControl.Ve ) < 2*V )
+		{
+			Vt = divdp( fabs( NC_AREAControl.Vm - NC_AREAControl.Ve ), 2.0 );
+			T = divdp( K*Vt, NC_AREAControl.a_de );
+			T_dec = 2*T;
+			NC_AREAControl.T1_Dec = T;
+			NC_AREAControl.T_Dec = T_dec;				
+			if(fabs( T )<0.000001 )
+			{
+				S[5]=0;
+				S[6]=0;
+				S[7]=0;
+			}
+			else
+			{
+				S[5] = NC_AREAControl.Vm*T-divdp( NC_AREAControl.a_de*powdp(T,K+1), K*(K+1)*powdp(T,K-1) );
+				S[6]=0;
+				S[7] = NC_AREAControl.Ve*T + divdp( NC_AREAControl.a_de*powdp(T,2),  K*(K+1) );
+			}
+			NC_AREAControl.Sde = S[5]+S[6]+S[7];
+		}
+		else
+		{
+			Vt =  fabs( NC_AREAControl.Vm - NC_AREAControl.Ve ) - 2*V;
+			T = divdp( Vt,	NC_AREAControl.a_de );
+			T_dec = 2*NC_AREAControl.T1_Dec + T;
+			NC_AREAControl.T_Dec = T_dec; 
+			NC_AREAControl.Vclampv_de[1]=NC_AREAControl.Ve+V;
+			NC_AREAControl.Vclampv_de[2]=NC_AREAControl.Vm-V;				
+			S[5] = NC_AREAControl.Vm*NC_AREAControl.T1_Dec -
+				divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Dec,K-1) );
+			S[6]= divdp( powdp( NC_AREAControl.Vclampv_de[2], 2 ) - powdp( NC_AREAControl.Vclampv_de[1] , 2 ) , 2*NC_AREAControl.a_de );
+			S[7] = NC_AREAControl.Ve*NC_AREAControl.T1_Dec + divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,2), K*(K+1) );
+			NC_AREAControl.Sde = S[5]+S[6]+S[7];
+		}	
+
+		if( NC_AREAControl.Stotal >= NC_AREAControl.Sac + NC_AREAControl.Sde )
+		{
+			NC_AREAControl.VmReal = NC_AREAControl.Vm;
+			NC_AREAControl.Sm = NC_AREAControl.Stotal - NC_AREAControl.Sac - NC_AREAControl.Sde;
+			NC_AREAControl.S4 = NC_AREAControl.Sm;
+			S[4] = NC_AREAControl.S4;
+			if(NC_AREAControl.VmReal<1e-6) 
+			{
+				NC_AREAControl.DeltaT4=  3e38;		//趋于无穷
+			}
+			else
+			{
+				NC_AREAControl.DeltaT4 = divdp( NC_AREAControl.S4, NC_AREAControl.VmReal);
+			}
+
+			NC_AREAControl.DeltaT1 = NC_AREAControl.T1_Acc;
+			NC_AREAControl.DeltaT2 = NC_AREAControl.T_Acc-2*NC_AREAControl.T1_Acc;
+			NC_AREAControl.DeltaT3 = NC_AREAControl.T1_Acc; 
+			NC_AREAControl.DeltaT5 = NC_AREAControl.T1_Dec;
+			NC_AREAControl.DeltaT6 = NC_AREAControl.T_Dec-2*NC_AREAControl.T1_Dec;
+			NC_AREAControl.DeltaT7 = NC_AREAControl.T1_Dec; 
+			NC_AREAControl.S1 = S[1];
+			NC_AREAControl.S2 = S[2];
+			NC_AREAControl.S3 = S[3]; 
+			NC_AREAControl.S5 = S[5];
+			NC_AREAControl.S6 = S[6];
+			NC_AREAControl.S7 = S[7]; 			
+		}
+		else //NC_AREAControl.Stotal < NC_AREAControl.Sac + NC_AREAControl.Sde
+		{	
+			NC_AREAControl.Sac = -1.0;
+			NC_AREAControl.Sde = -1.0;			
+			if( NC_AREAControl.Vs <= NC_AREAControl.Ve )
+			{		
+				V = divdp( NC_AREAControl.T1_Acc*NC_AREAControl.a_ac, K );
+				if( fabs( NC_AREAControl.Ve - NC_AREAControl.Vs ) < 2*V )
+				{
+					Vt = divdp( fabs( NC_AREAControl.Ve - NC_AREAControl.Vs ), 2.0 );
+					T = divdp( K*Vt, NC_AREAControl.a_ac );
+					T_acc = 2*T;
+					NC_AREAControl.T1_Acc = T;
+					NC_AREAControl.T_Acc = T_acc; 		
+					if(fabs( T )<0.000001 )
+					{
+						S[1]=0;
+						S[2]=0;
+						S[3]=0;
+					}
+					else
+					{
+						S[1] = NC_AREAControl.Vs*T+divdp( NC_AREAControl.a_ac*powdp(T,K+1), K*(K+1)*powdp(T,K-1) );
+						S[2]=0;
+						S[3] = ( NC_AREAControl.Ve )*T - divdp( NC_AREAControl.a_ac*powdp(T,2),  K*(K+1) );
+					}
+					NC_AREAControl.Sac = S[1]+S[2]+S[3];
+				}
+				else
+				{
+					Vt =  fabs( NC_AREAControl.Ve - NC_AREAControl.Vs ) - 2*V;
+					T = divdp( Vt,	NC_AREAControl.a_ac );
+					T_acc = 2*NC_AREAControl.T1_Acc + T;
+					NC_AREAControl.T_Acc = T_acc; 					
+					NC_AREAControl.Vclampv_ac[1]=NC_AREAControl.Vs+V;
+					NC_AREAControl.Vclampv_ac[2]=NC_AREAControl.Ve-V;				
+					S[1] = NC_AREAControl.Vs*NC_AREAControl.T1_Acc+
+						divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Acc,K-1) );
+					S[2] = divdp( powdp( NC_AREAControl.Vclampv_ac[2], 2 ) - powdp( NC_AREAControl.Vclampv_ac[1] , 2 ) , 2*NC_AREAControl.a_ac );
+					S[3] =	( NC_AREAControl.Ve )*NC_AREAControl.T1_Acc -divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,2),  K*(K+1) );
+					NC_AREAControl.Sac = S[1]+S[2]+S[3];
+				}
+			}
+			else
+			{
+				V = divdp( NC_AREAControl.T1_Dec*NC_AREAControl.a_de, K );		
+				if( fabs( NC_AREAControl.Vs - NC_AREAControl.Ve ) < 2*V )
+				{
+					Vt = divdp( fabs( NC_AREAControl.Vs - NC_AREAControl.Ve ), 2.0 );
+					T = divdp( K*Vt, NC_AREAControl.a_de );
+					T_dec = 2*T;
+					NC_AREAControl.T1_Dec = T;
+					NC_AREAControl.T_Dec = T_dec;			
+					if(fabs( T )<0.000001 )
+					{
+						S[5]=0;
+						S[6]=0;
+						S[7]=0;
+					}
+					else
+					{
+						S[5] = NC_AREAControl.Vs*T-divdp( NC_AREAControl.a_de*powdp(T,K+1), K*(K+1)*powdp(T,K-1) );
+						S[6]=0;
+						S[7] =NC_AREAControl.Ve*T + divdp( NC_AREAControl.a_de*powdp(T,2),  K*(K+1) );
+					}
+					NC_AREAControl.Sde = S[5]+S[6]+S[7];
+				}
+				else
+				{
+					Vt =  fabs( NC_AREAControl.Vs - NC_AREAControl.Ve ) - 2*V;
+					T = divdp( Vt,	NC_AREAControl.a_de );
+					T_dec = 2*NC_AREAControl.T1_Dec + T;
+					NC_AREAControl.T_Dec = T_dec; 	
+					NC_AREAControl.Vclampv_de[1]=NC_AREAControl.Ve+V;
+					NC_AREAControl.Vclampv_de[2]=NC_AREAControl.Vs-V;							
+					S[5] = NC_AREAControl.Vs*NC_AREAControl.T1_Dec -
+						divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Dec,K-1) );
+					S[6]= divdp( powdp( NC_AREAControl.Vclampv_de[2], 2 ) - powdp( NC_AREAControl.Vclampv_de[1] , 2 ) , 2*NC_AREAControl.a_de );
+					S[7] = NC_AREAControl.Ve*NC_AREAControl.T1_Dec + divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,2), K*(K+1) );
+					NC_AREAControl.Sde = S[5]+S[6]+S[7];
+				}
+			}
+			
+			S[0] = 0;
+			S[1] = 0;
+			S[2] = 0;
+			S[3] = 0;
+			S[4] = 0;
+			S[5] = 0;
+			S[6] = 0;
+			S[7] = 0;
+			if( NC_AREAControl.Sac >= NC_AREAControl.Stotal  ) //更改加速度
+			{
+				vs=NC_AREAControl.Vs;
+				ve=NC_AREAControl.Ve;
+				NC_AREAControl.VmReal=ve;
+				dac = divdp( K*powdp(ve,2)-K*powdp(vs,2) , 2*NC_AREAControl.Stotal );
+				NC_AREAControl.a_ac = dac;
+				NC_AREAControl.T1_Acc = divdp( K*(ve-vs), 2*dac );
+				NC_AREAControl.T_Acc = 2*NC_AREAControl.T1_Acc;
+				V = divdp( NC_AREAControl.T1_Acc*NC_AREAControl.a_ac, K );
+				NC_AREAControl.Vclampv_ac[1]=NC_AREAControl.Vs+V;
+				NC_AREAControl.Vclampv_ac[2]=NC_AREAControl.Vclampv_ac[1];				
+				S[1] = NC_AREAControl.Vs*NC_AREAControl.T1_Acc+
+					divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Acc,K-1) );
+				S[2] = 0;
+				S[3] = ( NC_AREAControl.Ve )*NC_AREAControl.T1_Acc -divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,2),  K*(K+1) );
+				NC_AREAControl.Sac = S[1]+S[2]+S[3];
+				NC_AREAControl.Sde = 0;
+				NC_AREAControl.Sm = 0;
+				NC_AREAControl.S4 = 0;
+				NC_AREAControl.DeltaT4 = 0;
+				
+				NC_AREAControl.DeltaT1 = NC_AREAControl.T1_Acc;
+				NC_AREAControl.DeltaT2 = 0;
+				NC_AREAControl.DeltaT3 = NC_AREAControl.T1_Acc; 
+				NC_AREAControl.DeltaT5 = 0;
+				NC_AREAControl.DeltaT6 = 0;
+				NC_AREAControl.DeltaT7 = 0; 				
+				NC_AREAControl.S1 = S[1];
+				NC_AREAControl.S2 = S[2];
+				NC_AREAControl.S3 = S[3]; 
+				NC_AREAControl.S5 = 0;
+				NC_AREAControl.S6 = 0;
+				NC_AREAControl.S7 = 0; 		
+			}
+			else if(  NC_AREAControl.Sde >= NC_AREAControl.Stotal ) //更改加速度
+			{
+				vs=NC_AREAControl.Vs;
+				ve=NC_AREAControl.Ve;
+				NC_AREAControl.VmReal=vs;
+				dde = divdp( K*powdp(vs,2)-K*powdp(ve,2) , 2*NC_AREAControl.Stotal );
+				NC_AREAControl.a_de = dde;
+				NC_AREAControl.T1_Dec = divdp( K*(vs-ve), 2*dde );
+				NC_AREAControl.T_Dec = 2*NC_AREAControl.T1_Dec;
+				V = divdp( NC_AREAControl.T1_Dec*NC_AREAControl.a_de, K );				
+				NC_AREAControl.Vclampv_de[1]=NC_AREAControl.Ve+V;
+				NC_AREAControl.Vclampv_de[2]=NC_AREAControl.Vclampv_de[1];								
+				S[5] = NC_AREAControl.Vs*NC_AREAControl.T1_Dec -
+					divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Dec,K-1) );
+				S[6]= 0;
+				S[7] = NC_AREAControl.Ve*NC_AREAControl.T1_Dec + divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,2), K*(K+1));
+				NC_AREAControl.Sde = S[5]+S[6]+S[7];
+				NC_AREAControl.Sac = 0;
+				NC_AREAControl.Sm = 0;
+				NC_AREAControl.S4 = 0;
+				NC_AREAControl.DeltaT4 = 0;
+				
+				NC_AREAControl.DeltaT1 = 0;
+				NC_AREAControl.DeltaT2 = 0;
+				NC_AREAControl.DeltaT3 = 0; 
+				NC_AREAControl.DeltaT5 = NC_AREAControl.T1_Dec;
+				NC_AREAControl.DeltaT6 = 0;
+				NC_AREAControl.DeltaT7 = NC_AREAControl.T1_Dec; 				
+				NC_AREAControl.S1 = 0;
+				NC_AREAControl.S2 = 0;
+				NC_AREAControl.S3 = 0;
+				NC_AREAControl.S5 = S[5];
+				NC_AREAControl.S6 = S[6];
+				NC_AREAControl.S7 = S[7]; 			
+			}
+			else
+			{
+				vs=NC_AREAControl.Vs;
+				ve=NC_AREAControl.Ve;
+				Aac=NC_AREAControl.a_ac;
+				Ade=NC_AREAControl.a_de;	
+				St = NC_AREAControl.Stotal + divdp( K*vs*vs , 2*Aac ) + divdp( K*ve*ve , 2*Ade );
+				dac = divdp( K,2*Aac );
+				dde = divdp( K,2*Ade );
+				vm =  sqrtdp(	divdp(	St , dac+dde ) );
+				NC_AREAControl.VmReal= vm;		
+
+				NC_AREAControl.Sm = 0;
+				NC_AREAControl.S4 = 0;
+				NC_AREAControl.DeltaT4 = 0;
+				Vt = divdp(  NC_AREAControl.VmReal - NC_AREAControl.Vs , 2.0 );
+				T = divdp( K*Vt, NC_AREAControl.a_ac );
+				NC_AREAControl.T1_Acc = T;
+				NC_AREAControl.T_Acc = 2*T;
+				V = divdp( NC_AREAControl.T1_Acc*NC_AREAControl.a_ac, K );				
+				NC_AREAControl.Vclampv_ac[1]=NC_AREAControl.Vs+V;
+				NC_AREAControl.Vclampv_ac[2]=NC_AREAControl.Vclampv_ac[1];								
+				S[1] = NC_AREAControl.Vs*NC_AREAControl.T1_Acc+
+					divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Acc,K-1) );
+				S[2] = 0;
+				S[3] = ( NC_AREAControl.VmReal)*NC_AREAControl.T1_Acc -divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,2),  K*(K+1));
+				NC_AREAControl.Sac = S[1]+S[2]+S[3];
+
+				
+				Vt = divdp(  NC_AREAControl.VmReal - NC_AREAControl.Ve , 2.0 );
+				T = divdp( K*Vt, NC_AREAControl.a_de );
+				NC_AREAControl.T1_Dec = T;
+				NC_AREAControl.T_Dec = 2*T;
+				V = divdp( NC_AREAControl.T1_Dec*NC_AREAControl.a_de, K );	
+				NC_AREAControl.Vclampv_de[1]=NC_AREAControl.Ve+V;
+				NC_AREAControl.Vclampv_de[2]=NC_AREAControl.Vclampv_de[1];					
+				S[5] = NC_AREAControl.VmReal*NC_AREAControl.T1_Dec -
+					divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Dec,K-1) );
+				S[6]= 0;
+				S[7] = NC_AREAControl.Ve*NC_AREAControl.T1_Dec + divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,2), K*(K+1) );
+				NC_AREAControl.Sde = S[5]+S[6]+S[7];
+
+				NC_AREAControl.DeltaT1 = NC_AREAControl.T1_Acc;
+				NC_AREAControl.DeltaT2 = 0;
+				NC_AREAControl.DeltaT3 = NC_AREAControl.T1_Acc; 
+				NC_AREAControl.DeltaT5 = NC_AREAControl.T1_Dec;
+				NC_AREAControl.DeltaT6 = 0;
+				NC_AREAControl.DeltaT7 = NC_AREAControl.T1_Dec; 				
+				NC_AREAControl.S1 = S[1];
+				NC_AREAControl.S2 = S[2];
+				NC_AREAControl.S3 = S[3]; 
+				NC_AREAControl.S5 = S[5];
+				NC_AREAControl.S6 = S[6];
+				NC_AREAControl.S7 = S[7]; 				
+			}			
+		}
+
+		NC_AREAControl.Area_Sadd[0] = 0;	
+		for( i=1; i<=7; i++ )
+		{
+			NC_AREAControl.Area_Sadd[i] = NC_AREAControl.Area_Sadd[i-1] + S[i];
+		}	
+		NC_AREAControl.T1 = NC_AREAControl.DeltaT1;
+		NC_AREAControl.T2 = NC_AREAControl.T1+NC_AREAControl.DeltaT2;
+		NC_AREAControl.T3 = NC_AREAControl.T2+NC_AREAControl.DeltaT3;
+		NC_AREAControl.T4 = NC_AREAControl.T3+NC_AREAControl.DeltaT4;
+		NC_AREAControl.T5 = NC_AREAControl.T4+NC_AREAControl.DeltaT5;
+		NC_AREAControl.T6 = NC_AREAControl.T5+NC_AREAControl.DeltaT6;
+		NC_AREAControl.T7 = NC_AREAControl.T6+NC_AREAControl.DeltaT7;
+		NC_AREAControl.TotalN = divdp(NC_AREAControl.T7, 0.001);		
+		//////////add by le///////////////////////
+		NC_AREAControl.TotalN++;
+		////////////////////////////////////////		
+	}
+	else
+	{		
+		NC_AREAControl.Vm = NC_AREAControl.Vm;	
+		Error.TrackRunOutError= 4;
+		high_error();		//CH0904
+		return FALSE;
+	}
+	return TRUE;
+}
+
+INT16U  NCArea3_SCurvePreCalStat2()
+{
+	FLOAT64 V,Vt,T,S[8];
+	FLOAT64 T_acc,T_dec;
+	FLOAT64 dde;
+	FLOAT64 vs,ve;
+	INT32S  i;
+	FLOAT32 K;
+	K = System.S_ce;
+	if( NC_AREAControl.Vs > NC_AREAControl.Vm && NC_AREAControl.Vm >= NC_AREAControl.Ve )
+	{		
+		///////Sac///////////////////////////////////////////
+		NC_AREAControl.a_ac = NC_AREAControl.a_de;
+		NC_AREAControl.T1_Acc = NC_AREAControl.T1_Dec;
+		V = divdp( NC_AREAControl.T1_Acc*NC_AREAControl.a_ac, K );
+		if( fabs( NC_AREAControl.Vm - NC_AREAControl.Vs ) < 2*V )
+		{
+			Vt = divdp( fabs( NC_AREAControl.Vm - NC_AREAControl.Vs ), 2.0 );
+			T = divdp( K*Vt, NC_AREAControl.a_ac );
+			T_acc = 2*T;
+			NC_AREAControl.T1_Acc = T;
+			NC_AREAControl.T_Acc = T_acc; 		
+			if(fabs( T )<0.000001 )
+			{
+				S[1]=0;
+				S[2]=0;
+				S[3]=0;
+			}
+			else
+			{
+				S[1] = NC_AREAControl.Vs*T-divdp( NC_AREAControl.a_ac*powdp(T,K+1), K*(K+1)*powdp(T,K-1) );
+				S[2]=0;
+				S[3] = NC_AREAControl.Vm*T + divdp( NC_AREAControl.a_ac*powdp(T,2),  K*(K+1) );
+			}
+			NC_AREAControl.Sac = S[1]+S[2]+S[3];
+		}
+		else
+		{
+			Vt =  fabs( NC_AREAControl.Vm - NC_AREAControl.Vs ) - 2*V;
+			T = divdp( Vt,	NC_AREAControl.a_ac );
+			T_acc = 2*NC_AREAControl.T1_Acc + T;
+			NC_AREAControl.T_Acc = T_acc; 	
+			NC_AREAControl.Vclampv_ac[1]=NC_AREAControl.Vs-V;
+			NC_AREAControl.Vclampv_ac[2]=NC_AREAControl.Vm+V;				
+			S[1] = NC_AREAControl.Vs*NC_AREAControl.T1_Acc -
+				divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Acc,K-1) );
+			S[2]= divdp( powdp( NC_AREAControl.Vclampv_ac[1], 2 ) - powdp( NC_AREAControl.Vclampv_ac[2] , 2 ) , 2*NC_AREAControl.a_ac );
+			S[3] = NC_AREAControl.Vm*NC_AREAControl.T1_Acc	+ divdp( NC_AREAControl.a_ac*powdp(NC_AREAControl.T1_Acc,2), K*(K+1));
+			
+			NC_AREAControl.Sac = S[1]+S[2]+S[3];
+		}
+
+		///////Sde///////////////////////////////////////////
+		V = divdp( NC_AREAControl.T1_Dec*NC_AREAControl.a_de, K );
+		if( fabs( NC_AREAControl.Vm - NC_AREAControl.Ve ) < 2*V )
+		{
+			Vt = divdp( fabs( NC_AREAControl.Vm - NC_AREAControl.Ve ), 2.0 );
+			T = divdp( K*Vt, NC_AREAControl.a_de );
+			T_dec = 2*T;
+			NC_AREAControl.T1_Dec = T;
+			NC_AREAControl.T_Dec = T_dec;			
+			if(fabs( T )<0.000001 )
+			{
+				S[5]=0;
+				S[6]=0;
+				S[7]=0;
+			}
+			else
+			{
+				S[5] = NC_AREAControl.Vm*T-divdp( NC_AREAControl.a_de*powdp(T,K+1), K*(K+1)*powdp(T,K-1) );
+				S[6]=0;
+				S[7] =NC_AREAControl.Ve*T + divdp( NC_AREAControl.a_de*powdp(T,2),  K*(K+1) );
+			}
+			NC_AREAControl.Sde = S[5]+S[6]+S[7];
+		}
+		else
+		{
+			Vt =  fabs( NC_AREAControl.Vm - NC_AREAControl.Ve ) - 2*V;
+			T = divdp( Vt,	NC_AREAControl.a_de );
+			T_dec = 2*NC_AREAControl.T1_Dec + T;
+			NC_AREAControl.T_Dec = T_dec; 
+			NC_AREAControl.Vclampv_de[1]=NC_AREAControl.Ve+V;
+			NC_AREAControl.Vclampv_de[2]=NC_AREAControl.Vm-V;				
+			S[5] = NC_AREAControl.Vm*NC_AREAControl.T1_Dec -
+				divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Dec,K-1) );
+			S[6]= divdp( powdp( NC_AREAControl.Vclampv_de[2], 2 ) - powdp( NC_AREAControl.Vclampv_de[1] , 2 ) , 2*NC_AREAControl.a_de );
+			S[7] = NC_AREAControl.Ve*NC_AREAControl.T1_Dec + divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,2), K*(K+1) );
+			NC_AREAControl.Sde = S[5]+S[6]+S[7];
+		}
+
+		if( NC_AREAControl.Stotal >= NC_AREAControl.Sac + NC_AREAControl.Sde )
+		{
+			NC_AREAControl.VmReal = NC_AREAControl.Vm;
+			NC_AREAControl.Sm = NC_AREAControl.Stotal - NC_AREAControl.Sac - NC_AREAControl.Sde;
+			NC_AREAControl.S4 = NC_AREAControl.Sm;
+			S[4] = NC_AREAControl.S4;
+			if(NC_AREAControl.VmReal<1e-6) 
+			{
+				NC_AREAControl.DeltaT4=  3e38;		//趋于无穷
+			}
+			else
+			{
+				NC_AREAControl.DeltaT4 = divdp( NC_AREAControl.S4, NC_AREAControl.VmReal);
+			}
+
+			NC_AREAControl.DeltaT1 = NC_AREAControl.T1_Acc;
+			NC_AREAControl.DeltaT2 = NC_AREAControl.T_Acc-2*NC_AREAControl.T1_Acc;
+			NC_AREAControl.DeltaT3 = NC_AREAControl.T1_Acc; 
+			NC_AREAControl.DeltaT5 = NC_AREAControl.T1_Dec;
+			NC_AREAControl.DeltaT6 = NC_AREAControl.T_Dec-2*NC_AREAControl.T1_Dec;
+			NC_AREAControl.DeltaT7 = NC_AREAControl.T1_Dec; 
+			NC_AREAControl.S1 = S[1];
+			NC_AREAControl.S2 = S[2];
+			NC_AREAControl.S3 = S[3]; 
+			NC_AREAControl.S5 = S[5];
+			NC_AREAControl.S6 = S[6];
+			NC_AREAControl.S7 = S[7]; 			
+		}
+		else //NC_AREAControl.Stotal < NC_AREAControl.Sac + NC_AREAControl.Sde
+		{       //更改加速度
+			S[1]=0;
+			S[2]=0;
+			S[3]=0; 
+			S[4]=0;		
+			vs=NC_AREAControl.Vs;
+			ve=NC_AREAControl.Ve;
+			NC_AREAControl.VmReal=vs;
+			dde = divdp( K*powdp(vs,2)-K*powdp(ve,2) , 2*NC_AREAControl.Stotal );
+			NC_AREAControl.a_de = dde;
+			NC_AREAControl.T1_Dec = divdp( K*(vs-ve), 2*dde );
+			NC_AREAControl.T_Dec = 2*NC_AREAControl.T1_Dec;
+			V = divdp( NC_AREAControl.T1_Dec*NC_AREAControl.a_de, K );
+			NC_AREAControl.Vclampv_de[1]=NC_AREAControl.Ve+V;
+			NC_AREAControl.Vclampv_de[2]=NC_AREAControl.Vclampv_de[1];				
+			S[5] = NC_AREAControl.Vs*NC_AREAControl.T1_Dec -
+				divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,K+1), K*(K+1)*powdp(NC_AREAControl.T1_Dec,K-1) );
+			S[6]= 0;
+			S[7] = NC_AREAControl.Ve*NC_AREAControl.T1_Dec + divdp( NC_AREAControl.a_de*powdp(NC_AREAControl.T1_Dec,2), K*(K+1) );
+			NC_AREAControl.Sde = S[5]+S[6]+S[7];
+			NC_AREAControl.Sac = 0;
+			NC_AREAControl.Sm = 0;
+			NC_AREAControl.S4 = 0;
+			NC_AREAControl.DeltaT4 = 0;
+			
+			NC_AREAControl.DeltaT1 = 0;
+			NC_AREAControl.DeltaT2 = 0;
+			NC_AREAControl.DeltaT3 = 0; 
+			NC_AREAControl.DeltaT5 = NC_AREAControl.T1_Dec;
+			NC_AREAControl.DeltaT6 = 0;
+			NC_AREAControl.DeltaT7 = NC_AREAControl.T1_Dec; 				
+			NC_AREAControl.S1 = 0;
+			NC_AREAControl.S2 = 0;
+			NC_AREAControl.S3 = 0;
+			NC_AREAControl.S5 = S[5];
+			NC_AREAControl.S6 = S[6];
+			NC_AREAControl.S7 = S[7]; 			
+		}
+
+		NC_AREAControl.Area_Sadd[0] = 0;	
+		for( i=1; i<=7; i++ )
+		{
+			NC_AREAControl.Area_Sadd[i] = NC_AREAControl.Area_Sadd[i-1] + S[i];
+		}	
+		NC_AREAControl.T1 = NC_AREAControl.DeltaT1;
+		NC_AREAControl.T2 = NC_AREAControl.T1+NC_AREAControl.DeltaT2;
+		NC_AREAControl.T3 = NC_AREAControl.T2+NC_AREAControl.DeltaT3;
+		NC_AREAControl.T4 = NC_AREAControl.T3+NC_AREAControl.DeltaT4;
+		NC_AREAControl.T5 = NC_AREAControl.T4+NC_AREAControl.DeltaT5;
+		NC_AREAControl.T6 = NC_AREAControl.T5+NC_AREAControl.DeltaT6;
+		NC_AREAControl.T7 = NC_AREAControl.T6+NC_AREAControl.DeltaT7;
+		NC_AREAControl.TotalN = divdp(NC_AREAControl.T7, 0.001);		
+		NC_AREAControl.TotalN++;
+	}
+	else
+	{		
+		NC_AREAControl.Vm = NC_AREAControl.Vm;	
+		Error.TrackRunOutError= 5;
+		high_error();		//CH0904
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+INT16U  NCArea3_SCurvePreCalStat3()
+{
+	return TRUE;
+}
+
+
+
+
+INT16U  NCArea3_SCurveRun()
+{
+	if( NC_AREAControl.Liner7CurvePreCalStat== 1 )
+	{
+		NCArea3_SCurveRunStat1( );
+	}
+	else if( NC_AREAControl.Liner7CurvePreCalStat== 2 )
+	{
+		NCArea3_SCurveRunStat2( );
+	}
+	else if( NC_AREAControl.Liner7CurvePreCalStat== 3 )
+	{
+		Error.TrackRunOutError = 6;
+		high_error();		
+		return FALSE;	
+	}
+	else if( NC_AREAControl.Liner7CurvePreCalStat== 4 )
+	{
+		Error.TrackRunOutError = 7;
+		high_error();		
+		return FALSE;	
+	}
+	else
+	{
+		Error.TrackRunOutError = 8;
+		high_error();		
+		return FALSE;		
+	}
+
+	return TRUE;
+}
+
+
+INT16U	NCArea3_SCurveRunStat1( )
+{
+	FLOAT64 t,S,V,K;
+	V = NC_AREAControl.VNow;
+	S = NC_AREAControl.Snow;	
+	K = System.S_ce;
+	if( fabs( NC_AREAControl.Snow ) < 0.00001 )
+	{
+		NC_AREAControl.Snow=NC_AREAControl.Snow;
+	}
+		
+	if( NC_AREAControl.CurrentT <= NC_AREAControl.T1 ) 
+	{
+		t = NC_AREAControl.CurrentT;
+		NC_AREAControl.VNow = NC_AREAControl.Vs + divdp( NC_AREAControl.a_ac*powdp( t, K ), K*powdp(NC_AREAControl.T1_Acc, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.Vs*t + divdp( NC_AREAControl.a_ac*powdp( t, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Acc, K-1 ) );
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T1 && NC_AREAControl.CurrentT <= NC_AREAControl.T2 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T1;
+		NC_AREAControl.VNow = NC_AREAControl.Vclampv_ac[1] + NC_AREAControl.a_ac*t;
+		NC_AREAControl.Snow = NC_AREAControl.Vclampv_ac[1]*t + divdp( NC_AREAControl.a_ac*t*t,2.0 )+NC_AREAControl.Area_Sadd[1];
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T2 && NC_AREAControl.CurrentT <= NC_AREAControl.T3 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T2;
+		NC_AREAControl.VNow = NC_AREAControl.VmReal + 
+						divdp( NC_AREAControl.a_ac*powdp( t-NC_AREAControl.T1_Acc, K ), K*powdp(NC_AREAControl.T1_Acc, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*t +
+			divdp( NC_AREAControl.a_ac*powdp( t-NC_AREAControl.T1_Acc, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Acc, K-1 ) ) -
+				divdp( NC_AREAControl.a_ac*powdp( NC_AREAControl.T1_Acc,2) , K*(K+1)) + NC_AREAControl.Area_Sadd[2];
+
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T3 && NC_AREAControl.CurrentT <= NC_AREAControl.T4 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T3 ;
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*t+NC_AREAControl.Area_Sadd[3];
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T4 && NC_AREAControl.CurrentT <= NC_AREAControl.T5 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T4;
+		NC_AREAControl.VNow = NC_AREAControl.VmReal- divdp( NC_AREAControl.a_de*powdp( t, K ), K*powdp(NC_AREAControl.T1_Dec, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*t - divdp( NC_AREAControl.a_de*powdp( t, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Dec, K-1 ) )+NC_AREAControl.Area_Sadd[4];
+
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T5 && NC_AREAControl.CurrentT <= NC_AREAControl.T6 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T5;
+		NC_AREAControl.VNow = NC_AREAControl.Vclampv_de[2] - NC_AREAControl.a_de*t;
+		NC_AREAControl.Snow = NC_AREAControl.Vclampv_de[2]*t - divdp( NC_AREAControl.a_de*t*t,2.0 )+NC_AREAControl.Area_Sadd[5];
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T6 && NC_AREAControl.CurrentT <= NC_AREAControl.T7 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T6;
+		NC_AREAControl.VNow = NC_AREAControl.Ve - divdp( NC_AREAControl.a_de*powdp( t-NC_AREAControl.T1_Dec, K ), K*powdp(NC_AREAControl.T1_Dec, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.Ve*t - divdp( NC_AREAControl.a_de*powdp( t-NC_AREAControl.T1_Dec, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Dec, K-1 ) ) +
+			divdp( NC_AREAControl.a_de*powdp( NC_AREAControl.T1_Dec, 2 ), K*(K+1) ) + NC_AREAControl.Area_Sadd[6];
+	}
+		
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T7 )		
+	{	
+		//尾巴段(余量段)
+		NC_AREAControl.VNow = NC_AREAControl.Ve;
+		NC_AREAControl.Snow = NC_AREAControl.Stotal;
+	}
+
+	if( fabs( V - NC_AREAControl.VNow )>100 )
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow ;
+	}
+
+	if( (fabs( S - NC_AREAControl.Snow )>5 ) && (NC_AREAControl.I>1) )
+	{
+		NC_AREAControl.Snow = NC_AREAControl.Snow;
+	}
+	
+	return TRUE;
+}
+
+INT16U	NCArea3_SCurveRunStat2( )
+{
+	FLOAT64 t,S,V,K;
+	V = NC_AREAControl.VNow;
+	S = NC_AREAControl.Snow;	
+	K = System.S_ce;
+	if( NC_AREAControl.CurrentT <= NC_AREAControl.T1 ) 
+	{
+		t = NC_AREAControl.CurrentT;
+		NC_AREAControl.VNow = NC_AREAControl.Vs- divdp( NC_AREAControl.a_ac*powdp( t, K ), K*powdp(NC_AREAControl.T1_Acc, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.Vs*t - divdp( NC_AREAControl.a_ac*powdp( t, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Acc, K-1 ) );
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T1 && NC_AREAControl.CurrentT <= NC_AREAControl.T2 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T1;
+		NC_AREAControl.VNow = NC_AREAControl.Vclampv_ac[1] - NC_AREAControl.a_ac*t;
+		NC_AREAControl.Snow = NC_AREAControl.Vclampv_ac[1]*t - divdp( NC_AREAControl.a_ac*t*t,2.0 )+NC_AREAControl.Area_Sadd[1];
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T2 && NC_AREAControl.CurrentT <= NC_AREAControl.T3 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T2;
+		NC_AREAControl.VNow = NC_AREAControl.VmReal -divdp( NC_AREAControl.a_ac*powdp( t-NC_AREAControl.T1_Acc, K ), K*powdp(NC_AREAControl.T1_Acc, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*t  - divdp( NC_AREAControl.a_ac*powdp( t-NC_AREAControl.T1_Acc, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Acc, K-1 ) ) +
+			divdp( NC_AREAControl.a_ac*powdp( NC_AREAControl.T1_Acc, 2 ), K*(K+1)) + NC_AREAControl.Area_Sadd[2];
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T3 && NC_AREAControl.CurrentT <= NC_AREAControl.T4 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T3 ;
+		NC_AREAControl.VNow = NC_AREAControl.VmReal;
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*t+NC_AREAControl.Area_Sadd[3];
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T4 && NC_AREAControl.CurrentT <= NC_AREAControl.T5 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T4;
+		NC_AREAControl.VNow = NC_AREAControl.VmReal- divdp( NC_AREAControl.a_de*powdp( t, K ), K*powdp(NC_AREAControl.T1_Dec, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.VmReal*t - divdp( NC_AREAControl.a_de*powdp( t, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Dec, K-1 ) )+NC_AREAControl.Area_Sadd[4];
+
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T5 && NC_AREAControl.CurrentT <= NC_AREAControl.T6 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T5;
+		NC_AREAControl.VNow = NC_AREAControl.Vclampv_de[2] - NC_AREAControl.a_de*t;
+		NC_AREAControl.Snow = NC_AREAControl.Vclampv_de[2]*t - divdp( NC_AREAControl.a_de*t*t,2.0 )+NC_AREAControl.Area_Sadd[5];
+	}
+	
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T6 && NC_AREAControl.CurrentT <= NC_AREAControl.T7 ) 
+	{
+		t = NC_AREAControl.CurrentT-NC_AREAControl.T6;
+		NC_AREAControl.VNow = NC_AREAControl.Ve - divdp( NC_AREAControl.a_de*powdp( t-NC_AREAControl.T1_Dec, K ), K*powdp(NC_AREAControl.T1_Dec, K-1 ) );
+		NC_AREAControl.Snow = NC_AREAControl.Ve*t - divdp( NC_AREAControl.a_de*powdp( t-NC_AREAControl.T1_Dec, K+1 ), K*(K+1)*powdp(NC_AREAControl.T1_Dec, K-1 ) ) +
+			divdp( NC_AREAControl.a_de*powdp( NC_AREAControl.T1_Dec, 2 ), K*(K+1)) + NC_AREAControl.Area_Sadd[6];
+	}
+		
+	else if( NC_AREAControl.CurrentT > NC_AREAControl.T7 )		
+	{	
+		//尾巴段(余量段)
+		NC_AREAControl.VNow = NC_AREAControl.Ve;
+		NC_AREAControl.Snow = NC_AREAControl.Stotal;
+	}
+
+	if( fabs( NC_AREAControl.Snow ) < 0.00001 )
+	{
+		NC_AREAControl.Snow=NC_AREAControl.Snow;
+	}
+
+	if( fabs( V - NC_AREAControl.VNow )>100)
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow ;
+	}
+	
+	if( (fabs( S - NC_AREAControl.Snow )>5 ) && (NC_AREAControl.I>1) )
+	{
+		NC_AREAControl.Snow = NC_AREAControl.Snow;
+	}
+	return TRUE;
+}
+
+INT16U	NCArea3_SCurveRunStat3( )
+{
+	return TRUE;
+}
+
+
+FLOAT64  NCArea3_CodeAngle( VECTOR a, VECTOR b )
+{
+	FLOAT64 cos_angle,an=0.0;
+	FLOAT64 ax,ay,az, bx,by,bz, len;
+
+	ax = a.X;	
+	ay = a.Y;	
+	az = a.Z;
+	bx = b.X;	
+	by = b.Y;	
+	bz = b.Z;	
+
+	len = sqrtdp( ax*ax + ay*ay + ay*ay );
+	if( fabs( len )<0.000001 )
+	{
+		return -1.0;
+	}
+	a.X = divdp( ax, len );
+	a.Y= divdp( ay, len );
+	a.Z= divdp( az, len );
+
+	len = sqrtdp( bx*bx + by*by + by*by );
+	if( fabs( len )<0.000001 )
+	{
+		return -1.0;
+	}	
+	b.X = divdp( bx, len );
+	b.Y= divdp( by, len );
+	b.Z= divdp( bz, len );	
+
+	cos_angle = a.X*b.X + a.Y*b.Y + a.Z*b.Z;
+	an = divdp( acosdp( cos_angle )*180,PI );
+
+	return an;
+}
+
+
+FLOAT64  NCArea3_CodeAngle2( INT32S a, INT32S b )
+{
+	tsGCODE 	aCodePT;
+	tsGCODE 	bCodePT; 
+	FLOAT64 cos_angle,an=0.0;	
+	aCodePT = NCAreaGCodeBuffer[(a- 1)% STDGCODE_MOD];	
+	bCodePT = NCAreaGCodeBuffer[(b - 1)% STDGCODE_MOD];	
+	if( fabs( aCodePT.Stotal)<0.000001 ||fabs( bCodePT.Stotal)<0.000001 )
+	{
+		return 180.0;
+	}
+	an = aCodePT.StPointVector.X*bCodePT.StPointVector.X + 
+				aCodePT.StPointVector.Y*bCodePT.StPointVector.Y+ 
+				  aCodePT.StPointVector.Z*bCodePT.StPointVector.Z;
+	cos_angle = divdp( acosdp( an )*180,PI );
+	cos_angle = 180.0 - cos_angle;
+	return cos_angle;
+
+}
+
+FLOAT64  NCArea3_CodeAngle3( INT32S a, INT32S b )
+{
+	tsGCODE 	aCodePT;
+	tsGCODE 	bCodePT; 
+	FLOAT64 cos_angle,an=0.0;	
+	aCodePT = NCAreaGCodeBuffer[(a- 1)% STDGCODE_MOD];	
+	bCodePT = NCAreaGCodeBuffer[(b - 1)% STDGCODE_MOD];	
+	
+	/*
+	if( fabs( aCodePT.Stotal)<0.000001 ||fabs( bCodePT.Stotal)<0.000001 )
+	{
+		return 180.0;
+	}*/
+	
+	an = aCodePT.StPointVector.X*bCodePT.StPointVector.X + 
+				aCodePT.StPointVector.Y*bCodePT.StPointVector.Y+ 
+				  aCodePT.StPointVector.Z*bCodePT.StPointVector.Z;
+	cos_angle = divdp( acosdp( an )*180,PI );
+	return cos_angle;
+
+}
+
+INT16U  NCArea3_CheckArea(   )
+{
+	INT32S i,EndCodeCn;
+	tsGCODE 	*aCodePT;
+	tsGCODE 	*bCodePT; 
+	VECTOR L,F;
+	FLOAT64 LimitAngelError = 10.0;
+	FLOAT64 StartCheckAngle = 170.0, LimitLength = 0.02;
+	FLOAT64 A, len1,len2;
+	INT8U StartCheck = 0;
+	if( NC_AREAControl.Pointer_StartCode<=1 )
+	{
+		return FALSE;
+	}
+	
+	if( NC_AREAControl.Pointer_EndCode <= NCRunSign.EndCodeCount-1 )
+	{
+		EndCodeCn = NC_AREAControl.Pointer_EndCode + 1;
+	}
+	else
+	{
+		EndCodeCn = NC_AREAControl.Pointer_EndCode;
+	}
+	
+	for( i=NC_AREAControl.Pointer_StartCode; i<=EndCodeCn; i++ )
+	{
+		aCodePT = &NCAreaGCodeBuffer[(i - 2)% STDGCODE_MOD];	
+		bCodePT = &NCAreaGCodeBuffer[(i - 1)% STDGCODE_MOD];		
+		L.X = -aCodePT->StPointVector.X;
+		L.Y = -aCodePT->StPointVector.Y;
+		L.Z = -aCodePT->StPointVector.Z;	
+		F.X = bCodePT->EndPointVector.X;
+		F.Y = bCodePT->EndPointVector.Y;
+		F.Z = bCodePT->EndPointVector.Z;			
+		A = NCArea3_CodeAngle( L,F );			
+		if( StartCheck == 0 )
+		{
+			if( A<StartCheckAngle || A<0 )
+			{
+				continue;
+			}
+			else
+			{		
+				StartCheck = TRUE;
+				continue;
+			}
+		}
+		else
+		{
+			if( A < LimitAngelError )
+			{			
+				len1 = aCodePT->Stotal;
+				len2 = bCodePT->Stotal;	
+				if( len1<LimitLength || len2<LimitLength )
+				{
+					///////////compare/////////////////////////
+					L.X = -NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].StPointVector.X;
+					L.Y = -NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].StPointVector.Y;
+					L.Z = -NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].StPointVector.Z;	
+					F.X = NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].StartPoint.X - 
+						NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].EndPoint.X;
+					F.Y= NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].StartPoint.Y - 
+						NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].EndPoint.Y;
+					F.Z= NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].StartPoint.Z - 
+						NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].EndPoint.Z;	
+
+					L.X = NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].EndPoint.X - 
+						NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].StartPoint.X;
+					L.Y= NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].EndPoint.Y - 
+						NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].StartPoint.Y;
+					L.Z= NCAreaGCodeBuffer[(i-3) % STDGCODE_MOD].EndPoint.Z - 
+						NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].StartPoint.Z;
+					F.X = -NCAreaGCodeBuffer[(i) % STDGCODE_MOD].StPointVector.X;
+					F.Y = -NCAreaGCodeBuffer[(i) % STDGCODE_MOD].StPointVector.Y;
+					F.Z = -NCAreaGCodeBuffer[(i) % STDGCODE_MOD].StPointVector.Z;			
+					///////////////////////////////////////////////////////////////////////
+				}
+			}
+		}
+
+	}
+
+	
+	return TRUE;
+}
+
+INT16U  NCArea3_DealWithTale2( )
+{	
+	return TRUE;
+}
+
+
+INT16U  NCArea3_DealWithTale3( )
+{
+	INT32S	   x,y,z;
+	INT32U		 ri,cnt=0;
+	FLOAT64 	 Sadd,ex, ey, ez, x0,y0,z0;
+	FLOAT64 	 DeltaS,LS,CurrentArcAngle;
+	tsGCODE	  NextGCodePT,*GCodePT;
+	VECTOR	  I1EndVector;
+	
+	if( NCRunSign.RealRunCount >= NCRunSign.RealSendCount )
+	{
+		return FALSE;	
+	}
+
+	NextGCodePT= NCAreaGCodeBuffer[(NCRunSign.RealRunCount) % STDGCODE_MOD];
+
+	if(  !(NextGCodePT.CMD1==0 ||NextGCodePT.CMD1==1 ||
+		   NextGCodePT.CMD1==2 ||NextGCodePT.CMD1==3 )	)
+	{
+		return FALSE;
+	}
+
+	ri = NCRunSign.RealRunCount+1;
+	DeltaS = NC_AREAControl.Snow - NC_AREAControl.Stotal;	
+	if( DeltaS < 0 )
+	{			
+		NC_AREAControl.Snow=NC_AREAControl.Snow;		
+		return FALSE;
+	}	
+
+	Sadd = NextGCodePT.Stotal;
+	if( DeltaS>=NextGCodePT.Stotal )
+	{	
+		cnt=0;
+		ri = NCRunSign.RealRunCount+2;
+		if( ri >= NCRunSign.RealSendCount )
+		{
+			NC_AREAControl.Snow=NC_AREAControl.Snow;		
+			return FALSE;		
+		}
+		NextGCodePT = NCAreaGCodeBuffer[(ri-1) % STDGCODE_MOD]; 	
+		while( DeltaS >= Sadd + NextGCodePT.Stotal )
+		{
+			cnt++;
+			if( cnt>=20 )
+			{
+				NC_AREAControl.Snow=NC_AREAControl.Snow;		
+				return FALSE;
+			}
+			Sadd = Sadd + NextGCodePT.Stotal;			
+			ri++;
+			if( ri >= NCRunSign.RealSendCount )
+			{
+				NC_AREAControl.Snow=NC_AREAControl.Snow;		
+				return FALSE;		
+			}			
+			NextGCodePT = NCAreaGCodeBuffer[(ri-1) % STDGCODE_MOD]; 					
+		}
+
+		DeltaS = DeltaS - Sadd;
+		for( cnt=NCRunSign.RealRunCount+1; cnt<=ri-1; cnt++ )
+		{
+			GCodePT = &NCAreaGCodeBuffer[(cnt-1) % STDGCODE_MOD];
+			GCodePT->StartPoint.X = GCodePT->EndPoint.X;
+			GCodePT->StartPoint.Y = GCodePT->EndPoint.Y;
+			GCodePT->StartPoint.Z = GCodePT->EndPoint.Z;			
+			GCodePT->Stotal = 0;		
+		}
+	}
+
+	if( DeltaS>10 )
+	{
+		NC_AREAControl.Snow=NC_AREAControl.Snow;	
+	}
+
+	GCodePT = &NCAreaGCodeBuffer[(ri-1) % STDGCODE_MOD];
+	ex=divdp(NC_AREAControl.OldValue.X , 1);//mm
+	ey=divdp(NC_AREAControl.OldValue.Y , 1);//mm
+	ez=divdp(NC_AREAControl.OldValue.Z , 1);//mm		
+
+	if( GCodePT->CMD1 == 0 || GCodePT->CMD1 == 1 )//搭直线
+	{
+		x0=GCodePT->StartPoint.X*System.UnitTo_mm;//mm
+		y0=GCodePT->StartPoint.Y*System.UnitTo_mm;//mm
+		z0=GCodePT->StartPoint.Z*System.UnitTo_mm;//mm
+		I1EndVector = GCodePT->EndPointVector;
+
+		x = (INT32S)(  divdp( (x0 + DeltaS*I1EndVector.X) , System.UnitTo_mm ) );
+		y = (INT32S)(  divdp( (y0 + DeltaS*I1EndVector.Y) , System.UnitTo_mm ) );
+		z = (INT32S)(  divdp( (z0 + DeltaS*I1EndVector.Z) , System.UnitTo_mm ) );	
+
+		LS = powdp( (ex-x),2 ) + powdp( (ey-y),2 ) + powdp( (ez-z),2 );
+		LS = sqrtdp( LS );
+
+		GCodePT->StartPoint.X=x;
+		GCodePT->StartPoint.Y=y;
+		GCodePT->StartPoint.Z=z;	
+		
+		x0 = (GCodePT->EndPoint.X - GCodePT->StartPoint.X)*System.UnitTo_mm;	//mm
+		y0 = (GCodePT->EndPoint.Y - GCodePT->StartPoint.Y)*System.UnitTo_mm;	//mm
+		z0 = (GCodePT->EndPoint.Z - GCodePT->StartPoint.Z)*System.UnitTo_mm;	//mm
+		
+		GCodePT->Stotal = sqrtdp(powdp(x0,2)+powdp(y0,2)+powdp(z0,2));		
+	}
+	else if( GCodePT->CMD1 == 2 || GCodePT->CMD1 == 3 )//搭圆弧
+	{
+		if(GCodePT->CMD1==03)
+		{
+			CurrentArcAngle = GCodePT->StartAngle+divdp( DeltaS, GCodePT->Radius*System.UnitTo_mm );
+		}
+		else
+		{
+			CurrentArcAngle = GCodePT->StartAngle-divdp( DeltaS, GCodePT->Radius*System.UnitTo_mm );
+		}
+		
+		if(GCodePT->GGroup02==17)
+		{	//xy
+			x = (GCodePT->CenterPoint.X+GCodePT->Radius*cosdp(CurrentArcAngle)); 
+			y = (GCodePT->CenterPoint.Y+GCodePT->Radius*sindp(CurrentArcAngle)); 
+			if(GCodePT->StartPoint.Z != GCodePT->EndPoint.Z)
+			{
+				z = fabs(divdp( (CurrentArcAngle-GCodePT->StartAngle), divdp( GCodePT->Stotal, (GCodePT->Radius*System.UnitTo_mm))) )*
+										(GCodePT->EndPoint.Z-GCodePT->StartPoint.Z)+GCodePT->StartPoint.Z;
+			}
+			else
+			{
+				z = GCodePT->StartPoint.Z;
+			}
+		}
+		else if(GCodePT->GGroup02==18)//换了ZX坐标，sin,cos要跟着换 royalqing 20100928
+		{	//xz
+			x = (GCodePT->CenterPoint.X+GCodePT->Radius*sindp(CurrentArcAngle)); 
+			y = GCodePT->StartPoint.Y;
+			z = (GCodePT->CenterPoint.Z+GCodePT->Radius*cosdp(CurrentArcAngle)); 
+		}
+		else if(GCodePT->GGroup02==19)
+		{	//yz
+			x = GCodePT->StartPoint.X;
+			y = (GCodePT->CenterPoint.Y+GCodePT->Radius*cosdp(CurrentArcAngle)); 
+			z = (GCodePT->CenterPoint.Z+GCodePT->Radius*sindp(CurrentArcAngle)); 
+		}	
+
+		GCodePT->StartPoint.X=x;
+		GCodePT->StartPoint.Y=y;
+		GCodePT->StartPoint.Z=z;	
+
+		GCodePT->StartAngle = CurrentArcAngle;
+
+		//计算园弧所夹角度和园弧长度
+		if(GCodePT->CMD1==2)		 
+		{
+			CurrentArcAngle  = 2*PI-(GCodePT->EndAngle-GCodePT->StartAngle);
+		}
+		else
+		{
+			CurrentArcAngle  = GCodePT->EndAngle-GCodePT->StartAngle;
+		}
+		
+		if(CurrentArcAngle < 0)
+		{
+			CurrentArcAngle = CurrentArcAngle+2.0*PI;
+		}
+
+		if(CurrentArcAngle > 2.0*PI)
+		{
+			CurrentArcAngle = CurrentArcAngle-2.0*PI;
+		}
+
+		//GCodePT->ArcTotalAngle_Out = (INT32S)( divdp( CurrentArcAngle*180 , PI ) );
+		GCodePT->Stotal = CurrentArcAngle*GCodePT->Radius*System.UnitTo_mm;//mm 	
+		
+		if( (GCodePT->StartPoint.X==GCodePT->EndPoint.X)&&
+			(GCodePT->StartPoint.Y==GCodePT->EndPoint.Y)&&
+			(GCodePT->StartPoint.Z==GCodePT->EndPoint.Z) )
+		{
+			GCodePT->Stotal = 0; 
+		}
+
+		STD_Deal_Vveer(GCodePT);		
+	}
+	else
+	{
+	}
+
+	funtion_v.Uint32_a = ri;
+	NCCoord_WorkToMACToLinear(&GCodePT->StartPoint, &NC_AREAControl.EndPointMachPulseOut);
+	return TRUE;			
+}
+
+
+
+VECTOR  NCArea3_CalArcCodeVector( tsGCODE *Code , INT8U kind )//计算圆弧起始于结尾向量
+{
+	FLOAT64       angle;
+	FLOAT64       cosf,sinf;
+	VECTOR   vec;
+	if( kind == 1 )//起始向量
+	{
+		if( Code->CMD1 == 2 ) //顺时针圆弧
+		{			
+			angle = Code->StartAngle - divdp( 90.0*PI , 180.0 );  //弧度			
+			cosf = cosdp( angle );
+			sinf = sindp( angle );
+		}
+		else if( Code->CMD1 == 3 )//逆时针圆弧
+		{
+			angle = Code->StartAngle + divdp( 90.0*PI , 180.0 );  //弧度			
+			cosf = cosdp( angle );
+			sinf = sindp( angle );
+		}
+	}
+	else//末尾向量
+	{
+		if( Code->CMD1 == 2 ) //顺时针圆弧
+		{			
+			angle = Code->EndAngle - divdp( 90.0*PI , 180.0 );  //弧度			
+			cosf = cosdp( angle );
+			sinf = sindp( angle );
+		}
+		else if( Code->CMD1 == 3 )//逆时针圆弧
+		{
+			angle = Code->EndAngle + divdp( 90.0*PI , 180.0 );  //弧度			
+			cosf = cosdp( angle );
+			sinf = sindp( angle );
+		}	
+	}
+
+	if( Code->GGroup02==17 )//xy
+	{	
+		vec.X = cosf;
+		vec.Y = sinf;
+		vec.Z = 0;
+	}
+	else if( Code->GGroup02==18 )//xz
+	{
+		vec.X=sinf;
+		vec.Y=0;
+		vec.Z=cosf;	
+	}
+	else if( Code->GGroup02==19 )//yz
+	{
+		vec.X=0;
+		vec.Y=cosf;
+		vec.Z=sinf;		
+	}
+	else
+	{
+		vec.X=0;
+		vec.Y=0;
+		vec.Z=0;		
+	}
+
+	return vec;
+}
+
+
+INT16U  NCArea3_CalSs2()
+{
+	INT32U			inc_i;			//向后搜索相对搜索起点的条数
+	FLOAT64 		Ve_Cal;			//从起点到当前搜索线段累积长度 单位: mm
+	FLOAT64 		Veer,Over_Vm;
+	FLOAT64 		angle_temp;		
+	tsGCODE			*CurrentCodePT; //当前计算条指针
+	tsGCODE			*RiCodePT;		//当前运行条GcodeBuffer 指针
+
+	RiCodePT = &NCAreaGCodeBuffer[(NCRunSign.RealRunCount - 1)% STDGCODE_MOD];	
+	NCArea_VmGet(RiCodePT);	
+
+	if( NCRunSign.RealRunCount == funtion_v.Uint40_a )
+	{
+		NCRunSign.RealRunCount = NCRunSign.RealRunCount;
+	}
+	
+	NC_AREAControl.Pointer_StartCode = NCRunSign.RealRunCount;	
+					
+	NC_AREAControl.Vs = NC_AREAControl.VNow;
+	NC_AREAControl.Vm = RiCodePT->Vm;
+
+	NCArea_AccelerationSet(&NC_AREAControl, NCRunSign.RealRunCount);
+
+	//确定当前代码最小速度		
+	NC_AREAControl.VMin = NCArea_VminSet(RiCodePT);	
+	if( NC_AREAControl.Vm <= NC_AREAControl.VMin)
+	{
+		NC_AREAControl.VMin = NC_AREAControl.Vm;
+	}
+	if(NCArea_SingleState(&NC_AREAControl,RiCodePT) == FALSE)
+	{
+		return FALSE;
+	}
+
+	NC_AREAControl.Vm = RiCodePT->Vm;
+	Over_Vm = NC_AREAControl.Vm;
+	
+	if( NC_AREAControl.Vm <= NC_AREAControl.VMin)
+	{
+		NC_AREAControl.VMin = NC_AREAControl.Vm;
+	}
+
+	for(inc_i=0;inc_i<=NC_AREAControl.SearchCount-1;inc_i++)
+	{
+		CurrentCodePT = &NCAreaGCodeBuffer[(NCRunSign.RealRunCount+inc_i-1) % STDGCODE_MOD];
+			
+		//考虑还是加上
+		//不同时为XYZ运动代码或A4运动代码，不能作为当前区域线段，这里暂时这样判断
+		if( CurrentCodePT->MoveCodeSign != RiCodePT->MoveCodeSign )
+		{			
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode+inc_i-1;			
+			break;
+		}
+		
+		if((NCRunSign.RealRunCount+inc_i) >= NCRunSign.EndCodeCount)
+		{	
+			//到达最大接收代码长度
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode+inc_i-1;			
+			break;
+		}	
+
+		////add by le//LongCodeLen detect//////////////////////////////////////////////
+		if( ( CurrentCodePT->CMD1 == 1 ) && ( CurrentCodePT->Stotal>= System.LongCodeLen ) )
+		{			
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode+inc_i-1;			
+			break;
+		}
+
+		NCArea_VmGet(CurrentCodePT);		
+		if( CurrentCodePT->Vm != NC_AREAControl.Vm )
+		{	
+			//当前计算条Vm 有变化，不能作为当前区域中线段
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode+inc_i-1;
+			if( CurrentCodePT->Vm < NC_AREAControl.Vm )
+			{
+				Over_Vm = CurrentCodePT->Vm;
+			}
+			break;
+		}		
+
+		if(inc_i >= STD_AREA_MAX_NUMBER)
+		{	
+			//超出Ss 区域最大处理长度
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode+inc_i-1;			
+			break;
+		}
+		
+		NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode+inc_i;		
+	}
+
+	if( NC_AREAControl.Pointer_EndCode < NC_AREAControl.Pointer_StartCode )
+	{
+		NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_StartCode;		
+	}
+
+	NCArea_DecDistance( &NC_AREAControl, Over_Vm );
+
+	////add by le//LongCodeLen detect//////////////////////////////////////////////
+	if( NC_AREAControl.Pointer_EndCode == NC_AREAControl.Pointer_StartCode )
+	{
+		CurrentCodePT = &NCAreaGCodeBuffer[ (NC_AREAControl.Pointer_StartCode - 1)% STDGCODE_MOD ];
+		if( ( CurrentCodePT->CMD1 == 1 ) && ( CurrentCodePT->Stotal>= System.LongCodeLen ) )
+		{			
+			angle_temp = NCArea3_CodeAngle3( NC_AREAControl.Pointer_StartCode , NC_AREAControl.Pointer_StartCode+1 );
+			if( angle_temp >= System.LongCodeAngle )
+			{
+				NC_AREAControl.a_ac = System.LongCodeA;
+				NC_AREAControl.a_de = System.LongCodeA;
+				NC_AREAControl.Ve = System.LongCodeVm;
+				return FALSE;
+			}
+		}
+	}
+
+	/////////////////////step 2///////////////////////////////////////////
+	Ve_Cal = Over_Vm;
+	Ve_Cal = NCArea3_CalVsByS( Over_Vm );
+
+	/////////////step 3/////////////////////////////////////////////
+	if( (NC_AREAControl.Pointer_EndCode+1) <=NCRunSign.EndCodeCount )
+	{
+		Veer = NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, NC_AREAControl.Pointer_EndCode,NC_AREAControl.Pointer_EndCode+1,Ve_Cal); 	
+		if( Ve_Cal < 0 )
+		{
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_EndCode;
+		}		
+		if( Ve_Cal>Veer )
+		{
+			Ve_Cal = Veer;
+		}
+
+		Veer=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, NC_AREAControl.Pointer_EndCode,NC_AREAControl.Pointer_EndCode+1,0);		
+		if( Veer < 0 )
+		{
+			NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_EndCode;
+		}		
+		if( Ve_Cal>Veer )
+		{
+			Ve_Cal = Veer;
+		}
+	}
+	
+	/////////////////////step 4///////////////////////////////////////////
+	if( NC_AREAControl.Pointer_EndCode >= NCRunSign.EndCodeCount )
+	{
+		Ve_Cal = 0;
+	}
+
+	if( Ve_Cal <  NC_AREAControl.VMin )
+	{
+		Ve_Cal = NC_AREAControl.VMin;
+		//Ve_Cal = 0;
+	}
+	NC_AREAControl.Ve=Ve_Cal; 
+	return TRUE;
+}
+
+
+
+INT16U  NCArea3_FirstInflexion2()
+{
+	INT32U		ri,i=0;
+	FLOAT64 	 Viec,Veer, Veer1,Veer_min,Ss,Cal_A;	
+//	INT32U	TotalINLimit = 20;
+	
+	NC_AREAControl.Pointer_FirstInflexionCode = NC_AREAControl.Pointer_EndCode; 
+	ri = (NCRunSign.RealRunCount-1) % STDGCODE_MOD;
+
+	if( NC_AREAControl.Ve < 0 )
+	{
+		NC_AREAControl.Pointer_EndCode = NC_AREAControl.Pointer_EndCode;
+	}
+	
+	if( NC_AREAControl.Pointer_StartCode == NC_AREAControl.Pointer_EndCode) 	
+	{
+		//单条加减速
+		NC_AREAControl.SpeedState = NCAREA_SINGLE_STATE;	
+		NC_AREAControl.SpeedStateCal = 1;
+
+		if( NC_AREAControl.Vs > NC_AREAControl.Vm ) 			
+		{
+			//特殊区域,用于变档等速度急降处理
+			NC_AREAControl.SpeedState = NCAREA_SPECIAL_STATE;		
+			NC_AREAControl.SpeedStateCal = 2;
+		}
+		
+		if(((OverallSign.NCSign == NCSIGN_SPC)&&((System.FunctionSelectionSwitch_08 & 0x02)!=0x02))||
+			  (NCAreaGCodeBuffer[ri].CMD1 == 0))
+		{
+			NC_AREAControl.SearchCount = OverallSign.NC_SearchCount;
+			return TRUE;
+		}
+			
+		NC_AREAControl.Stotal=0;
+		for( i=NC_AREAControl.Pointer_StartCode; i<=NC_AREAControl.Pointer_EndCode; i++ )
+		{
+			NC_AREAControl.Stotal=NC_AREAControl.Stotal+NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].Stotal; 	
+		}
+	
+		if((System.AreaControlModle & 0x0F)== 0x00) 
+		{
+			NCArea_HyperbolaPrecalStandardCurve();
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x01)
+		{
+			NCArea_QuinticPrecalStandardCurve();
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x02)
+		{
+			NCArea_LinearPrecalStandardCurve();		
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x03)
+		{
+			NCArea_LinearPrecalStandardCurve();	
+		}		
+		else if((System.AreaControlModle & 0x0F)== 0x04)
+		{
+			NCArea_SoftExponentPrecalStandardCurve();
+		}	
+		else if((System.AreaControlModle & 0x0F)== 0x05)
+		{
+			NCArea_HardExponentPrecalStandardCurve();
+		}
+
+		/////////////for test/////////////////////
+		Veer=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, NC_AREAControl.Pointer_EndCode, NC_AREAControl.Pointer_EndCode+1,0);
+		Veer1=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, NC_AREAControl.Pointer_EndCode, NC_AREAControl.Pointer_EndCode+1,NC_AREAControl.Ve ); 
+		Veer_min = Veer;
+		if( Veer1 < Veer_min )
+		{
+			Veer_min = Veer1;
+		}
+		if(Veer_min > NC_AREAControl.Ve)
+		{
+			Veer_min = NC_AREAControl.Ve;
+		}		
+		Viec = NCArea3_CalVsByS( Veer_min );		
+		Cal_A = NCArea3_CalSpecialCodeAcc( NC_AREAControl.Pointer_EndCode+1 );
+		if(  Cal_A > 0 )
+		{
+			NC_AREAControl.a_de = Cal_A;
+		}		
+		NC_AREAControl.Ve = Viec;
+
+		////////////for test//////////////////////////////
+		if( NC_AREAControl.Stotal < System.NCAreashortLen )
+		{
+			NC_AREAControl.TotalN = NC_AREAControl.TotalN;
+			NC_AREAControl.a_ac = System.NCAreashortA;
+			NC_AREAControl.a_de = System.NCAreashortA;
+			NC_AREAControl.Tao_ac = 1;//ms
+			NC_AREAControl.Tao_de = 1;	//ms
+			NC_AREAControl.NeedPreCalOneMore = 1;
+		}	
+
+		NC_AREAControl.SearchCount = OverallSign.NC_SearchCount;		
+	}
+	else if( NC_AREAControl.Pointer_EndCode >  NC_AREAControl.Pointer_StartCode )
+	{
+		NC_AREAControl.SpeedState = NCAREA_SINGLE_STATE;
+		if( NC_AREAControl.Vs > NC_AREAControl.Vm ) 			
+		{
+			//特殊区域,用于变档等速度急降处理
+			NC_AREAControl.SpeedState = NCAREA_SPECIAL_STATE;		
+			NC_AREAControl.SpeedStateCal = 2;
+		}
+		
+		NC_AREAControl.Stotal=0;
+		for( i=NC_AREAControl.Pointer_StartCode; i<=NC_AREAControl.Pointer_EndCode; i++ )
+		{
+			NC_AREAControl.Stotal=NC_AREAControl.Stotal+NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].Stotal; 	
+		}
+		
+		Ss=0;	
+	
+		if((System.AreaControlModle & 0x0F)== 0x00)
+		{
+			NCArea_HyperbolaPrecalStandardCurve();
+			for(i=NC_AREAControl.Pointer_StartCode; i<=NC_AREAControl.Pointer_EndCode; i++)
+			{					
+				Veer=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,0); 				
+				Ss=Ss+NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].Stotal;
+				if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )
+				{
+					Viec= NCArea3_HyperbolaSpecialCalVByS( Ss );
+				}
+				else
+				{				
+					Viec= NCArea3_HyperbolaCalVByS( Ss );
+				}
+				Veer1=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,Viec);
+				if( (Veer<Viec) && (fabs(Viec-Veer) >5) )
+				{
+					NC_AREAControl.Pointer_EndCode = i; 				
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer;
+					NC_AREAControl.Ve=Viec; 					
+					return FALSE;
+				}	
+
+				if( (Veer1<Viec) && (fabs(Viec-Veer1) >5) )
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer1;
+					NC_AREAControl.Ve=Viec; 					
+					return FALSE;
+				}					
+			}	
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x01)
+		{
+			NCArea_QuinticPrecalStandardCurve();
+			for(i=NC_AREAControl.Pointer_StartCode; i<=NC_AREAControl.Pointer_EndCode; i++)
+			{					
+				Veer=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,0);
+				Ss=Ss+NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].Stotal;
+				if(NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE)
+				{
+					Viec= NCArea3_QuinticSpecialCalVByS( Ss );
+				}
+				else
+				{				
+					Viec= NCArea3_QuinticCalVByS( Ss );
+				}
+				Veer1=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,Viec);
+				if((Veer<Viec) && (fabs(Viec-Veer) >5))
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer;
+					NC_AREAControl.Ve=Viec; 											
+					return FALSE;
+				}	
+
+				if((Veer1<Viec) && (fabs(Viec-Veer1) >5))
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer1;
+					NC_AREAControl.Ve=Viec; 											
+					return FALSE;
+				}					
+			}			
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x02)
+		{
+			NCArea_LinearPrecalStandardCurve();
+			for(i=NC_AREAControl.Pointer_StartCode; i<=NC_AREAControl.Pointer_EndCode; i++)
+			{					
+				Veer=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,0);
+				Ss=Ss+NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].Stotal;
+				if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )
+				{
+					Viec= NCArea3_LinerSpecialCalVByS( Ss );
+				}
+				else
+				{				
+					Viec= NCArea3_LinerCalVByS( Ss );
+				}
+				Veer1=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,Viec);
+				if( (Veer<Viec) && (fabs(Viec-Veer) >5) )
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer;
+					NC_AREAControl.Ve=Viec; 											
+					return FALSE;
+				}
+
+				if( (Veer1<Viec) && (fabs(Viec-Veer1) >5) )
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer1;
+					NC_AREAControl.Ve=Viec; 											
+					return FALSE;
+				}					
+			}			
+		}		
+		else if((System.AreaControlModle & 0x0F)== 0x04)
+		{
+			NCArea_SoftExponentPrecalStandardCurve();
+			for(i=NC_AREAControl.Pointer_StartCode; i<=NC_AREAControl.Pointer_EndCode; i++)
+			{					
+				Veer=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,0);
+				Ss=Ss+NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].Stotal;
+				if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )
+				{
+					Viec= NCArea3_SoftExponentSpecialCalVByS( Ss );
+				}
+				else
+				{					
+					Viec= NCArea3_SoftExponentCalVByS( Ss );
+				}
+				Veer1=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,Viec);
+				if( (Veer<Viec) && (fabs(Viec-Veer) >5) )
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer;
+					NC_AREAControl.Ve=Viec; 											
+					return FALSE;
+				}	
+
+				if( (Veer1<Viec) && (fabs(Viec-Veer1) >5) )
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer1;
+					NC_AREAControl.Ve=Viec; 									
+					return FALSE;
+				}					
+			}			
+		}
+		else if((System.AreaControlModle & 0x0F)== 0x05)
+		{
+			NCArea_HardExponentPrecalStandardCurve();
+			for(i=NC_AREAControl.Pointer_StartCode; i<=NC_AREAControl.Pointer_EndCode; i++)
+			{					
+				Veer=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,0);
+				Ss=Ss+NCAreaGCodeBuffer[(i-1) % STDGCODE_MOD].Stotal;
+				if( NC_AREAControl.SpeedState == NCAREA_SPECIAL_STATE )
+				{
+					Viec= NCArea3_SoftExponentSpecialCalVByS( Ss );
+				}
+				else
+				{					
+					Viec= NCArea3_HardExponentCalVByS( Ss );
+				}
+				Veer1=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, i, i+1,Viec);
+				if((Veer<Viec) && (fabs(Viec-Veer) >5))
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer;
+					NC_AREAControl.Ve=Viec; 											
+					return FALSE;
+				}	
+
+				if((Veer1<Viec) && (fabs(Viec-Veer1) >5))
+				{
+					NC_AREAControl.Pointer_EndCode = i; 					
+					NC_AREAControl.Pointer_FirstInflexionCode = i;
+					NC_AREAControl.SearchCount = NC_AREAControl.Pointer_FirstInflexionCode - NC_AREAControl.Pointer_StartCode+1;
+					Viec=Veer1;
+					NC_AREAControl.Ve=Viec; 											
+					return FALSE;
+				}					
+			}			
+		}
+
+		////////////for test//////////////////////////////
+		if( NC_AREAControl.Stotal < System.NCAreashortLen )
+		{
+			NC_AREAControl.TotalN = NC_AREAControl.TotalN;
+			NC_AREAControl.a_ac = System.NCAreashortA;
+			NC_AREAControl.a_de = System.NCAreashortA;
+			NC_AREAControl.Tao_ac = 1;//ms
+			NC_AREAControl.Tao_de = 1;	//ms
+			NC_AREAControl.NeedPreCalOneMore = 1;
+		}		
+		NC_AREAControl.SearchCount = OverallSign.NC_SearchCount;				
+	}
+
+	return TRUE;
+}
+
+
+FLOAT64 NCArea3_CalVsByS( FLOAT32 V_M )
+{
+	FLOAT64     Vecal=0;
+	FLOAT64     sadd,V_eer,V_eer1,Vmin_eer,Vtemp,Cur_Vm;
+	INT32S       inci;
+	tsGCODE		*inciCodePT;
+	
+	sadd=0;
+	Vecal=V_M;
+	for(inci=NC_AREAControl.Pointer_EndCode+1;inci<=NCRunSign.EndCodeCount;inci++)	
+	{
+	    inciCodePT = &NCAreaGCodeBuffer[(inci-1) % STDGCODE_MOD];
+		sadd += inciCodePT->Stotal;
+		if( sadd>=NC_AREAControl.Ss )
+		{
+			break;
+		}
+		////////////////add by le 20140218//////////
+		Cur_Vm = NCArea_VmGet(inciCodePT);
+		if( Cur_Vm < Vecal )
+		{
+			Vecal = Cur_Vm;
+		}
+		//////////////////////////////////////////
+		V_eer = NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, inci,  inci+1,0);	
+		V_eer1=NCArea_Cal_i1_i2_Vveer(NC_AREAControl.a_de, inci, inci+1, Vecal ); 	
+		Vmin_eer = V_eer;
+		if( V_eer1 < Vmin_eer )
+		{
+			Vmin_eer = V_eer1;
+		}
+		if( Vecal > Vmin_eer )
+		{	
+			if((System.AreaControlModle & 0x0F)== 0x00)
+			{
+				Vtemp = NCArea3_HyperbolaCalVsByS( Vecal,  Vmin_eer , sadd );
+			}	
+			else if((System.AreaControlModle & 0x0F)== 0x01)
+			{
+				Vtemp = NCArea3_QuinticCalVsByS( Vecal,  Vmin_eer , sadd );
+			}	
+			else if((System.AreaControlModle & 0x0F)== 0x02)
+			{
+				Vtemp = NCArea3_LinerCalVsByS( Vecal,  Vmin_eer , sadd );
+			}			
+			else if( ((System.AreaControlModle & 0x0F)== 0x04) ||
+					 ((System.AreaControlModle & 0x0F)== 0x05) )
+			{
+				Vtemp = NCArea3_SoftExponentCalVsByS( Vecal,  Vmin_eer , sadd );
+			}
+			//////add by le 20140214/////////////////////
+			if( Vtemp > Vecal ||Vtemp < Vmin_eer )
+			{
+				Vtemp = Vmin_eer;
+			}
+			///////////////////////////////////////////
+			Vecal = Vtemp;
+		}
+	}
+
+	////////////////add by le 20140311///////////////
+	if( Vecal < 0 || Vecal > V_M )
+	{
+		Vecal = 0;
+	}
+	///////////////////////////////////////////////
+	
+	return Vecal;
+}
+
+
+////////////////////////////////Hyperbola///////////////////////////////////////////////////////////////////
+/*
+根据给定速度Vm, 代码终点转角速度ve，和减速距离S
+求取最大允许区域结束速度
+利用二分法求解
+标准S 型曲线
+*/
+FLOAT64  NCArea3_HyperbolaCalVsByS( FLOAT64 vm , FLOAT64 ve , FLOAT64 S )
+{
+	////////step 1//////////////////////
+	/* 根据代码终点允许速度ve 先求出时间t，
+	    然后用t  来求出所需减速距离S_de ，若减速距离S_de
+	    小于或等于代码长度S , 则没问题*/
+	FLOAT64  ret=0;
+
+	if( fabs( S )<0.0000001 )
+	{
+		return vm;
+	}
+	
+	funtion_v.Uint8_a=0;
+	funtion_v.float64_a = divdp( vm, 2);
+	if( funtion_v.float64_a<= ve )
+	{
+		funtion_v.float64_a = sqrtdp( divdp( 2*(vm-ve)*vm , NC_AREAControl.a_de*NC_AREAControl.a_de ) );
+		funtion_v.float64_b = -divdp(powdp(NC_AREAControl.a_de,2)*powdp(funtion_v.float64_a,3),6*vm)+
+								vm*funtion_v.float64_a;
+		if( funtion_v.float64_b <= S )
+		{
+			return vm;
+		}
+		else
+		{
+			funtion_v.float64_c = 	vm ;//上限
+			funtion_v.float64_d = 	ve ;		//下限
+			funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中				
+			funtion_v.float64_a = sqrtdp( divdp( 2*(funtion_v.float64_e-ve)*funtion_v.float64_e , NC_AREAControl.a_de*NC_AREAControl.a_de ) );
+			funtion_v.float64_b = -divdp(powdp(NC_AREAControl.a_de,2)*powdp(funtion_v.float64_a,3),6*funtion_v.float64_e)+
+									funtion_v.float64_e*funtion_v.float64_a;	
+			while( fabs(funtion_v.float64_b-S)>0.0001 )
+			{
+				funtion_v.Uint8_a++;
+				if( funtion_v.Uint8_a>CALCULATEMax )
+				{
+					//////////////for test///////////////////////
+					ret = funtion_v.float64_e;
+					return ret;
+					///////////////////////////////////////////
+					//Error.InterpolationOver = 57;
+					//high_error();
+					//return;					
+				}
+				if( funtion_v.float64_b >= S )//计算距离过大
+				{
+					funtion_v.float64_c = 	funtion_v.float64_e ;//上限
+					funtion_v.float64_d = 	funtion_v.float64_d;		//下限
+					funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中						
+				}
+				else//计算距离过小
+				{
+					funtion_v.float64_c = 	funtion_v.float64_c ;//上限
+					funtion_v.float64_d = 	funtion_v.float64_e ;		//下限
+					funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中				
+				}
+				funtion_v.float64_a = sqrtdp( divdp( 2*(funtion_v.float64_e-ve)*funtion_v.float64_e , NC_AREAControl.a_de*NC_AREAControl.a_de ) );
+				funtion_v.float64_b = -divdp(powdp(NC_AREAControl.a_de,2)*powdp(funtion_v.float64_a,3),6*funtion_v.float64_e)+
+										funtion_v.float64_e*funtion_v.float64_a;					
+			}
+
+			ret = funtion_v.float64_e;
+		}
+	}
+	else //funtion_v.float64_a  >    ve
+	{
+		funtion_v.float64_f = divdp( 5*powdp(vm,2) , 6*NC_AREAControl.a_de );//S4
+		funtion_v.float64_g = divdp( vm , NC_AREAControl.a_de );//DeltaT5		
+		funtion_v.float64_a = funtion_v.float64_g - sqrtdp( divdp( 2*vm*ve , NC_AREAControl.a_de*NC_AREAControl.a_de ) ) ;
+		funtion_v.float64_b = divdp(powdp(NC_AREAControl.a_de,2)*(powdp((funtion_v.float64_a-funtion_v.float64_g),3)+ powdp(funtion_v.float64_g,3)  ),6*vm)+
+								funtion_v.float64_f;		
+		if( funtion_v.float64_b <= S )
+		{
+			return vm;
+		}
+		else
+		{
+			funtion_v.float64_h = 	divdp( 5*powdp(2*ve,2) , 6*NC_AREAControl.a_de );//S4
+			if( funtion_v.float64_h >= S )//属于S4
+			{
+				funtion_v.float64_c = 	2*ve ;//上限
+				funtion_v.float64_d = 	ve ;		//下限
+				funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中				
+				funtion_v.float64_a = sqrtdp( divdp( 2*(funtion_v.float64_e-ve)*funtion_v.float64_e , NC_AREAControl.a_de*NC_AREAControl.a_de ) );
+				funtion_v.float64_b = -divdp(powdp(NC_AREAControl.a_de,2)*powdp(funtion_v.float64_a,3),6*funtion_v.float64_e)+
+										funtion_v.float64_e*funtion_v.float64_a;	
+				while( fabs(funtion_v.float64_b-S)>0.0001 )
+				{
+					funtion_v.Uint8_a++;
+					if( funtion_v.Uint8_a>CALCULATEMax )
+					{
+						//////////////for test///////////////////////
+						ret = funtion_v.float64_e;
+						return ret;
+						///////////////////////////////////////////					
+						//Error.InterpolationOver = 58;
+						//high_error();
+						//return;					
+					}					
+					if( funtion_v.float64_b >= S )//计算距离过大
+					{
+						funtion_v.float64_c = 	funtion_v.float64_e ;//上限
+						funtion_v.float64_d = 	funtion_v.float64_d;		//下限
+						funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中						
+					}
+					else//计算距离过小
+					{
+						funtion_v.float64_c = 	funtion_v.float64_c ;//上限
+						funtion_v.float64_d = 	funtion_v.float64_e ;		//下限
+						funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中				
+					}
+					funtion_v.float64_a = sqrtdp( divdp( 2*(funtion_v.float64_e-ve)*funtion_v.float64_e , NC_AREAControl.a_de*NC_AREAControl.a_de ) );
+					funtion_v.float64_b = -divdp(powdp(NC_AREAControl.a_de,2)*powdp(funtion_v.float64_a,3),6*funtion_v.float64_e)+
+											funtion_v.float64_e*funtion_v.float64_a;					
+				}	
+
+				ret = funtion_v.float64_e;				
+			}
+			else//属于S5
+			{
+				funtion_v.float64_c = 	divdp( vm , 2 );//上限
+				funtion_v.float64_d = 	ve ;		//下限
+				funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中
+				funtion_v.float64_f = divdp( 5*powdp(2*funtion_v.float64_e,2) , 6*NC_AREAControl.a_de );//S4
+				funtion_v.float64_g = divdp( 2*funtion_v.float64_e , NC_AREAControl.a_de );//DeltaT5					
+				funtion_v.float64_a =  funtion_v.float64_g - sqrtdp( divdp( 2*2*funtion_v.float64_e*ve , NC_AREAControl.a_de*NC_AREAControl.a_de ) );
+				funtion_v.float64_b = divdp(powdp(NC_AREAControl.a_de,2)*(powdp((funtion_v.float64_a-funtion_v.float64_g),3)+ powdp(funtion_v.float64_g,3)  ),6*2*funtion_v.float64_e)+
+										funtion_v.float64_f;		
+				while( fabs(funtion_v.float64_b-S)>0.0001 )
+				{
+					funtion_v.Uint8_a++;
+					if( funtion_v.Uint8_a>CALCULATEMax )
+					{
+						//////////////for test///////////////////////
+						ret = funtion_v.float64_e*2;
+						return ret;
+						///////////////////////////////////////////					
+						//Error.InterpolationOver = 59;
+						//high_error();
+						//return;					
+					}						
+					if( funtion_v.float64_b >= S )//计算距离过大
+					{
+						funtion_v.float64_c = 	funtion_v.float64_e ;//上限
+						funtion_v.float64_d = 	funtion_v.float64_d;		//下限
+						funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中						
+					}
+					else//计算距离过小
+					{
+						funtion_v.float64_c = 	funtion_v.float64_c ;//上限
+						funtion_v.float64_d = 	funtion_v.float64_e ;		//下限
+						funtion_v.float64_e = 	divdp( funtion_v.float64_c+funtion_v.float64_d , 2 );	//取中				
+					}
+					funtion_v.float64_f = divdp( 5*powdp(2*funtion_v.float64_e,2) , 6*NC_AREAControl.a_de );//S4
+					funtion_v.float64_g = divdp( 2*funtion_v.float64_e , NC_AREAControl.a_de );//DeltaT5					
+					funtion_v.float64_a =  funtion_v.float64_g - sqrtdp( divdp( 2*2*funtion_v.float64_e*ve , NC_AREAControl.a_de*NC_AREAControl.a_de ) );
+					funtion_v.float64_b = divdp(powdp(NC_AREAControl.a_de,2)*(powdp((funtion_v.float64_a-funtion_v.float64_g),3)+ powdp(funtion_v.float64_g,3)  ),6*2*funtion_v.float64_e)+
+											funtion_v.float64_f;			
+				}	
+
+				ret = funtion_v.float64_e*2;				
+			}		
+		}
+	}
+	
+	return ret;
+}
+
+
+/*
+牛顿迭代法求取
+                            f(xn)
+x(n+1) = xn   -    -------
+                            f'(xn)
+
+标准S  型曲线
+*/
+FLOAT64 NCArea3_HyperbolaCalVByS( FLOAT64 S )
+{
+	FLOAT64 ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_a=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a = 	NC_AREAControl.T1;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S1;//起始S
+		funtion_v.float64_c  = divdp( (NC_AREAControl.VmReal + NC_AREAControl.Vs) , 2 );//起始速度	
+		while(  fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  = divdp( powdp(NC_AREAControl.a_ac,2)*powdp( funtion_v.float64_a,2 ), 
+							2*(NC_AREAControl.VmReal - NC_AREAControl.Vs) )+NC_AREAControl.Vs;//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*powdp( funtion_v.float64_a,3 ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Vs) )+NC_AREAControl.Vs*funtion_v.float64_a - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////
+				//Error.InterpolationOver = 51;
+				//high_error();
+				//return;				
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*powdp( funtion_v.float64_a,3 ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Vs) )+NC_AREAControl.Vs*funtion_v.float64_a ;		
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S2 )//属于S2
+	{
+		scom = S - NC_AREAControl.S1;
+		funtion_v.float64_a = 	NC_AREAControl.T2;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S2;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal ;//起始速度		
+		while(  fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  =divdp( powdp(NC_AREAControl.a_ac,2)*powdp( (funtion_v.float64_a-NC_AREAControl.T2),2 ), 
+							2*(NC_AREAControl.Vs - NC_AREAControl.VmReal) )+NC_AREAControl.VmReal;	//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T2),3 ) + powdp(NC_AREAControl.DeltaT2,3) ), 
+							6*(NC_AREAControl.Vs -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T1) - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 52;
+				//high_error();
+				//return;				
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T2),3 ) + powdp(NC_AREAControl.DeltaT2,3) ), 
+							6*(NC_AREAControl.Vs -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T1)  ;		
+		}
+		ret = funtion_v.float64_c;	
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5 )//属于S3
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5+
+				NC_AREAControl.S8 )//属于S4
+	{
+		scom = S - NC_AREAControl.S1-NC_AREAControl.S2-NC_AREAControl.S5;
+		funtion_v.float64_a = 	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度		
+		while(  fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  = divdp( powdp(NC_AREAControl.a_de,2)*powdp( (funtion_v.float64_a-NC_AREAControl.T5),2 ), 
+							2*(NC_AREAControl.Ve -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal;	//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T5),3 )  ), 
+							6*(NC_AREAControl.Ve -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5) - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 53;
+				//high_error();
+				//return;				
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T5),3 )  ), 
+							6*(NC_AREAControl.Ve -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5)  ;		
+		}
+		ret = funtion_v.float64_c;	
+	}
+	
+	else if( S<NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5+
+				NC_AREAControl.S8+NC_AREAControl.S9 )//属于S5
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S2 - NC_AREAControl.S5 -NC_AREAControl.S8;
+		funtion_v.float64_a = 	NC_AREAControl.T8;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S8;//起始S
+		funtion_v.float64_c  = divdp( (NC_AREAControl.VmReal + NC_AREAControl.Ve) , 2 );//起始速度		
+		while(  fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  =divdp( powdp(NC_AREAControl.a_de,2)*powdp( (funtion_v.float64_a-NC_AREAControl.T9),2 ), 
+							2*(NC_AREAControl.VmReal  - NC_AREAControl.Ve) )+NC_AREAControl.Ve ;	//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T9),3 )+powdp( NC_AREAControl.DeltaT9,3 )  ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Ve) )+NC_AREAControl.Ve*(funtion_v.float64_a-NC_AREAControl.T8) - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 54;
+				//high_error();
+				//return;				
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T9),3 )+powdp( NC_AREAControl.DeltaT9,3 )  ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Ve) )+NC_AREAControl.Ve*(funtion_v.float64_a-NC_AREAControl.T8)  ;		
+		}
+		ret = funtion_v.float64_c;	
+	}
+	
+	else
+	{
+		return NC_AREAControl.Ve;
+	}
+
+	return ret;
+}
+
+
+FLOAT64 NCArea3_HyperbolaSpecialCalVByS( FLOAT64 S )
+{
+	FLOAT64 ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_a=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a =	0;//起始T
+		funtion_v.float64_b =	0;//起始S
+		funtion_v.float64_c  = NC_AREAControl.Vs;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  = divdp( powdp(NC_AREAControl.a_ac,2)*powdp( funtion_v.float64_a,2 ), 
+							2*(NC_AREAControl.VmReal - NC_AREAControl.Vs) )+NC_AREAControl.Vs;//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*powdp( funtion_v.float64_a,3 ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Vs) )+NC_AREAControl.Vs*funtion_v.float64_a - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 73;
+				//high_error();
+				//return; 			
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*powdp( funtion_v.float64_a,3 ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Vs) )+NC_AREAControl.Vs*funtion_v.float64_a ; 	
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S2 )//属于S2
+	{
+		scom = S - NC_AREAControl.S1;
+		funtion_v.float64_a =	NC_AREAControl.T1;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S1;//起始S
+		funtion_v.float64_c  = divdp( (NC_AREAControl.VmReal + NC_AREAControl.Vs) , 2 );//起始速度		
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  =divdp( powdp(NC_AREAControl.a_ac,2)*powdp( (funtion_v.float64_a-NC_AREAControl.T2),2 ), 
+							2*(NC_AREAControl.Vs - NC_AREAControl.VmReal) )+NC_AREAControl.VmReal;	//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T2),3 ) + powdp(NC_AREAControl.DeltaT2,3) ), 
+							6*(NC_AREAControl.Vs -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T1) - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 74;
+				//high_error();
+				//return; 			
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_ac,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T2),3 ) + powdp(NC_AREAControl.DeltaT2,3) ), 
+							6*(NC_AREAControl.Vs -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T1)  ;		
+		}
+		ret = funtion_v.float64_c;	
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5 )//属于S3
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5+
+				NC_AREAControl.S8 )//属于S4
+	{
+		scom = S - NC_AREAControl.S1-NC_AREAControl.S2-NC_AREAControl.S5;
+		funtion_v.float64_a =	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 	
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  = divdp( powdp(NC_AREAControl.a_de,2)*powdp( (funtion_v.float64_a-NC_AREAControl.T5),2 ), 
+							2*(NC_AREAControl.Ve -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal;	//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T5),3 )  ), 
+							6*(NC_AREAControl.Ve -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5) - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 75;
+				//high_error();
+				//return; 			
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T5),3 )  ), 
+							6*(NC_AREAControl.Ve -NC_AREAControl.VmReal ) )+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5)  ;		
+		}
+		ret = funtion_v.float64_c;	
+	}
+	
+	else if( S<NC_AREAControl.S1+NC_AREAControl.S2+NC_AREAControl.S5+
+				NC_AREAControl.S8+NC_AREAControl.S9 )//属于S5
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S2 - NC_AREAControl.S5 -NC_AREAControl.S8;
+		funtion_v.float64_a =	NC_AREAControl.T8;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S8;//起始S
+		funtion_v.float64_c  = divdp( (NC_AREAControl.VmReal + NC_AREAControl.Ve) , 2 );//起始速度 	
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_a++;			
+			funtion_v.float64_c  =divdp( powdp(NC_AREAControl.a_de,2)*powdp( (funtion_v.float64_a-NC_AREAControl.T9),2 ), 
+							2*(NC_AREAControl.VmReal  - NC_AREAControl.Ve) )+NC_AREAControl.Ve ;	//f'(xn)
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T9),3 )+powdp( NC_AREAControl.DeltaT9,3 )  ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Ve) )+NC_AREAControl.Ve*(funtion_v.float64_a-NC_AREAControl.T8) - scom;//f(xn)
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_a>CALCULATEMax ) )
+			{
+				//////////////////for test///////////////
+				return System.VeerDeltaV;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 76;
+				//high_error();
+				//return; 			
+			}
+			funtion_v.float64_b = divdp( powdp(NC_AREAControl.a_de,2)*( powdp( (funtion_v.float64_a-NC_AREAControl.T9),3 )+powdp( NC_AREAControl.DeltaT9,3 )  ), 
+							6*(NC_AREAControl.VmReal - NC_AREAControl.Ve) )+NC_AREAControl.Ve*(funtion_v.float64_a-NC_AREAControl.T8)  ;		
+		}
+		ret = funtion_v.float64_c;	
+	}
+	
+	else
+	{
+		return NC_AREAControl.Ve;
+	}
+
+	return ret;
+}
+/////////////////////////////Hyperbola/////////////////////////////////////////////////////////////////////////////
+
+
+
+////////////////////////////Quintic///////////////////////////////////////////////////////////
+/*
+根据给定速度Vm, 代码终点转角速度ve，和减速距离S
+求取最大允许区域结束速度
+利用二分法求解
+5 次S 型曲线
+*/
+FLOAT64  NCArea3_QuinticCalVsByS( FLOAT64 vm , FLOAT64 ve , FLOAT64 S )
+{
+	////////step 1//////////////////////
+	/* 根据代码终点允许速度ve 先求出时间t，
+	    然后用t  来求出所需减速距离S_de ，若减速距离S_de
+	    小于或等于代码长度S , 则没问题*/
+	FLOAT64  ret=0;
+
+	if( fabs( S )<0.0000001 )
+	{
+		return vm;
+	}
+
+	funtion_v.Uint8_b=0;
+	funtion_v.float64_c = 1.25*divdp( vm-0 , NC_AREAControl.a_de );//DeltaT3
+	funtion_v.float64_a = NCArea3_QuinticCalTByVInSde( vm , ve );//T
+	funtion_v.float64_b = NC_AREAControl.a_de*divdp(8,(15*powdp(funtion_v.float64_c,4)))*
+					        powdp((funtion_v.float64_a-divdp(funtion_v.float64_c,2)),6)-
+					           NC_AREAControl.a_de*divdp(powdp(funtion_v.float64_a,2),2)+NC_AREAControl.a_de*0.1*funtion_v.float64_c*funtion_v.float64_a-
+					           NC_AREAControl.a_de*divdp(powdp(funtion_v.float64_c,2),120)+vm*funtion_v.float64_a;
+	if( funtion_v.float64_b <= S )
+	{
+		return vm;
+	}
+	else
+	{	
+		funtion_v.float64_d =	vm ;//上限V
+		funtion_v.float64_e =	ve ;		//下限V
+		funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中V				
+		funtion_v.float64_a = NCArea3_QuinticCalTByVInSde( funtion_v.float64_f , ve );//T
+		funtion_v.float64_b = NC_AREAControl.a_de*divdp(8,(15*powdp(funtion_v.float64_c,4)))*
+								powdp((funtion_v.float64_a-divdp(funtion_v.float64_c,2)),6)-
+								   NC_AREAControl.a_de*divdp(powdp(funtion_v.float64_a,2),2)+NC_AREAControl.a_de*0.1*funtion_v.float64_c*funtion_v.float64_a-
+								   NC_AREAControl.a_de*divdp(powdp(funtion_v.float64_c,2),120)+funtion_v.float64_f*funtion_v.float64_a;
+		while( fabs(funtion_v.float64_b-S)>0.0001 )
+		{
+			funtion_v.Uint8_b++;
+			if( funtion_v.Uint8_b>CALCULATEMax )
+			{
+				//////////////////for test///////////////
+				ret = funtion_v.float64_e;
+				return ret;
+				///////////////////////////////////////			
+				//Error.InterpolationOver = 60;
+				//high_error();
+				//return;					
+			}			
+			if( funtion_v.float64_b >= S )//计算距离过大
+			{
+				funtion_v.float64_d =	funtion_v.float64_f ;//上限V
+				funtion_v.float64_e =	funtion_v.float64_e;		//下限V
+				funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中						
+			}
+			else//计算距离过小
+			{
+				funtion_v.float64_d =	funtion_v.float64_d ;//上限
+				funtion_v.float64_e =	funtion_v.float64_f ;		//下限
+				funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中				
+			}
+			funtion_v.float64_a = NCArea3_QuinticCalTByVInSde( funtion_v.float64_f , ve );//T
+			funtion_v.float64_b = NC_AREAControl.a_de*divdp(8,(15*powdp(funtion_v.float64_c,4)))*
+									powdp((funtion_v.float64_a-divdp(funtion_v.float64_c,2)),6)-
+									   NC_AREAControl.a_de*divdp(powdp(funtion_v.float64_a,2),2)+NC_AREAControl.a_de*0.1*funtion_v.float64_c*funtion_v.float64_a-
+									   NC_AREAControl.a_de*divdp(powdp(funtion_v.float64_c,2),120)+funtion_v.float64_f*funtion_v.float64_a;				
+		}
+		
+		ret = funtion_v.float64_e;
+
+	}
+	
+	return ret;
+}
+
+
+/*
+牛顿迭代法求取
+                            f(xn)
+x(n+1) = xn   -    -------
+                            f'(xn)
+
+5次S  型曲线
+*/
+FLOAT64 NCArea3_QuinticCalVByS( FLOAT64 S )
+{
+	FLOAT64  ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_b=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a = 	NC_AREAControl.T1;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S1;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度	
+		while(  fabs( funtion_v.float64_b - scom )>CAL_e1 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = -NC_AREAControl.a_ac * divdp(16,(5*powdp(NC_AREAControl.T1,4)))*
+								   powdp((funtion_v.float64_a-divdp(NC_AREAControl.T1,2)),5)
+						                   +NC_AREAControl.a_ac * funtion_v.float64_a 
+						                     -NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1+NC_AREAControl.Vs;//f'(xn)
+
+			funtion_v.float64_b =  -NC_AREAControl.a_ac * divdp(8,(15*powdp(NC_AREAControl.T1,4)))*
+								  powdp((funtion_v.float64_a-divdp(NC_AREAControl.T1,2)),6)
+						                  +NC_AREAControl.a_ac * 0.5 * powdp(funtion_v.float64_a,2)
+						                     -NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1 * funtion_v.float64_a
+						                         +NC_AREAControl.a_ac * divdp(powdp(NC_AREAControl.T1,2) , 120)
+						                               +(NC_AREAControl.Vs*funtion_v.float64_a) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<CAL_e2 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<CAL_e2 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test///////////////////////
+				return System.VeerDeltaV;
+				////////////////////////////////////////
+				//Error.InterpolationOver = 55;
+				//high_error();
+				//return;				
+			}
+
+			funtion_v.float64_b = -NC_AREAControl.a_ac * divdp(8,(15*powdp(NC_AREAControl.T1,4)))*
+								  powdp((funtion_v.float64_a-divdp(NC_AREAControl.T1,2)),6)
+						                  +NC_AREAControl.a_ac * 0.5 * powdp(funtion_v.float64_a,2)
+						                     -NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1 * funtion_v.float64_a
+						                         +NC_AREAControl.a_ac * divdp(powdp(NC_AREAControl.T1,2) , 120)
+						                               +(NC_AREAControl.Vs*funtion_v.float64_a) ;		
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S5 )//属于S2
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<NC_AREAControl.S1 +NC_AREAControl.S5 + NC_AREAControl.S9 )//属于S3
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S5;
+		funtion_v.float64_a = 	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度	
+		while(  fabs( funtion_v.float64_b - scom )>CAL_e1 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.a_de * divdp(16,(5*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*
+									powdp((funtion_v.float64_a-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),5)
+									 - NC_AREAControl.a_de * (funtion_v.float64_a-NC_AREAControl.T5)
+										+ NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5)
+										  + NC_AREAControl.VmReal;//f'(xn)							              
+						                 						                    
+			funtion_v.float64_b =  NC_AREAControl.a_de * divdp(8,(15*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*
+				                               powdp((funtion_v.float64_a-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),6)
+						                   -NC_AREAControl.a_de * 0.5 * powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+						                      +NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5) * (funtion_v.float64_a-NC_AREAControl.T5)
+						                          -NC_AREAControl.a_de * divdp(powdp((NC_AREAControl.T9-NC_AREAControl.T5),2) , 120)
+						                              +(NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5)) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<CAL_e2 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<CAL_e2 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test///////////////////////
+				return System.VeerDeltaV;
+				////////////////////////////////////////			
+				//Error.InterpolationOver = 56;
+				//high_error();
+				//return;				
+			}
+
+			funtion_v.float64_b = NC_AREAControl.a_de * divdp(8,(15*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*
+				                               powdp((funtion_v.float64_a-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),6)
+						                   -NC_AREAControl.a_de * 0.5 * powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+						                      +NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5) * (funtion_v.float64_a-NC_AREAControl.T5)
+						                          -NC_AREAControl.a_de * divdp(powdp((NC_AREAControl.T9-NC_AREAControl.T5),2) , 120)
+						                              +(NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5))  ;		
+		}
+		ret = funtion_v.float64_c;
+	}
+
+	else
+	{
+		return NC_AREAControl.Ve;
+	}	
+	return ret;
+}
+
+
+FLOAT64 NCArea3_QuinticSpecialCalVByS( FLOAT64 S )
+{
+	FLOAT64  ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_b=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a =	0;//起始T
+		funtion_v.float64_b =	0;//起始S
+		funtion_v.float64_c  = NC_AREAControl.Vs;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.a_ac * divdp(16,(5*powdp(NC_AREAControl.T1,4)))*powdp((funtion_v.float64_a-divdp(NC_AREAControl.T1,2)),5)
+								-NC_AREAControl.a_ac * funtion_v.float64_a 
+								+NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1
+								+NC_AREAControl.Vs;//f'(xn)
+
+			funtion_v.float64_b =  NC_AREAControl.a_ac * divdp(8,(15*powdp(NC_AREAControl.T1,4)))*powdp((funtion_v.float64_a-divdp(NC_AREAControl.T1,2)),6)
+								-NC_AREAControl.a_ac * 0.5 * powdp(funtion_v.float64_a,2)
+								+NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1 * funtion_v.float64_a
+								-NC_AREAControl.a_ac * divdp(powdp(NC_AREAControl.T1,2) , 120)
+								+(NC_AREAControl.Vs*funtion_v.float64_a) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test///////////////////////
+				return System.VeerDeltaV;
+				////////////////////////////////////////			
+				//Error.InterpolationOver = 69;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.a_ac * divdp(8,(15*powdp(NC_AREAControl.T1,4)))*powdp((funtion_v.float64_a-divdp(NC_AREAControl.T1,2)),6)
+								-NC_AREAControl.a_ac * 0.5 * powdp(funtion_v.float64_a,2)
+								+NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1 * funtion_v.float64_a
+								-NC_AREAControl.a_ac * divdp(powdp(NC_AREAControl.T1,2) , 120)
+								+(NC_AREAControl.Vs*funtion_v.float64_a) ;		
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S5 )//属于S2
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<NC_AREAControl.S1 +NC_AREAControl.S5 + NC_AREAControl.S9)//属于S3
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S5;
+		funtion_v.float64_a =	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.a_de * divdp(16,(5*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*
+									powdp((funtion_v.float64_a-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),5)
+									 - NC_AREAControl.a_de * (funtion_v.float64_a-NC_AREAControl.T5)
+										+ NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5)
+										  + NC_AREAControl.VmReal;//f'(xn)										  
+																					
+			funtion_v.float64_b =  NC_AREAControl.a_de * divdp(8,(15*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*
+											   powdp((funtion_v.float64_a-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),6)
+										   -NC_AREAControl.a_de * 0.5 * powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+											  +NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5) * (funtion_v.float64_a-NC_AREAControl.T5)
+												  -NC_AREAControl.a_de * divdp(powdp((NC_AREAControl.T9-NC_AREAControl.T5),2) , 120)
+													  +(NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5)) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test///////////////////////
+				return System.VeerDeltaV;
+				////////////////////////////////////////			
+				//Error.InterpolationOver = 70;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.a_de * divdp(8,(15*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*
+											   powdp((funtion_v.float64_a-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),6)
+										   -NC_AREAControl.a_de * 0.5 * powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+											  +NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5) * (funtion_v.float64_a-NC_AREAControl.T5)
+												  -NC_AREAControl.a_de * divdp(powdp((NC_AREAControl.T9-NC_AREAControl.T5),2) , 120)
+													  +(NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5))	;		
+		}
+		ret = funtion_v.float64_c;
+	}
+
+	else
+	{
+		return NC_AREAControl.Ve;
+	}	
+	return ret;
+}
+
+
+
+/*
+牛顿迭代法求取
+                            f(xn)
+x(n+1) = xn   -    -------
+                            f'(xn)
+
+*/
+FLOAT64 NCArea3_QuinticCalTByVInSde( FLOAT64 Vm , FLOAT64 V )//返回时间T
+{
+	FLOAT64  ret=0;
+	if( V > Vm )
+	{
+		return 0;
+	}
+	funtion_v.float64_u = 1.25*divdp( Vm-0 , NC_AREAControl.a_de );//DeltaT3
+	funtion_v.float64_v = divdp( funtion_v.float64_u , 2 );//起始T
+	funtion_v.float64_w = divdp( Vm , 2 );//起始V	
+	funtion_v.Uint8_a = 0;
+	while(  fabs( funtion_v.float64_w - V )>0.0001 )
+	{
+		funtion_v.Uint8_a++;	
+		if( funtion_v.Uint8_a>CALCULATEMax )
+		{
+			///////////for test///////////////////////
+			ret = funtion_v.float64_v;					
+			return ret;
+			////////////////////////////////////////		
+			//Error.InterpolationOver = 61;
+			//high_error();
+			//return;					
+		}		
+		funtion_v.float64_x  =	NC_AREAControl.a_de*divdp(16,powdp(funtion_v.float64_u,4))*
+							  powdp((funtion_v.float64_v-divdp(funtion_v.float64_u,2)),4)-
+							    NC_AREAControl.a_de;//f'(xn)
+							    
+		funtion_v.float64_w = NC_AREAControl.a_de*divdp(16,(5*powdp(funtion_v.float64_u,4)))*
+							  powdp((funtion_v.float64_v-divdp(funtion_v.float64_u,2)),5)-
+							    NC_AREAControl.a_de*funtion_v.float64_v+NC_AREAControl.a_de*0.1*funtion_v.float64_u+Vm-V;//f(xn)
+							    
+		funtion_v.float64_v = funtion_v.float64_v - divdp( funtion_v.float64_w, funtion_v.float64_x );//new T
+		
+		funtion_v.float64_w =  NC_AREAControl.a_de*divdp(16,(5*powdp(funtion_v.float64_u,4)))*
+							  powdp((funtion_v.float64_v-divdp(funtion_v.float64_u,2)),5)-
+							    NC_AREAControl.a_de*funtion_v.float64_v+NC_AREAControl.a_de*0.1*funtion_v.float64_u+Vm;//new V		
+	}
+	ret = funtion_v.float64_v;		
+	
+	return ret;
+}
+////////////////////////////Quintic///////////////////////////////////////////////////////////
+
+
+
+
+////////////////////////////SoftExponent///////////////////////////////////////////////////////////
+FLOAT64 NCArea3_SoftExponentCalVsByS(FLOAT64 vm , FLOAT64 ve , FLOAT64 S )
+{
+	////////step 1//////////////////////
+	/* 根据代码终点允许速度ve 先求出时间t，
+	    然后用t  来求出所需减速距离S_de ，若减速距离S_de
+	    小于或等于代码长度S , 则没问题*/
+	FLOAT64  ret=0;
+
+	if( fabs( S )<0.0000001 )
+	{
+		return vm;
+	}
+
+	funtion_v.Uint8_b=0;
+	funtion_v.float64_c = NC_AREAControl.Tao_de * (logdp(vm)-logdp(0.0001));//DeltaT3
+	funtion_v.float64_a = NCArea3_SoftExponentCalTByVInSde( vm , ve );//T
+	funtion_v.float64_b = NC_AREAControl.Tao_de * vm *(1.0- expdp(-divdp((funtion_v.float64_a) , 
+							NC_AREAControl.Tao_de)));
+	if( funtion_v.float64_b <= S )
+	{
+		return vm;
+	}
+	else
+	{	
+		funtion_v.float64_d =	vm ;//上限V
+		funtion_v.float64_e =	ve ;		//下限V
+		funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中V				
+		funtion_v.float64_a = NCArea3_SoftExponentCalTByVInSde( funtion_v.float64_f , ve );//T
+		funtion_v.float64_b = NC_AREAControl.Tao_de * vm *(1.0- expdp(-divdp((funtion_v.float64_a) , 
+							NC_AREAControl.Tao_de)));
+		while( fabs(funtion_v.float64_b-S)>0.0001 )
+		{
+			funtion_v.Uint8_b++;
+			if( funtion_v.Uint8_b>CALCULATEMax )
+			{
+				///////////for test///////////////////////
+				ret = funtion_v.float64_e;					
+				return ret;
+				////////////////////////////////////////			
+				//Error.InterpolationOver = 63;
+				//high_error();
+				//return;					
+			}			
+			if( funtion_v.float64_b >= S )//计算距离过大
+			{
+				funtion_v.float64_d =	funtion_v.float64_f ;//上限V
+				funtion_v.float64_e =	funtion_v.float64_e;		//下限V
+				funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中						
+			}
+			else//计算距离过小
+			{
+				funtion_v.float64_d =	funtion_v.float64_d ;//上限
+				funtion_v.float64_e =	funtion_v.float64_f ;		//下限
+				funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中				
+			}
+			funtion_v.float64_a = NCArea3_SoftExponentCalTByVInSde( funtion_v.float64_f , ve );//T
+			funtion_v.float64_b = NC_AREAControl.Tao_de * vm *(1.0- expdp(-divdp((funtion_v.float64_a) , 
+							        NC_AREAControl.Tao_de)));
+		}
+		
+		ret = funtion_v.float64_e;
+
+	}
+	
+	return ret;
+
+}
+
+FLOAT64 NCArea3_SoftExponentCalVByS( FLOAT64 S )
+{
+	FLOAT64  ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_b=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a =	NC_AREAControl.T1;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S1;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.Vs * expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac));//f'(xn)
+
+			funtion_v.float64_b = NC_AREAControl.Tao_ac * NC_AREAControl.Vs * ( expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac)) -1.0) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////
+				//Error.InterpolationOver = 64;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.Tao_ac * NC_AREAControl.Vs * ( expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac)) -1.0);		
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S5 )//属于S2
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<NC_AREAControl.S1 +NC_AREAControl.S5 + NC_AREAControl.S9)//属于S3
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S5;
+		funtion_v.float64_a = 	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度	
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.VmReal * expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de));//f'(xn)
+
+			funtion_v.float64_b = NC_AREAControl.Tao_de * NC_AREAControl.VmReal * (1.0- expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de))) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////			
+				//Error.InterpolationOver = 65;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.Tao_de * NC_AREAControl.VmReal * (1.0- expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de)));		
+		}
+		ret = funtion_v.float64_c;
+
+	}
+
+	else
+	{
+		return NC_AREAControl.Ve;
+	}	
+	return ret;
+}
+
+
+FLOAT64 NCArea3_SoftExponentSpecialCalVByS( FLOAT64 S )
+{
+	FLOAT64  ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_b=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a =	0;//起始T
+		funtion_v.float64_b =	0;//起始S
+		funtion_v.float64_c  = NC_AREAControl.Vs;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.Vs * expdp(-divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac));//f'(xn)
+
+			funtion_v.float64_b = NC_AREAControl.Tao_ac*NC_AREAControl.Vs*(1.0- expdp(-divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac))) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////			
+				//Error.InterpolationOver = 71;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.Tao_ac*NC_AREAControl.Vs*(1.0- expdp(-divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac)));		
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S5 )//属于S2
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<NC_AREAControl.S1 +NC_AREAControl.S5 + NC_AREAControl.S9)//属于S3
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S5;
+		funtion_v.float64_a =	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.VmReal * expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de));//f'(xn)
+
+			funtion_v.float64_b = NC_AREAControl.Tao_de * NC_AREAControl.VmReal * (1.0- expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de))) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////			
+				//Error.InterpolationOver = 72;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.Tao_de * NC_AREAControl.VmReal * (1.0- expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de)));		
+		}
+		ret = funtion_v.float64_c;
+
+	}
+
+	else
+	{
+		return NC_AREAControl.Ve;
+	}	
+	return ret;
+}
+
+
+FLOAT64 NCArea3_SoftExponentCalTByVInSde( FLOAT64 Vm , FLOAT64 V )//返回时间T
+{
+	FLOAT64  ret=0;
+	if( V > Vm )
+	{
+		return 0;
+	}
+	if( V<=0.0001 )
+	{
+		return 0;
+	}	
+	funtion_v.float64_v = 0;//起始T
+	funtion_v.float64_w = Vm;//起始V	
+	funtion_v.Uint8_a = 0;
+	while(  fabs( funtion_v.float64_w - V )>0.0001 )
+	{
+		funtion_v.Uint8_a++;	
+		if( funtion_v.Uint8_a>CALCULATEMax )
+		{
+			///////////for test/////////////////////
+			ret = funtion_v.float64_v;				
+			return ret;
+			//////////////////////////////////////		
+			//Error.InterpolationOver = 62;
+			//high_error();
+			//return;					
+		}		
+		funtion_v.float64_x  =	-Vm*expdp(-divdp((funtion_v.float64_v) , NC_AREAControl.Tao_de))*
+								divdp( 1 ,NC_AREAControl.Tao_de ) ;//f'(xn)
+							    
+		funtion_v.float64_w = Vm*expdp(-divdp((funtion_v.float64_v) , NC_AREAControl.Tao_de)) - V;//f(xn)
+							    
+		funtion_v.float64_v = funtion_v.float64_v - divdp( funtion_v.float64_w, funtion_v.float64_x );//new T
+		
+		funtion_v.float64_w =  Vm*expdp(-divdp((funtion_v.float64_v) , NC_AREAControl.Tao_de));//new V		
+	}
+	ret = funtion_v.float64_v;	
+	
+	return ret;
+}
+////////////////////////////SoftExponent///////////////////////////////////////////////////////////
+
+
+
+////////////////////////////HardExponent///////////////////////////////////////////////////////////
+FLOAT64 NCArea3_HardExponentCalVByS( FLOAT64 S )
+{
+	FLOAT64  ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_b=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	
+	else if( S<=divdp((NC_AREAControl.VmReal-NC_AREAControl.Vs) , 2)*NC_AREAControl.Tao_ac ) //属于S1
+	{ 
+		scom = S;
+		funtion_v.float64_a =	divdp(NC_AREAControl.T1,2);//起始T
+		funtion_v.float64_b =	NC_AREAControl.Tao_ac * NC_AREAControl.Vs * ( expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac)) -1.0);//起始S
+		funtion_v.float64_c  = NC_AREAControl.Vs * expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac));//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.Vs * expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac));//f'(xn)
+
+			funtion_v.float64_b = NC_AREAControl.Tao_ac * NC_AREAControl.Vs * ( expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac)) -1.0) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////			
+				return System.VeerDeltaV;
+				//////////////////////////////////////			
+				//Error.InterpolationOver = 66;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.Tao_ac * NC_AREAControl.Vs * ( expdp(divdp(funtion_v.float64_a , NC_AREAControl.Tao_ac)) -1.0);		
+		}
+		ret = funtion_v.float64_c;
+	}
+
+	else if( S<=NC_AREAControl.S1 )//属于S2
+	{
+		scom = S;
+		funtion_v.float64_a =	NC_AREAControl.T1;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S1;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.Vs + NC_AREAControl.VmReal - divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)*
+									expdp(divdp(-(funtion_v.float64_a-divdp(NC_AREAControl.T1,2)) , NC_AREAControl.Tao_ac));//f'(xn)
+
+			funtion_v.float64_b = (NC_AREAControl.Vs + NC_AREAControl.VmReal) * (funtion_v.float64_a-divdp(NC_AREAControl.T1,2)) 
+								+ NC_AREAControl.Tao_ac *divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)*
+								  expdp(divdp(-(funtion_v.float64_a-divdp(NC_AREAControl.T1,2)) , NC_AREAControl.Tao_ac))
+								    - NC_AREAControl.Tao_ac *divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)
+								       +NC_AREAControl.Tao_ac *divdp((NC_AREAControl.VmReal-NC_AREAControl.Vs ),2.0) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////			
+				return System.VeerDeltaV;
+				//////////////////////////////////////				
+				//Error.InterpolationOver = 67;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = (NC_AREAControl.Vs + NC_AREAControl.VmReal) * (funtion_v.float64_a-divdp(NC_AREAControl.T1,2)) 
+								+ NC_AREAControl.Tao_ac *divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)*
+								  expdp(divdp(-(funtion_v.float64_a-divdp(NC_AREAControl.T1,2)) , NC_AREAControl.Tao_ac))
+								    - NC_AREAControl.Tao_ac *divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)
+								       +NC_AREAControl.Tao_ac *divdp((NC_AREAControl.VmReal-NC_AREAControl.Vs ),2.0);		
+		}
+		ret = funtion_v.float64_c;
+	}
+
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S5 )//属于S2
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<NC_AREAControl.S1 +NC_AREAControl.S5 + NC_AREAControl.S9)//属于S3
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S5;
+		funtion_v.float64_a = 	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b = 	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度	
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = NC_AREAControl.VmReal * expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de));//f'(xn)
+
+			funtion_v.float64_b = NC_AREAControl.Tao_de * NC_AREAControl.VmReal * (1.0- expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de))) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////			
+				return System.VeerDeltaV;
+				//////////////////////////////////////				
+				//Error.InterpolationOver = 68;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = NC_AREAControl.Tao_de * NC_AREAControl.VmReal * (1.0- expdp(-divdp((funtion_v.float64_a-NC_AREAControl.T5) , NC_AREAControl.Tao_de)));		
+		}
+		ret = funtion_v.float64_c;
+
+	}
+
+	else
+	{
+		return NC_AREAControl.Ve;
+	}	
+	return ret;
+
+}
+////////////////////////////HardExponent///////////////////////////////////////////////////////////
+
+
+
+
+//////////////////////////////Liner///////////////////////////////////////////////////////
+FLOAT64 NCArea3_LinerCalVsByS(FLOAT64 vm , FLOAT64 ve , FLOAT64 S )
+{
+	////////step 1//////////////////////
+	/* 根据代码终点允许速度ve 先求出时间t，
+	    然后用t  来求出所需减速距离S_de ，若减速距离S_de
+	    小于或等于代码长度S , 则没问题*/
+	FLOAT64  ret=0;
+
+	if( fabs( S )<0.0000001 )
+	{
+		return vm;
+	}
+	
+	funtion_v.Uint8_b=0;
+	funtion_v.float64_c = divdp( vm-0 , NC_AREAControl.a_de );//DeltaT3
+	funtion_v.float64_a = divdp( vm-ve , NC_AREAControl.a_de );//T
+	funtion_v.float64_b = -0.5*NC_AREAControl.a_de*funtion_v.float64_a+vm*funtion_v.float64_a;//S
+	if( funtion_v.float64_b <= S )
+	{
+		return vm;
+	}
+	else
+	{	
+		funtion_v.float64_d =	vm ;//上限V
+		funtion_v.float64_e =	ve ;		//下限V
+		funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中V				
+		funtion_v.float64_a = divdp( funtion_v.float64_f-ve , NC_AREAControl.a_de );//T
+		funtion_v.float64_b = -0.5*NC_AREAControl.a_de*funtion_v.float64_a+funtion_v.float64_f*funtion_v.float64_a;//S
+		while( fabs(funtion_v.float64_b-S)>0.0001 )
+		{
+			funtion_v.Uint8_b++;
+			if( funtion_v.Uint8_b>CALCULATEMax )
+			{
+				///////////for test/////////////////////
+				ret = funtion_v.float64_e;
+				return ret;
+				//////////////////////////////////////				
+				//Error.InterpolationOver = 60;
+				//high_error();
+				//return;					
+			}			
+			if( funtion_v.float64_b >= S )//计算距离过大
+			{
+				funtion_v.float64_d =	funtion_v.float64_f ;//上限V
+				funtion_v.float64_e =	funtion_v.float64_e;		//下限V
+				funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中						
+			}
+			else//计算距离过小
+			{
+				funtion_v.float64_d =	funtion_v.float64_d ;//上限
+				funtion_v.float64_e =	funtion_v.float64_f ;		//下限
+				funtion_v.float64_f =	divdp( funtion_v.float64_d+funtion_v.float64_e , 2 );	//取中				
+			}
+			funtion_v.float64_a = divdp( funtion_v.float64_f-ve , NC_AREAControl.a_de );//T
+			funtion_v.float64_b = -0.5*NC_AREAControl.a_de*funtion_v.float64_a+funtion_v.float64_f*funtion_v.float64_a;//S			
+		}
+		
+		ret = funtion_v.float64_e;
+
+	}
+	
+	return ret;
+}
+
+
+
+FLOAT64 NCArea3_LinerCalVByS( FLOAT64 S )
+{
+	FLOAT64  ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_b=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a =	NC_AREAControl.T1;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S1;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = funtion_v.float64_a * NC_AREAControl.a_ac+NC_AREAControl.Vs;//f'(xn)
+
+			funtion_v.float64_b =  0.5*NC_AREAControl.a_ac*powdp(funtion_v.float64_a,2)
+									+NC_AREAControl.Vs*funtion_v.float64_a - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////			
+				//Error.InterpolationOver = 55;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = 0.5*NC_AREAControl.a_ac*powdp(funtion_v.float64_a,2)
+									+NC_AREAControl.Vs*funtion_v.float64_a;		
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S5 )//属于S2
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<NC_AREAControl.S1 +NC_AREAControl.S5 + NC_AREAControl.S9)//属于S3
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S5;
+		funtion_v.float64_a =	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = -(funtion_v.float64_a-NC_AREAControl.T5) * NC_AREAControl.a_de+NC_AREAControl.VmReal;//f'(xn)										  
+																					
+			funtion_v.float64_b =  -0.5*NC_AREAControl.a_de*powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+								+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////				
+				//Error.InterpolationOver = 56;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b =  -0.5*NC_AREAControl.a_de*powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+								+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5) ;		
+		}
+		ret = funtion_v.float64_c;
+	}
+
+	else
+	{
+		return NC_AREAControl.Ve;
+	}	
+	return ret;
+}
+
+
+FLOAT64 NCArea3_LinerSpecialCalVByS( FLOAT64 S )
+{
+	FLOAT64  ret=0;
+	FLOAT64 scom;
+	funtion_v.Uint8_b=0;
+	if( S<=0 )
+	{
+		return NC_AREAControl.Vs;
+	}
+	
+	else if( S<=NC_AREAControl.S1 )//属于S1
+	{
+		scom = S;
+		funtion_v.float64_a =	0;//起始T
+		funtion_v.float64_b =	0;//起始S
+		funtion_v.float64_c  = NC_AREAControl.Vs;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = -funtion_v.float64_a * NC_AREAControl.a_ac+NC_AREAControl.Vs;//f'(xn)
+
+			funtion_v.float64_b =  -0.5*NC_AREAControl.a_ac*powdp(funtion_v.float64_a,2)
+								+NC_AREAControl.Vs*funtion_v.float64_a - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////				
+				//Error.InterpolationOver = 69;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b =  -0.5*NC_AREAControl.a_ac*powdp(funtion_v.float64_a,2)
+								+NC_AREAControl.Vs*funtion_v.float64_a ;		
+		}
+		ret = funtion_v.float64_c;
+	}
+	
+	else if( S<=NC_AREAControl.S1+NC_AREAControl.S5 )//属于S2
+	{
+		ret = NC_AREAControl.VmReal;
+	}
+	
+	else if( S<NC_AREAControl.S1 +NC_AREAControl.S5 + NC_AREAControl.S9)//属于S3
+	{
+		scom = S - NC_AREAControl.S1 - NC_AREAControl.S5;
+		funtion_v.float64_a =	NC_AREAControl.T5;//起始T
+		funtion_v.float64_b =	NC_AREAControl.S5;//起始S
+		funtion_v.float64_c  = NC_AREAControl.VmReal;//起始速度 
+		while(	fabs( funtion_v.float64_b - scom )>0.0001 )
+		{
+			funtion_v.Uint8_b++;			
+
+			funtion_v.float64_c  = -(funtion_v.float64_a-NC_AREAControl.T5) * NC_AREAControl.a_de+NC_AREAControl.VmReal;//f'(xn)										  
+																					
+			funtion_v.float64_b =  -0.5*NC_AREAControl.a_de*powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+								+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5) - scom;//f(xn)
+
+			funtion_v.float64_a = funtion_v.float64_a - divdp( funtion_v.float64_b, funtion_v.float64_c );
+
+			if( ( funtion_v.float64_a<0 && fabs( funtion_v.float64_a )<0.001 ) ||
+				( funtion_v.float64_c<0  && fabs( funtion_v.float64_c )<0.001 ) ||( funtion_v.Uint8_b>CALCULATEMax ) )
+			{
+				///////////for test/////////////////////
+				return System.VeerDeltaV;
+				//////////////////////////////////////				
+				//Error.InterpolationOver = 70;
+				//high_error();
+				//return; 			
+			}
+
+			funtion_v.float64_b = -0.5*NC_AREAControl.a_de*powdp((funtion_v.float64_a-NC_AREAControl.T5),2)
+								+NC_AREAControl.VmReal*(funtion_v.float64_a-NC_AREAControl.T5);		
+		}
+		ret = funtion_v.float64_c;
+	}
+
+	else
+	{
+		return NC_AREAControl.Ve;
+	}	
+	return ret;
+}
+//////////////////////////////Liner///////////////////////////////////////////////////////
+
+INT16U  NCArea3_VectorInterpolatePreCal()
+{
+	tsGCODE	 *LastCodePT;
+	tsGCODE	*RiCodePT;		//当前运行条GcodeBuffer 指针
+	tsGCODE	 *FrontCodePT;	
+	INT32S		k, d_all, d_start, d_end;
+	FLOAT64    S_start, S_end, L_start, cosangle1, cosangle2, H, L1;
+	FLOAT64    H_add, cosangle_ave, Delta_S;
+	FLOAT64    X1, Y1, Z1, X2, Y2, Z2;
+	VECTOR	Vect={0 , 0 , 0 , 0 , 0};
+
+	if( NCRunSign.RealRunCount <= 1 || OverallSign.NCSign != NCSIGN_STD	)
+	{
+		NCRunSign.RealRunCount = NCRunSign.RealRunCount;
+		return FALSE;	
+	}
+
+	RiCodePT = &NCAreaGCodeBuffer[(NCRunSign.RealRunCount - 1)% STDGCODE_MOD];		
+	LastCodePT = &NCAreaGCodeBuffer[(NCRunSign.RealRunCount - 2)% STDGCODE_MOD];
+	FrontCodePT = &NCAreaGCodeBuffer[(NCRunSign.RealRunCount)% STDGCODE_MOD];
+	
+	if( RiCodePT->Stotal <= System.VecterInerpolate_MinLen ||
+		LastCodePT->Stotal <= System.VecterInerpolate_MinLen ||
+		  FrontCodePT->Stotal <= System.VecterInerpolate_MinLen )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;		
+	}
+	
+	if( RiCodePT->Stotal > System.VecterInerpolate_MaxLen )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;	
+	}
+	
+	Delta_S = NC_AREAControl.VmReal*System.Tsample;
+	if( fabs( Delta_S )<=0.00000001 )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;	
+	}
+	
+	if( NC_AREAControl.Snow == 0 )
+	{
+		S_start = Delta_S;
+	}
+	else
+	{
+		S_start = NC_AREAControl.Snow - NC_AREAControl.CurrentStotalLast;
+	}
+	k = (INT32S)( divdp(  RiCodePT->Stotal-S_start ,  Delta_S )	);
+	S_end = RiCodePT->Stotal -S_start - k*Delta_S;
+	d_all = k+2;
+	NC_AREAControl.S_Start = S_start;
+	NC_AREAControl.S_End = S_end;
+
+	cosangle1 = NCArea3_CodeAngle2(  NCRunSign.RealRunCount-1, NCRunSign.RealRunCount );
+	cosangle2 = NCArea3_CodeAngle2(  NCRunSign.RealRunCount, NCRunSign.RealRunCount+1 );
+	cosangle1 = 180.0-cosangle1;
+	cosangle2 = 180.0-cosangle2;	
+	cosangle1 = divdp( cosangle1 , 2.0 );
+	cosangle2 = divdp( cosangle2 , 2.0 );
+	if( fabs(cosangle1)<=0.000001 || fabs(cosangle2)<=0.000001 )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;		
+	}
+
+	if(  fabs(cosangle1)>=20 || fabs(cosangle2)>=20  || fabs( cosangle2 - cosangle1 )>=10  )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;		
+	}
+	
+	H = divdp( RiCodePT->Stotal *  atandp(cosangle1*PI/180.0)*	atandp(cosangle2*PI/180.0) , 
+				atandp(cosangle1*PI/180.0) + atandp(cosangle2*PI/180.0) );
+	L1 = divdp( H,atandp(cosangle1*PI/180.0) ); 	
+	NC_AREAControl.angle_start = cosangle1; 
+	NC_AREAControl.angle_end = cosangle2; 
+
+	if( L1<=S_start )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;
+	}
+
+	////求Vector //////////////////////
+	H = L1 * atandp(2*cosangle1*PI/180.0);
+	X1 = L1 * RiCodePT->EndPointVector.X + RiCodePT->StartPoint.X * System.UnitTo_mm;
+	Y1 = L1 * RiCodePT->EndPointVector.Y + RiCodePT->StartPoint.Y * System.UnitTo_mm;
+	Z1 = L1 * RiCodePT->EndPointVector.Z + RiCodePT->StartPoint.Z * System.UnitTo_mm;
+	H = sqrtdp( H*H + L1*L1 );
+	X2 = H * LastCodePT->EndPointVector.X + LastCodePT->EndPoint.X * System.UnitTo_mm;
+	Y2 = H * LastCodePT->EndPointVector.Y + LastCodePT->EndPoint.Y * System.UnitTo_mm;
+	Z2 = H * LastCodePT->EndPointVector.Z + LastCodePT->EndPoint.Z * System.UnitTo_mm;	
+	X1 = X2 - X1;
+	Y1 = Y2 - Y1;
+	Z1 = Z2 - Z1;	
+	H = sqrtdp( X1*X1 + Y1*Y1 + Z1*Z1 );
+	if( H<=0.0	)
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;		
+	}	
+	Vect.X = divdp( X1 , H );
+	Vect.Y = divdp( Y1 , H );
+	Vect.Z = divdp( Z1 , H );	
+	NC_AREAControl.Code_CrossVector = Vect;
+	//////////////////////////////////////
+
+	k = (INT32S)( divdp(  L1 -S_start , Delta_S )  );
+	L_start = (k+1)*Delta_S;
+	if( RiCodePT->Stotal -S_start - L_start - S_end < 0 )
+	{
+		L_start = (k)*Delta_S;	
+		d_start = k+1;
+		d_end = d_all - d_start;	
+	}
+	else
+	{
+		d_start = k+2;
+	}		
+	d_end = d_all - d_start;
+	NC_AREAControl.Section_start = d_start;
+	NC_AREAControl.Section_end = d_end;
+
+	cosangle_ave = divdp( cosangle1 , d_start - 1 );
+	NC_AREAControl.angle_ave_start = cosangle_ave;	
+	H_add = S_start*atandp(cosangle1*PI/180.0);
+	for( k=1; k<=d_start-1; k++ )
+	{
+		H_add = H_add + Delta_S*atandp( (cosangle1-k*cosangle_ave)*PI/180.0);
+	}
+
+	////////for test////////////////////////
+	H = NC_AREAControl.S_End*atandp(cosangle2*PI/180.0);
+	while( H >= H_add )
+	{
+		if( NC_AREAControl.Section_end <= 1 )
+		{
+			S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+			break;
+		}
+		NC_AREAControl.Section_end--;
+		NC_AREAControl.Section_start++;
+		
+		L_start = (NC_AREAControl.Section_start-1)*Delta_S; 
+		/*NC_AREAControl.S_End = RiCodePT->Stotal -S_start - L_start-(NC_AREAControl.Section_end-1)*Delta_S;	
+		if( NC_AREAControl.S_End<0 )
+		{
+			S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+			return FALSE;
+		}
+		H = NC_AREAControl.S_End*atandp(cosangle2*PI/180.0);*/
+
+		cosangle_ave = divdp( cosangle1 , NC_AREAControl.Section_start - 1 );
+		NC_AREAControl.angle_ave_start = cosangle_ave;	
+		H_add = S_start*atandp(cosangle1*PI/180.0);
+		for( k=1; k<=NC_AREAControl.Section_start-1; k++ )
+		{
+			H_add = H_add + Delta_S*atandp( (cosangle1-k*cosangle_ave)*PI/180.0);
+		}		
+	}
+	
+	if( H >= H_add && NC_AREAControl.Section_end<=1 )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		H = H_add;
+		cosangle2 = divdp( atan2dp( H , NC_AREAControl.S_End )*180,PI );	
+		NC_AREAControl.angle_end = cosangle2; 
+	}
+	NC_AREAControl.H_Center = H_add;
+
+	L1 = RiCodePT->Stotal -S_start - L_start - NC_AREAControl.S_End;
+	if(L1 < 0 )
+	{
+		S_Spindle.RunModeSign = S_Spindle.RunModeSign;
+		return FALSE;
+	}	
+	
+	cosangle_ave = divdp( atan2dp( H_add-H,L1)*180,PI );
+	if( NC_AREAControl.Section_end>1 )
+	{	
+		cosangle_ave = divdp( cosangle_ave , NC_AREAControl.Section_end - 1 );
+	}
+	NC_AREAControl.angle_ave_end = cosangle_ave;
+	NC_AREAControl.Section_run = 1;
+	NC_AREAControl.HL_run = 0;
+
+	if( ( NC_AREAControl.CurrentStotalLast >= NC_AREAControl.Sac ) &&
+		 ( NC_AREAControl.CurrentStotal <= NC_AREAControl.Sac + NC_AREAControl.Sm )   )
+	{
+		OverallSign.ToleranceBigCanRunSign = 3; //处于匀速阶段
+		NC_AREAControl.Sm = NC_AREAControl.Sm;	
+	}
+	else
+	{
+		OverallSign.ToleranceBigCanRunSign = 4; //处于加减速阶段
+	}
+	
+	return TRUE;
+}
+
+
+
+INT16U  NCArea3_VectorInterpolate()
+{
+	FLOAT64 Hk;
+	INT32S I;
+	I = NC_AREAControl.Section_run;
+	if(  I <= NC_AREAControl.Section_start )
+	{
+		if( I == 1 )
+		{
+			NC_AREAControl.HL_run = (NC_AREAControl.Snow-NC_AREAControl.CurrentStotalLast)*atandp(NC_AREAControl.angle_start*PI/180.0);
+		}
+		else
+		{
+			NC_AREAControl.HL_run = NC_AREAControl.HL_run + 
+				NC_AREAControl.VNow*System.Tsample*atandp( (NC_AREAControl.angle_start - (I-1)*NC_AREAControl.angle_ave_start)*PI/180.0);
+		}
+		
+		NC_AREAControl.NowValue.X = NC_AREAControl.NowValue.X + (INT32S)(divdp(NC_AREAControl.HL_run * NC_AREAControl.Code_CrossVector.X , System.UnitTo_mm ));
+		NC_AREAControl.NowValue.Y = NC_AREAControl.NowValue.Y + (INT32S)(divdp( NC_AREAControl.HL_run * NC_AREAControl.Code_CrossVector.Y , System.UnitTo_mm ));
+		NC_AREAControl.NowValue.Z = NC_AREAControl.NowValue.Z + (INT32S)(divdp( NC_AREAControl.HL_run * NC_AREAControl.Code_CrossVector.Z , System.UnitTo_mm ));
+	}
+	else
+	{
+		if( I == NC_AREAControl.Section_start + 1 )
+		{
+			NC_AREAControl.HL_run = NC_AREAControl.VNow * System.Tsample;
+			Hk = NC_AREAControl.HL_run * atandp(NC_AREAControl.angle_ave_end*PI/180.0);
+			Hk = NC_AREAControl.H_Center - Hk;		
+		}
+		else 
+		{
+			NC_AREAControl.HL_run = NC_AREAControl.HL_run + NC_AREAControl.VNow * System.Tsample;
+			Hk = NC_AREAControl.HL_run * atandp( (I-NC_AREAControl.Section_start)*NC_AREAControl.angle_ave_end*PI/180.0);
+			Hk = NC_AREAControl.H_Center - Hk;		
+		}
+		NC_AREAControl.NowValue.X = NC_AREAControl.NowValue.X + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.X , System.UnitTo_mm ));
+		NC_AREAControl.NowValue.Y = NC_AREAControl.NowValue.Y + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.Y , System.UnitTo_mm ));
+		NC_AREAControl.NowValue.Z = NC_AREAControl.NowValue.Z + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.Z , System.UnitTo_mm ));			
+	}
+	NC_AREAControl.Section_run++;
+	
+	return TRUE;
+}
+
+
+INT16U  NCArea3_CutGcodeInterpolate()
+{	
+	FLOAT64 Hk,H,L2,L;
+	INT32S I;
+	while( 1 )
+	{
+		I = NC_AREAControl.Section_run;
+		if( I == 1 )
+		{
+			if( NC_AREAControl.DeltaSnow > NC_AREAControl.S_Start )
+			{
+				if(  I <= NC_AREAControl.Section_start )
+				{
+					if( I == 1 )
+					{
+						NC_AREAControl.HL_run = NC_AREAControl.HL_run + 
+							NC_AREAControl.S_Start*atandp( (NC_AREAControl.angle_start)*PI/180.0 );				
+					}
+					else
+					{
+						NC_AREAControl.HL_run = NC_AREAControl.HL_run + 
+							NC_AREAControl.VmReal*System.Tsample*atandp( (NC_AREAControl.angle_start - (I-1)*NC_AREAControl.angle_ave_start)*PI/180.0);
+					}
+				}
+				else
+				{
+					if( I == NC_AREAControl.Section_start + 1 )
+					{
+						NC_AREAControl.HL_run = NC_AREAControl.VmReal * System.Tsample;		
+					}
+					else 
+					{
+						NC_AREAControl.HL_run = NC_AREAControl.HL_run + NC_AREAControl.VmReal * System.Tsample;	
+					}			
+				}
+				NC_AREAControl.Section_run++;	
+				I = NC_AREAControl.Section_run;			
+			}
+			else
+			{
+				H = NC_AREAControl.DeltaSnow;
+				H = H*atandp( (NC_AREAControl.angle_start )*PI/180.0);
+				Hk = NC_AREAControl.HL_run + H;			
+				NC_AREAControl.NowValue.X = NC_AREAControl.NowValue.X + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.X , System.UnitTo_mm ));
+				NC_AREAControl.NowValue.Y = NC_AREAControl.NowValue.Y + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.Y , System.UnitTo_mm ));
+				NC_AREAControl.NowValue.Z = NC_AREAControl.NowValue.Z + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.Z , System.UnitTo_mm ));
+				break;
+			}	
+		}	
+		
+		if( NC_AREAControl.DeltaSnow <= NC_AREAControl.S_Start + (I-1)*NC_AREAControl.VmReal*System.Tsample )
+		{			
+			if(  I <= NC_AREAControl.Section_start )
+			{
+				if( I == NC_AREAControl.Section_start )
+				{
+					Hk = NC_AREAControl.H_Center;
+				}
+				else
+				{
+					H = NC_AREAControl.DeltaSnow - NC_AREAControl.S_Start - (I-2)*NC_AREAControl.VmReal*System.Tsample;
+					H = H*atandp( (NC_AREAControl.angle_start - (I-1)*NC_AREAControl.angle_ave_start)*PI/180.0);
+					Hk = NC_AREAControl.HL_run + H;
+				}
+			}
+			else
+			{				
+				if( I >= NC_AREAControl.Section_start + NC_AREAControl.Section_end )
+				{
+					L = NC_AREAControl.S_End - (NC_AREAControl.DeltaSnow - NC_AREAControl.S_Start - (I-2)*NC_AREAControl.VmReal*System.Tsample);
+					Hk = L*atandp( NC_AREAControl.angle_end*PI/180.0 );
+				}
+				else if( I == NC_AREAControl.Section_start + 1 )
+				{
+					H =  NC_AREAControl.DeltaSnow - NC_AREAControl.S_Start - (I-2)*NC_AREAControl.VmReal*System.Tsample;					
+					Hk = H * atandp(NC_AREAControl.angle_ave_end*PI/180.0);
+					Hk = NC_AREAControl.H_Center - Hk;		
+				}
+				else 
+				{
+					L2 = NC_AREAControl.S_Start + (I-1)*NC_AREAControl.VmReal*System.Tsample - NC_AREAControl.DeltaSnow;
+					L = (NC_AREAControl.HL_run + NC_AREAControl.VmReal *System.Tsample) * atandp( (I-NC_AREAControl.Section_start)*NC_AREAControl.angle_ave_end*PI/180.0);
+					L = NC_AREAControl.H_Center - L;
+					H = NC_AREAControl.HL_run * atandp( (I-1-NC_AREAControl.Section_start)*NC_AREAControl.angle_ave_end*PI/180.0);
+					H = NC_AREAControl.H_Center - H;
+					H = divdp( L2 * ( H - L ), NC_AREAControl.VmReal*System.Tsample );
+					Hk = L + H;	
+				}			
+			}
+
+			NC_AREAControl.NowValue.X = NC_AREAControl.NowValue.X + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.X , System.UnitTo_mm ));
+			NC_AREAControl.NowValue.Y = NC_AREAControl.NowValue.Y + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.Y , System.UnitTo_mm ));
+			NC_AREAControl.NowValue.Z = NC_AREAControl.NowValue.Z + (INT32S)(divdp( Hk * NC_AREAControl.Code_CrossVector.Z , System.UnitTo_mm ));		
+			break;
+		}
+		
+		if(  I <= NC_AREAControl.Section_start )
+		{
+			if( I == 1 )
+			{
+				NC_AREAControl.HL_run = NC_AREAControl.HL_run + 
+					NC_AREAControl.S_Start*atandp( (NC_AREAControl.angle_start)*PI/180.0 );				
+			}
+			else
+			{
+				NC_AREAControl.HL_run = NC_AREAControl.HL_run + 
+					NC_AREAControl.VmReal*System.Tsample*atandp( (NC_AREAControl.angle_start - (I-1)*NC_AREAControl.angle_ave_start)*PI/180.0);
+			}
+		}
+		else
+		{
+			if( I == NC_AREAControl.Section_start + 1 )
+			{
+				NC_AREAControl.HL_run = NC_AREAControl.VmReal * System.Tsample;		
+			}
+			else 
+			{
+				NC_AREAControl.HL_run = NC_AREAControl.HL_run + NC_AREAControl.VmReal * System.Tsample;	
+			}			
+		}
+		NC_AREAControl.Section_run++;
+	}
+
+	return TRUE;	
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+FLOAT64 NCArea3_CalSpecialCodeAcc( INT32U Codecn )
+{
+	FLOAT64 angle,retA=-1;
+	tsGCODE 	*CodePT;	//当前计算条指针	
+	CodePT = &NCAreaGCodeBuffer[(Codecn - 1)% STDGCODE_MOD];	
+	if( Codecn<=2 )
+	{
+		return retA;
+	}
+	
+	if( CodePT->CMD1 == 1 )
+	{
+		if(  CodePT->Stotal>= System.LongCodeLen )
+		{
+			angle = NCArea3_CodeAngle3( Codecn-1 , Codecn );
+			if( angle >= System.LongCodeAngle )
+			{
+				retA = System.LongCodeA;
+			}		
+		}
+	}
+	else if( CodePT->CMD1 == 2 ||CodePT->CMD1 == 3 )
+	{
+		retA=-1;
+	}	
+	return retA;
+}
+
+
+
+
+
+
+
