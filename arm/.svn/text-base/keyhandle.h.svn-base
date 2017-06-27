@@ -1,0 +1,71 @@
+#ifndef __KEYHANDLE_H__
+#define __KEYHANDLE_H__
+#include "taskglobal.h"
+//#include "arm_includes.h"
+extern U8 keyVersion[3];
+void keyHandle(U8 keyval);
+void assureEnter(void);
+void interfaceKeyHandle(U8 key);
+void jogGradeKeyHandle(U8 keyval);
+void spindleKeyHandle(U8 key);
+void assistenKeyHandle(U8 key);
+void spindle_spotMove(void);
+void gradeKeyHandle(U8 key);
+void whellKeyHandle(U8 key);
+void funcKeyHandle(U8 key);
+void dirKeyHandle(U8 key);
+void runKeyHandle(void);
+void singleKeyHandle(void);
+void jumpSegKeyHandle(void);
+void machLockKeyHanle(void);
+//void MSTLockKeyHanle(void);
+void falseRunKeyHanle(void);
+void whellRunKey(void);
+void pauseKeyHandle(void);
+void chuckKeyHandle(void);
+void guiGeneralFkeyHandle(U8 key);
+void guiMainFkeyHanle(U8 key);
+void guiCoordFkeyHandle(U8 key);
+void guiCoordWorkFkeyHandle(U8 key);
+void guiCoordSrcFkeyHandle(U8 key);
+void guiHDFkeyHandle(U8 key);
+void guiEditFkeyHandle(U8 key);
+void guiMDIFkeyHandle(U8 key); 
+void guiProgFkeyHandle(U8 key);
+void guiAlarmFkeyHandle(U8 key);
+void guiDGNFkeyHandle(U8 key);
+void guiPLCFKeyHandle(U8 key);
+void guiTKeyHandle(U8 key);
+void guiColourKeyHandle(U8 key);
+void guiG5XDirKeyHandle(U8 key);
+
+void guiToolCompFkeyHandle(U8 key);
+void guiParmFkeyHandle(U8 key);
+void guiHDDirKeyHandle(U8 key);
+void guiParamDirKeyHandle(U8 key);
+void guiParamGroupKeyHandle(U8 key);
+void guiToolCPDirKeyHandle(U8 key);
+void guiCoorRefDirKeyHandle(U8 key);
+void guiVarDirKeyHandle(U8 key);
+void guiSettingDirKeyHandle(U8 key);
+void guiPasswordDirKeyHandle(U8 key);
+void guiAlarmDirKeyHandle(U8 key);
+void guiTraceDirKeyHandle(U8 key);
+void guiFontTestDirKeyHandle(U8 key);
+
+void guiPLCprogDirKeyHandle(U8 key);
+void guiPLCladderDirKeyHandle(U8 key); //add by wqm
+//void guiPLCxyDirKeyHandle(U8 key);
+void guiPLCctDirKeyHandle(U8 key);
+void guiPLCtmDirKeyHandle(U8 key);
+void guiPLCfDirKeyHandle(U8 key);
+void guiPLCgDirKeyHandle(U8 key);
+void guiPLCrDirKeyHandle(U8 key);
+void guiPLCdDirKeyHandle(U8 key);
+void guiPLCkDirKeyHandle(U8 key);
+void guiPLCxDirKeyHandle(U8 key);
+void guiPLCyDirKeyHandle(U8 key);
+U16 GUI_PAGEUP(U16 curnum,U16 maxnum,U16 screennum);
+U16 GUI_PAGEDOWN(U16 curnum,U16 maxnum,U16 screennum);
+void guiSimTraceKeyHandle(U8 key);
+#endif

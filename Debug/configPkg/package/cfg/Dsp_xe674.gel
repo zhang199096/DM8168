@@ -1,0 +1,59 @@
+XDC_open() {
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/package/ti.sysbios.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/package/ti.sysbios.hal.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/package/ti.sysbios.knl.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/package/ti.sysbios.family.c64p.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/gates/package/ti.sysbios.gates.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/family/package/ti.sdo.ipc.family.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/utils/package/ti.sdo.utils.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/interfaces/package/ti.sdo.ipc.interfaces.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/syncs/package/ti.sysbios.syncs.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/heaps/package/ti.sysbios.heaps.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/timers/dmtimer/package/ti.sysbios.timers.dmtimer.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/xdcruntime/package/ti.sysbios.xdcruntime.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c62/package/ti.sysbios.family.c62.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/ti81xx/package/ti.sysbios.family.c64p.ti81xx.pjt");
+    GEL_ProjectLoad("C:/ti/bios_6_33_05_46/packages/ti/sysbios/utils/package/ti.sysbios.utils.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/package/ti.sdo.ipc.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/family/ti81xx/package/ti.sdo.ipc.family.ti81xx.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/notifyDrivers/package/ti.sdo.ipc.notifyDrivers.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/transports/package/ti.sdo.ipc.transports.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/nsremote/package/ti.sdo.ipc.nsremote.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/heaps/package/ti.sdo.ipc.heaps.pjt");
+    GEL_ProjectLoad("C:/ti/syslink_2_20_00_14/packages/ti/syslink/ipc/rtos/package/ti.syslink.ipc.rtos.pjt");
+    GEL_ProjectLoad("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/gates/package/ti.sdo.ipc.gates.pjt");
+    GEL_ProjectLoad("D:/work_space_1013_light/kdsppulse/Debug/configPkg/package/configPkg.pjt");
+    GEL_ProjectLoad("D:/work_space_1013_light/kdsppulse/Debug/configPkg/package/cfg/Dsp_xe674.pjt");
+    GEL_ProjectSetActive("D:/work_space_1013_light/kdsppulse/Debug/configPkg/package/cfg/Dsp_xe674.pjt");
+}
+XDC_close() {
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/package/ti.sysbios.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/package/ti.sysbios.hal.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/package/ti.sysbios.knl.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/package/ti.sysbios.family.c64p.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/gates/package/ti.sysbios.gates.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/family/package/ti.sdo.ipc.family.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/utils/package/ti.sdo.utils.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/interfaces/package/ti.sdo.ipc.interfaces.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/syncs/package/ti.sysbios.syncs.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/heaps/package/ti.sysbios.heaps.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/timers/dmtimer/package/ti.sysbios.timers.dmtimer.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/xdcruntime/package/ti.sysbios.xdcruntime.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c62/package/ti.sysbios.family.c62.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/ti81xx/package/ti.sysbios.family.c64p.ti81xx.pjt");
+    GEL_ProjectClose("C:/ti/bios_6_33_05_46/packages/ti/sysbios/utils/package/ti.sysbios.utils.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/package/ti.sdo.ipc.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/family/ti81xx/package/ti.sdo.ipc.family.ti81xx.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/notifyDrivers/package/ti.sdo.ipc.notifyDrivers.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/transports/package/ti.sdo.ipc.transports.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/nsremote/package/ti.sdo.ipc.nsremote.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/heaps/package/ti.sdo.ipc.heaps.pjt");
+    GEL_ProjectClose("C:/ti/syslink_2_20_00_14/packages/ti/syslink/ipc/rtos/package/ti.syslink.ipc.rtos.pjt");
+    GEL_ProjectClose("C:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/gates/package/ti.sdo.ipc.gates.pjt");
+    GEL_ProjectClose("D:/work_space_1013_light/kdsppulse/Debug/configPkg/package/configPkg.pjt");
+    GEL_ProjectClose("D:/work_space_1013_light/kdsppulse/Debug/configPkg/package/cfg/Dsp_xe674.pjt");
+}
+menuitem "XDC Package"
+hotmenu load_executable () { GEL_Load("D:/work_space_1013_light/kdsppulse/Debug/configPkg/Dsp.xe674"); }
+hotmenu open_project () { XDC_open(); }
+hotmenu close_project () { XDC_close(); }

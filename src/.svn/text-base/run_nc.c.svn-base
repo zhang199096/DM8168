@@ -1,0 +1,1435 @@
+/****************************************************************/
+/* Name :                                                                   				*/
+/*       NCRun_Gcode		                      							*/
+/* Function:                                                               				*/
+/*       NCRun_Gcode                                 							*/
+/*  Copyright 2008 by LOKSHUN CNC  Equipment LTD.                           	*/
+/*  All rights reserved  LOKSHUN CNC  Equipment LTD.                   		*/ 
+/*	Designed by: DAVID SHEN										*/
+/*   Modified by : ENJOY LU		                                                            */
+/****************************************************************/
+
+#include "..\\include\\DEC6713_main.h"
+
+//通用变量和标志
+tsSYSTEM		System;			//系统参数结构对象
+tsERROR			Error;			//报警结构对象
+tsOVERALLSIGN		OverallSign;		// 总体标志
+
+tsGCODE			SPCGCodeBuffer[SPCGCODE_MOD];	//SPC G-code 结构缓冲数组
+tsGCODE			AddLineGCodeBuffer[ADDGCODE_MOD];			//单段增加5条G代码
+tsGCODE			DividedTwoGCodeBuffer[Three_GCODE_MOD];		//分成两段
+
+tsNC_RUN_SIGN	NCRunSign;	//区域代码各组群状态和通讯状态结构对象
+
+UINT16AXIS LastPrecalMoveSign;						// 以前的移动方向
+UINT16AXIS NowPrecalMoveSign;						// 现在的移动方向
+
+//用于标准G代码
+tsNC_RUN_SIGN 	AddLineNCSign;		//用于单段加代码
+//#pragma DATA_SECTION(STDNCSign,".myData");
+tsNC_RUN_SIGN		STDNCSign;			//NC代码运行标志和变量
+
+//用于HANDLE  JOG  REF 等功能用特殊G代码
+tsNC_RUN_SIGN		SPCNCSign;			//NC代码运行标志和变量
+
+//用于主轴
+tsSPINDLE 		S_Spindle;	// 主轴  (=U)
+union tsSPINDLE_OUT_REG SpindleOutSignal;			//输出控制信号
+
+//参考点搜索
+tsREFERENCE	Reference;		
+
+//自动对刀功能	
+tsAUTOADJUSTTOOL 	AutoAdjustTool;
+
+//非线性补偿   
+AxisCompensation	AxisCompBuffer[COMPBUFFERLENGTH];
+
+tsGCODE  *psGCodeBufferNCRun;
+
+tsDSPTRACKOVER sDSPTrackOver;
+
+//判断轨迹是否偏离位置  CH0701
+//判断轨迹静态时是否偏离位置 各轴判定界限0.01mm 
+void NCRun_CheckTrackOver(void)		
+{	
+	if(OverallSign.GetMachCoordinateRight == 0)
+		return ;
+	if(STDNCSign.Waitsign == 1)
+		return ;	
+	if(++sDSPTrackOver.SampleCycle < 30)
+		return ;
+	sDSPTrackOver.ErrorSetup = 1000;
+	sDSPTrackOver.POSError = 0.5;
+	sDSPTrackOver.SampleCycle=0;
+	if(STDNCSign.GetPositionSign == 1)   // 需要获得稳定的坐标值
+	{
+		sDSPTrackOver.CheckCycle = 0;
+		sDSPTrackOver.ErrorCountX=0;
+		sDSPTrackOver.ErrorCountY=0;
+		sDSPTrackOver.ErrorCountY=0;
+		return ;
+	}
+
+	if(STDNCSign.RealRunCount==0)
+	{
+		sDSPTrackOver.ErrorCountX= 0;
+		sDSPTrackOver.ErrorCountY= 0;
+		sDSPTrackOver.ErrorCountY= 0;
+		return ;
+	}
+	if(STDNCSign.BreakSign)
+	{
+	    return ;
+	}	
+	if(System.TrackRunOutRangeSQR < 10.0)
+		return ;		
+	sDSPTrackOver.POSDeltaX = labs(NC_AREAControl.NowValue.X-OverallSign.ABS_Coordinate.X)*System.UnitTo_mm;  
+	sDSPTrackOver.POSDeltaY = labs(NC_AREAControl.NowValue.Y-OverallSign.ABS_Coordinate.Y)*System.UnitTo_mm;  
+	sDSPTrackOver.POSDeltaZ = labs(NC_AREAControl.NowValue.Z-OverallSign.ABS_Coordinate.Z)*System.UnitTo_mm;  
+	sDSPTrackOver.POSStotal = powdp(sDSPTrackOver.POSDeltaX,2)+powdp(sDSPTrackOver.POSDeltaZ,2)+powdp(sDSPTrackOver.POSDeltaY,2);
+	if(sDSPTrackOver.POSStotal > System.TrackRunOutRangeSQR)
+	{
+		if(++sDSPTrackOver.CheckCycle > 10)
+		{
+			Error.TrackRunOutError = 9;
+			high_error(); 
+		}
+	}
+	else
+	{
+		sDSPTrackOver.CheckCycle = 0;
+	}
+	if(GET_XCOIN)
+	{
+		if(sDSPTrackOver.POSDeltaX > sDSPTrackOver.POSError)
+		{
+			if(++sDSPTrackOver.ErrorCountX > sDSPTrackOver.ErrorSetup)
+			{
+				if(NC_AREAControl.NowValue.X == sDSPTrackOver.POSValueX)
+				{
+					Error.TrackRunOutError = 10;
+					high_error();
+				}
+				else
+				{
+					sDSPTrackOver.POSValueX = NC_AREAControl.NowValue.X;
+					sDSPTrackOver.ErrorCountX = 0;
+				}
+			}
+		}
+		else
+		{
+			sDSPTrackOver.ErrorCountX = 0;
+		}
+	}
+	else
+	{
+		sDSPTrackOver.ErrorCountX = 0;
+	}
+
+	if(GET_YCOIN)
+	{
+		if(sDSPTrackOver.POSDeltaY > sDSPTrackOver.POSError)
+		{
+			if(++sDSPTrackOver.ErrorCountY > sDSPTrackOver.ErrorSetup)
+			{
+				if(NC_AREAControl.NowValue.Y == sDSPTrackOver.POSValueY)
+				{
+					Error.TrackRunOutError = 11;
+					high_error();
+				}
+				else
+				{
+					sDSPTrackOver.POSValueY = NC_AREAControl.NowValue.Y;
+					sDSPTrackOver.ErrorCountY = 0;
+				}
+			}
+		}
+		else
+		{
+			sDSPTrackOver.ErrorCountY = 0;
+		}
+	}
+	else
+	{
+		sDSPTrackOver.ErrorCountY = 0;
+	}
+
+	if(GET_ZCOIN)
+	{
+		if(sDSPTrackOver.POSDeltaZ > sDSPTrackOver.POSError)
+		{
+			if(++sDSPTrackOver.ErrorCountZ > sDSPTrackOver.ErrorSetup)
+			{
+				if(NC_AREAControl.NowValue.Z == sDSPTrackOver.POSValueZ)
+				{
+					Error.TrackRunOutError = 12;
+					high_error();
+				}
+				else
+				{
+					sDSPTrackOver.POSValueZ = NC_AREAControl.NowValue.Z;
+					sDSPTrackOver.ErrorCountZ = 0;
+				}
+			}
+		}
+		else
+		{
+			sDSPTrackOver.ErrorCountZ = 0;
+		}
+	}
+	else
+	{
+		sDSPTrackOver.ErrorCountZ = 0;
+	}		
+}
+
+
+void NCRun_STDRenewCode(void)
+{
+	tsGCODE  *psNowCode; 
+
+	NCRunSign.RealSendCount = 0;
+	NCRunSign.RealRunCount = 0;	
+	NCRunSign.VeVmCalCount = 0;
+	NCRunSign.EndCodeCount = 0;
+	NCRunSign.NewAreaSign = 0;
+
+	//renew Z value if changed z length competation 
+	STDNCSign.LastRealSendCount = STDNCSign.RealRunCount;
+	while(STDNCSign.LastRealSendCount<STDNCSign.RealSendCount)
+	{
+		psNowCode=&GCodeBuffer[(STDNCSign.LastRealSendCount)%STDGCODE_MOD];
+		psNowCode->StartPoint.Z += OverallSign.Z_CompesationLengthDelta;
+		psNowCode->EndPoint.Z += OverallSign.Z_CompesationLengthDelta;
+		psNowCode->CenterPoint.Z += OverallSign.Z_CompesationLengthDelta;
+		if( psNowCode->MoveCodeSign)
+			NCAreaGCodeBuffer[(NCRunSign.RealSendCount++)%STDGCODE_MOD] = *psNowCode;
+		STDNCSign.LastRealSendCount++;
+	}
+	
+	STDNCSign.LastRealSendCount = STDNCSign.RealSendCount;
+	OverallSign.STDLastMoveGCode.EndPoint =GCodeBuffer[(STDNCSign.RealSendCount-1) % STDGCODE_MOD].EndPoint;
+
+	//initial NC_AREAControl
+	NC_AREAControl.VNow = 0;
+	NC_AREAControl.Snow = 0;
+	NC_AREAControl.VNowOut = 0;		//CH0512
+	NC_AREAControl.Pointer_StartCode = 0;
+	NC_AREAControl.Pointer_SecondInflexionCode = 0;
+	NC_AREAControl.Pointer_EndCode = 0;
+	NC_AREAControl.DeltaStep.X =0;
+	NC_AREAControl.DeltaStep.Y =0;
+	NC_AREAControl.DeltaStep.Z =0;        
+
+	STDNCSign.Waitsign = 0;
+	
+	//清插补缓冲区
+	InterpolationBuffer[0] = InterpolationBuffer[OverallSign.InterpolationRunCnt%INTERPOLATIONBUFLENGTH];
+	OverallSign.InterpolationSendCnt = 0;
+	OverallSign.InterpolationRunCnt = 0;
+}
+
+void NCRun_STDG04(void)
+{	
+	//G04 运算单位为ms	
+	if(STDNCSign.BreakSign)
+	{
+		STDNCSign.XYZ_Over=1;
+		return ;
+	}
+	if(psGCodeBufferNCRun->StartPoint.X == 0)
+	{
+		STDNCSign.XYZ_Over=1;
+		return ;
+	}
+	if(OverallSign.EveryAxisCoinValid==0)
+		return ;
+	
+	if(STDNCSign.PrecalCode==0)	
+	{
+		Timer0.G04StartCounter = Timer0.GenericCounter;
+		STDNCSign.PrecalCode = 1;    
+	}	           
+	if(OverallSign.InterpolationRunCnt >= OverallSign.InterpolationSendCnt)		
+	{    
+		if(get_delta_time(Timer0.G04StartCounter)> psGCodeBufferNCRun->StartPoint.X)
+		{
+			STDNCSign.XYZ_Over=1;
+		}
+	} 	
+}       
+
+
+void NCRun_STDG51(void)
+{
+	if(OverallSign.EveryAxisCoinValid)
+	{
+		NCRunSign.SingleModifyOffsetOrCompesationSign = 1;
+		STDNCSign.XYZ_Over=1;
+	}
+}
+
+void NCRun_STDM03(void)		// 主轴正转
+{  
+	S_Spindle.RunSign = S_CW; 
+	STDNCSign.XYZ_Over=1;	
+	if(S_Spindle.RunModeSign == S_RunModeRIGID)
+		return ;
+	S_Spindle.RunModeSign = S_RunModeGeneric;	
+}
+
+void NCRun_STDM04(void)		// 主轴反转
+{
+	S_Spindle.RunSign = S_CCW; 
+	STDNCSign.XYZ_Over=1;
+	if(S_Spindle.RunModeSign == S_RunModeRIGID)
+		return ;
+	S_Spindle.RunModeSign = S_RunModeGeneric;	
+}
+
+void NCRun_STDM05(void)		// 主轴停止
+{
+	STDNCSign.XYZ_Over=1;
+	S_Spindle.RunSign = S_STOP; 
+	S_Spindle.RunModeSign = S_RunModeGeneric;		
+}
+
+void NCRun_STDM253(void)		// 主轴定位
+{
+	if(S_Spindle.PulsePerCycle == 1)
+	{	
+		//无编码器
+		return ;
+	}
+	if(System.GearDownRate != 1)
+	{
+		S_Spindle.SpeedHz = 0;
+		Error.ORTError = 1;
+		//Error.MainErrorSign = 1;
+		return ;
+	}	
+	if(STDNCSign.PrecalCode==0)
+	{
+       	 S_Spindle.VT_ORT_OK_Counter=0; //初始化         
+		//处理清除主轴定位偏移标志
+		if(Error.ORTError == 0)
+		{
+			if((S_Spindle.RunModeSign==S_RunModeORTM252) && (S_Spindle.ORTCompleteSign))
+			{
+				if(S_Spindle.ORTM252Angle==psGCodeBufferNCRun->StartPoint.X)
+				{
+					STDNCSign.PrecalCode = 1;
+					STDNCSign.XYZ_Over=1;
+					return ;
+				}
+			}
+		}		
+		Error.ORTError = 0;	
+		//复位参考点信号输入
+		SET_CLRREF;
+		if((psGCodeBufferNCRun->StartPoint.X<0) || (psGCodeBufferNCRun->StartPoint.X>= System.SpindleOneRing_EncoderRealDegree))
+		{
+			S_Spindle.SpeedHz = 0;
+			Error.ORTError = 1;
+			//Error.MainErrorSign = 1;
+		}	
+		S_Spindle.RunModeSign = S_RunModeORTM252;
+		S_Spindle.ORTM252Angle = psGCodeBufferNCRun->StartPoint.X;		
+		S_Spindle.ORTM252CounterTimer = 0;
+		S_Spindle.ORTCompleteSign = 0;	
+		Timer0.ORTM252Counter = Timer0.GenericCounter;
+		
+		Reference.FindRefSign.U = 0;
+		CPLD_EncoderResetU();		
+		Reference.FindRefSign.U = 1;		//added 20090912
+
+		//取消复位参考点信号输入		
+		CLR_CLRREF;
+
+		//CH0609  只有正转定位
+		SpindleOutSignal.bit.CCW = 0;
+		SpindleOutSignal.bit.CW = 1;
+
+		STDNCSign.PrecalCode = 1;
+	}
+	else
+	{			
+		if((S_Spindle.ORTCompleteSign==1) || (STDNCSign.ChangeToolSign==1))
+		{
+			STDNCSign.XYZ_Over=1;
+		}
+		if(System.RunState == SimulateRun)
+		{
+			S_Spindle.ORTCompleteSign = 1;
+		}		
+	}	
+}
+
+void NCRun_STDM254(void)		// 主轴逆转CCW 攻丝	
+{
+	if(OverallSign.EveryAxisCoinValid == 0)
+		return ;
+	if(STDNCSign.PrecalCode == 0)	
+	{
+		STDNCSign.PrecalCode = 1;
+		S_Spindle.RigidTapStartSign = 0;
+		S_Spindle.RunModeSign = S_RunModeRIGID;		
+		CPLD_EncoderResetU();
+		if(System.RunState == 1)
+		{
+			S_Spindle.RealSpeed_r = 1;
+			S_Spindle.CalSpeedOKSign = 2;
+		}
+		return ;
+	}
+
+	if((S_Spindle.RealSpeed_r<2.0) && (S_Spindle.CalSpeedOKSign==2))
+	{	
+		//速度需连续两次小于2r/s 
+		S_Spindle.RigidMode = (psGCodeBufferNCRun->CMD2==254)?(S_REVERSETAP):(S_TAP);
+		S_Spindle.Z_S_Scale_A = divdp(psGCodeBufferNCRun->Feedrate, divdp((S_Spindle.SpinSpeedSet*System.STDShakeSign), 60.0));
+		S_Spindle.Z_S_Scale = divdp( S_Spindle.Z_S_Scale_A, S_Spindle.PulsePerCycle );
+
+		S_Spindle.RigidStartValue.X = NC_AREAControl.OldValue.X;
+		S_Spindle.RigidStartValue.Y = NC_AREAControl.OldValue.Y;
+		S_Spindle.RigidStartValue.Z = NC_AREAControl.OldValue.Z;		
+		//未初始化为0 造成判断错误added 20090804
+		NC_AREAControl.SnowLast = 0;	
+		CPLD_EncoderResetU();
+		if((OverallSign.FeedrateOverride)&&(OverallSign.RapidFeedrateOverride))
+			STDNCSign.XYZ_Over=1;
+	}	
+}
+
+void NCRun_STD64FS(void)
+{	
+	switch(psGCodeBufferNCRun->CMD2)    
+	{
+		case 0x04:	// F     unit:mm/s					
+			psGCodeBufferNCRun->Feedrate = divdp(psGCodeBufferNCRun->StartPoint.X, 60.0);
+			STDNCSign.XYZ_Over=1;
+			break;
+			
+		case 0x05:	// S	
+			S_Spindle.SpinSpeedSet = psGCodeBufferNCRun->StartPoint.X;
+			STDNCSign.XYZ_Over=1;
+			break;		
+		
+		default: 		
+			STDNCSign.XYZ_Over=1;
+			break;
+	}
+}
+
+void NCRun_STD65M(void)
+{
+	switch(psGCodeBufferNCRun->CMD2)    
+	{
+		case 0x03: NCRun_STDM03();break;
+		case 0x04: NCRun_STDM04();break;
+		case 0x05: NCRun_STDM05();break;	
+		case 0xfd: NCRun_STDM253();break;
+		case 0xfe: NCRun_STDM254();break;
+		case 0xff: NCRun_STDM254();break;
+		default: 	STDNCSign.XYZ_Over=1;break;
+	}
+}
+
+//主轴带功阳头减速箱运行  
+void  NCRun_SpinGongYang(void)			//主轴带功阳头减速箱运行
+{
+	U_Encoder.MACH_PositionValue = 0;
+	if(S_Spindle.RunModeSign == S_RunModeGeneric)
+	{	
+		if(S_Spindle.RunSign == S_STOP)
+		{
+			S_Spindle.RealDisplaySpeed = 0;
+		}
+		else
+		{
+			S_Spindle.RealDisplaySpeed = S_Spindle.SpinSpeedSet*(S_Spindle.SpindleGrade*0.1);
+		}
+	}	
+	else if(S_Spindle.RunModeSign == S_RunModeRIGID)
+	{
+		S_Spindle.RealDisplaySpeed = S_Spindle.SpinSpeedSet;
+	}
+	else if((S_Spindle.RunModeSign==S_RunModeORTM252)||(S_Spindle.RunModeSign==S_RunModeORTM253))
+	{
+		S_Spindle.RealDisplaySpeed = S_Spindle.ORTSpeed;	
+	}	                    
+}
+
+
+//S 主轴代码开始**************************
+
+//含编码器反馈主轴通常方式运行时失速监控  CH0701
+void NCRun_SpinVT_SpeedAbort(void)
+{
+	FLOAT64 	SetSpeed;					//设定转速unit:r/min	
+	if(S_Spindle.RunSign == S_STOP||S_Spindle.SpindleGrade == 0)
+	{
+		S_Spindle.UnReachSetSpeedSign = S_SpeedZero;
+		return ;
+	}
+	if(U_Encoder.OverSign == 1)
+	{
+		CPLD_EncoderResetU();
+	}
+	
+	SetSpeed = S_Spindle.SpinSpeedSet*(S_Spindle.SpindleGrade*0.1);	
+	if(SetSpeed > 0)
+	{	
+		if(SetSpeed <= 200)
+		{
+			//由编码器反馈值实际计算速度低于设定速度30%
+			if((SetSpeed * 0.3 ) > (S_Spindle.RealDisplaySpeed * System.GearDownRate))
+			{
+				S_Spindle.UnReachSetSpeedSign = S_SpeedAcc;
+			}
+		}
+		else
+		{	
+			//由编码器反馈值实际计算速度低于设定速度90%
+			if((SetSpeed * 0.9 ) > (S_Spindle.RealDisplaySpeed * System.GearDownRate))
+			{
+				S_Spindle.UnReachSetSpeedSign = S_SpeedAcc;
+			}
+		}
+	}
+}
+
+void NCRun_SpinVT_RealSpeed(void)	//总线式计算主轴实际运行速度
+{
+	S_Spindle.UnReachSetSpeedSign = 0;	
+
+	//含编码器主轴系统
+	if(S_Spindle.RunModeSign == S_RunModeGeneric)
+	{	
+		S_Spindle.RealDisplaySpeed = divdp((S_Spindle.VT_FeedbackSpeedHz*S_Spindle.SpeedPerVolt*0.001),System.GearDownRate); 
+		NCRun_SpinVT_SpeedAbort();		
+		return ;
+	}	
+	else if(S_Spindle.RunModeSign == S_RunModeRIGID)
+	{
+		S_Spindle.RealDisplaySpeed = divdp(S_Spindle.SpinSpeedSet , System.GearDownRate);
+	}
+	else if((S_Spindle.RunModeSign==S_RunModeORTM252)||(S_Spindle.RunModeSign==S_RunModeORTM253))
+	{
+		S_Spindle.RealDisplaySpeed = divdp((S_Spindle.VT_FeedbackSpeedHz*S_Spindle.SpeedPerVolt*0.001),System.GearDownRate); 
+	}
+	
+	if(get_delta_time(Timer0.SpindleRealSpeedCounter) >=S_SpeedSampleT)
+	{
+		if(U_Encoder.ResetSign)
+		{
+			U_Encoder.ResetSign = 0;
+			S_Spindle.LastUMachValue = U_Encoder.MACH_PositionValue;	
+			Timer0.SpindleRealSpeedCounter = Timer0.GenericCounter;	
+
+			//CH0704  未初始化造成刚性攻牙加速度前馈值过大
+			S_Spindle.RealSpeed = 0;
+			S_Spindle.RealSpeed_r = 0;
+			S_Spindle.RealSpeedLast = 0;
+			S_Spindle.RealSpeedLast_r = 0;
+			S_Spindle.Real_a = 0;
+			S_Spindle.Real_a_r = 0;
+			S_Spindle.CalSpeedOKSign = 0;
+			return ;
+		}
+
+		S_Spindle.RealSpeed_encoder = divdp(labs(U_Encoder.MACH_PositionValue-S_Spindle.LastUMachValue) , (0.001*S_SpeedSampleT));		
+		S_Spindle.RealSpeed = divdp((S_Spindle.VT_FeedbackSpeedHz*S_Spindle.SpeedPerVolt*0.001)*360000.0, 60.0); //r/min---->ud/s
+
+		if((System.SpindleSpeedbackmodle ==1)&&(S_Spindle.SpinSpeedZeroSign == 1))
+		{
+			S_Spindle.RealSpeed = S_Spindle.RealSpeed_encoder;
+		}
+		else if(System.SpindleSpeedbackmodle >=2)
+		{
+			S_Spindle.RealSpeed = S_Spindle.RealSpeed_encoder;
+		}
+		
+		//刚性攻丝主轴速度反馈采集模式(0 : VT总线,1:编码器)
+		S_Spindle.RealSpeed_r = divdp(S_Spindle.RealSpeed*System.UnitTo_d, 360.0);		
+		S_Spindle.Real_a = divdp((S_Spindle.RealSpeed-S_Spindle.RealSpeedLast),(S_SpeedSampleT*0.001));
+		S_Spindle.Real_a_r = divdp(S_Spindle.Real_a*System.UnitTo_d, 360.0);
+		S_Spindle.RealSpeedLast = S_Spindle.RealSpeed;
+		S_Spindle.RealSpeedLast_r = S_Spindle.RealSpeed_r;
+		
+		S_Spindle.LastUMachValue = U_Encoder.MACH_PositionValue;	
+		Timer0.SpindleRealSpeedCounter = Timer0.GenericCounter;
+
+		if(S_Spindle.CalSpeedOKSign < 2)
+		{
+			S_Spindle.CalSpeedOKSign++;
+		}
+	}
+}
+
+void NCRun_SpinVT_ORTWatch(void)
+{
+	if(System.GearDownRate == 1)
+	if((S_Spindle.RunModeSign==S_RunModeORTM252) || (S_Spindle.RunModeSign==S_RunModeORTM253))
+	{	
+		U_Encoder.MACH_PositionValue = S_Spindle.VT_FeedbackAngle * divdp( System.SpindleAxisMinUnit, 1000); 
+	   	return ;                     	
+	}
+	// 非刚性攻牙时，U 轴每过参考点清零 CH0701
+	if(S_Spindle.RunModeSign == S_RunModeRIGID)
+	{
+		Reference.FindRefSign.U = 0;
+		return ;
+	}
+	if(System.GearDownRate == 1)		
+	if(S_Spindle.RunSign != S_STOP)
+	{	//运行由于要计算转速，所以不可以清计数器
+		return ;
+	}
+
+	//CH090919  不转主轴先自动运行定位后，S轴参考点输入通道已关闭，
+	//在通常状态下已不能得到参考点信号
+	if(GET_UREF)
+	{
+		//复位参考点信号输入
+		SET_CLRREF;
+		if(System.GearDownRate == 1)
+			CPLD_EncoderResetU();
+		else
+			Reference.FindRefSign.U = 1;					
+		//取消复位参考点信号输入
+		CLR_CLRREF;	
+	}
+	else
+	{	
+		//在通常状态下复位参考点输入通道
+		if(OverallSign.NCSign == NCSIGN_NONE)
+		{
+			//复位参考点信号输入
+			SET_CLRREF;						
+			//取消复位参考点信号输入
+			CLR_CLRREF;	
+		}
+	}
+
+	//CH0609 	未得到正确坐标时不计算
+	if(OverallSign.GetMachCoordinateRight == 0)
+		return ;		
+	
+	if(U_Encoder.MACH_PositionValue<0)
+	{
+		U_Encoder.MACH_PositionValue =U_Encoder.MACH_PositionValue%System.SpindleOneRing_EncoderRealDegree+System.SpindleOneRing_EncoderRealDegree;
+	}
+	if(U_Encoder.MACH_PositionValue>System.SpindleOneRing_EncoderRealDegree)
+	{	
+		U_Encoder.MACH_PositionValue = U_Encoder.MACH_PositionValue%System.SpindleOneRing_EncoderRealDegree;		
+	}
+
+	OverallSign.GetMachCoordinateRight = 0;	
+}
+
+void NCRun_SpinVTGeneric(void)	//总线式主轴通常运行
+{
+	SpindleOutSignal.bit.ZEROSERVO = 0;	//CH0511 通用状态不采用零伺服
+	SpindleOutSignal.bit.ORT = 0;			// 取消主轴定位
+	Error.ORTError = 0;					
+	S_Spindle.ORTCompleteSign = 0;		//清主轴定位完成标志
+	
+	if(S_Spindle.RunSign == S_STOP)
+	{
+		SpindleOutSignal.bit.CCW = 0;
+		SpindleOutSignal.bit.CW = 0;
+		S_Spindle.SpeedHz = 0;
+		return ;
+	}
+	else if(S_Spindle.RunSign == S_CCW)
+	{
+		SpindleOutSignal.bit.CCW = 1;
+		SpindleOutSignal.bit.CW = 0;
+	}
+	else 
+	{
+		SpindleOutSignal.bit.CCW = 0;
+		SpindleOutSignal.bit.CW = 1;
+	}
+
+	if(OverallSign.BFChageOverrideSpeedSign == 1)
+	{
+		S_Spindle.SpeedHz = divdp( S_Spindle.BFChageOverrideSpeed*(S_Spindle.SpindleGrade*0.1)*1000.0,
+								S_Spindle.SpeedPerVolt );	
+	}
+	else
+	{
+		S_Spindle.SpeedHz = divdp( S_Spindle.SpinSpeedSet * System.GearDownRate*(S_Spindle.SpindleGrade*0.1)*1000.0 ,
+								S_Spindle.SpeedPerVolt );				//VT --->S_Spindle.SpeedHz unit :0.01HZ
+	}                    		
+}
+
+void NCRun_SpinVTRigid(void)		//总线式 Z 轴跟随主轴运行
+{	
+ 	if(S_Spindle.RunSign == S_STOP)
+	{
+		SpindleOutSignal.bit.CCW = 0;
+		SpindleOutSignal.bit.CW = 0;
+	}
+	else if(S_Spindle.RunSign == S_CCW)
+	{
+		SpindleOutSignal.bit.CCW = 1;
+		SpindleOutSignal.bit.CW = 0;
+	}
+	else 
+	{
+		SpindleOutSignal.bit.CCW = 0;
+		SpindleOutSignal.bit.CW = 1;
+	}
+
+	//ch20090807!注意: 此处一定是SpinSpeedSet_A*60,不是SpinSpeedSet!
+	S_Spindle.SpeedHz = divdp( S_Spindle.SpinSpeedSet_A*60*1000.0, S_Spindle.SpeedPerVolt );		//unit : 0.01HZ  
+}
+
+void NCRun_SpinVTM253(void)		//总线式主轴定位运行
+{
+	FLOAT64 DeltaAngle;			// 当前主轴偏离角度 单位: 度
+
+	if(Error.ORTError)		//CH0507
+		return ;	
+	
+	DeltaAngle = divdp( fabs((FLOAT64)S_Spindle.VT_FeedbackAngle-(FLOAT64)S_Spindle.ORTM252Angle), 1000.0 );
+	
+	if(S_Spindle.ORTCompleteSign)
+	{	
+		if((fabs(DeltaAngle)<(S_Spindle.S_StopDistance+3)) ||	(fabs(DeltaAngle)>(360.0-S_Spindle.S_StopDistance-3)))
+		{
+			if((fabs(DeltaAngle)<(S_Spindle.S_StopDistance)) ||(fabs(DeltaAngle)>(360.0-S_Spindle.S_StopDistance)))
+			{
+				S_Spindle.ORTM252CounterTimer = 0;
+			}
+			else
+			{
+				S_Spindle.ORTM252CounterTimer++;
+				if(S_Spindle.ORTM252CounterTimer > 20000)
+				{
+					S_Spindle.ORTCompleteSign = 0;
+					Error.ORTError = 1;
+				}
+			}
+		}
+		else
+		{
+			S_Spindle.ORTM252CounterTimer++;
+			if(S_Spindle.ORTM252CounterTimer > 5000)
+			{
+				S_Spindle.ORTCompleteSign = 0;
+				Error.ORTError = 1;
+			}
+		}
+	}                    
+}
+//总线式VT 控制方式  
+void NCRun_SpinVT(void)			//总线式主轴控制功能
+{
+	U_Encoder.OverSign = 0;
+	NCRun_SpinVT_ORTWatch();
+
+	NCRun_SpinVT_RealSpeed();
+
+	switch(S_Spindle.RunModeSign)
+	{
+		case 1: NCRun_SpinVTGeneric();break;
+		case 3: NCRun_SpinVTRigid();break;
+		case 4: NCRun_SpinVTM253();break;
+		default: break;
+	}                
+}
+
+//S 主轴代码结束区
+
+
+//参考点搜索开始区
+void NCRun_SPCRef(void)
+{
+	if((Reference.SearchRefSign== 0)||(System.RunState == SimulateRun))
+		return ;
+	if( Reference.RefStep == StepZero )
+	{
+
+		if(GET_XNEG == 0)
+		{
+			OverallSign.SearchRefMoveSign.X = 1;	
+		}
+		else if(GET_XPOS == 0)
+		{
+			OverallSign.SearchRefMoveSign.X = 2;	
+		}
+
+		if(GET_YNEG == 0)
+		{
+			OverallSign.SearchRefMoveSign.Y = 1;	
+		}
+		else if(GET_YPOS == 0)
+		{
+			OverallSign.SearchRefMoveSign.Y = 2;	
+		}
+
+		if(GET_ZNEG == 0)
+		{
+			OverallSign.SearchRefMoveSign.Z = 1;	
+		}
+		else if(GET_ZPOS == 0)
+		{
+			OverallSign.SearchRefMoveSign.Z = 2;	
+		}
+		
+		if( (GET_XPOS == 1)
+			&& (GET_YPOS == 1)
+			&& (GET_ZPOS == 1)
+		 	&& (GET_XNEG == 1) 
+		 	&& (GET_YNEG == 1)
+		 	&& (GET_ZNEG == 1))
+		{
+			Reference.RefStep = StepOne;				
+			SPCNCSign.GetPositionSign = 1;	 
+		}
+		return ;		
+	}
+	else if( Reference.RefStep == StepOne )
+	{
+		if( SPCNCSign.GetPositionSign == 0 )
+		{
+			tsGCODE *psGCodeRiPointer;
+
+			//复位参考点信号输入
+			//取消复位参考点信号
+			RESET_REF ;
+
+			psGCodeRiPointer = &SPCGCodeBuffer[(SPCNCSign.RealRunCount-1)%SPCGCODE_MOD];
+			psGCodeRiPointer->StartPoint = OverallSign.ABS_Coordinate;
+
+			if(OverallSign.SearchRefMoveSign.X == 1)
+			{
+				psGCodeRiPointer->EndPoint.X = psGCodeRiPointer->StartPoint.X + System.SRefBack;
+			}
+			else if(OverallSign.SearchRefMoveSign.X == 2)
+			{
+				psGCodeRiPointer->EndPoint.X = psGCodeRiPointer->StartPoint.X - System.SRefBack;
+			}	
+			
+			if(OverallSign.SearchRefMoveSign.Y == 1)
+			{
+				psGCodeRiPointer->EndPoint.Y = psGCodeRiPointer->StartPoint.Y + System.SRefBack;
+			}
+			else if(OverallSign.SearchRefMoveSign.Y == 2)
+			{
+				psGCodeRiPointer->EndPoint.Y = psGCodeRiPointer->StartPoint.Y - System.SRefBack;
+			}	
+
+			if(OverallSign.SearchRefMoveSign.Z == 1)
+			{
+				psGCodeRiPointer->EndPoint.Z = psGCodeRiPointer->StartPoint.Z + System.SRefBack;
+			}
+			else if(OverallSign.SearchRefMoveSign.Z == 2)
+			{
+				psGCodeRiPointer->EndPoint.Z = psGCodeRiPointer->StartPoint.Z - System.SRefBack;
+			}	
+
+			
+			if(psGCodeRiPointer->CMD2 == 1)
+			{
+				//SPC_A4_back_Vveer();
+			}
+			else
+			{
+				SPC_Deal_Line(psGCodeRiPointer);
+			}
+
+			NCAreaGCodeBuffer[(NCRunSign.RealRunCount-1)%STDGCODE_MOD]=*psGCodeRiPointer;
+			
+			NCRunSign.NewAreaSign = 0;
+			NCRunSign.PrecalCode = 0;	
+			SPCNCSign.XYZ_Over = 0;	
+			Reference.RefStep = StepTwo;
+		}
+		return ;		
+	}
+	else if( Reference.RefStep == StepTwo )
+	{	
+		//CPLD_ReadIOIn3();		//CPLD IO 输入口3
+
+		if(Reference.NeedFindAxisSign.X)
+		{
+			if(GET_XREF)
+			{
+				if(Reference.FindRefSign.X == 0)
+				{
+					CPLD_EncoderResetX();
+					Reference.FindRefSign.X = 1;
+				}
+			}
+		}
+
+		if(Reference.NeedFindAxisSign.Y)
+		{
+			if(GET_YREF)
+			{
+				if(Reference.FindRefSign.Y == 0)
+				{
+					CPLD_EncoderResetY();
+					Reference.FindRefSign.Y = 1;
+				}
+			}
+		}
+
+		if(Reference.NeedFindAxisSign.Z)
+		{
+			if(GET_ZREF)
+			{
+				if(Reference.FindRefSign.Z == 0)
+				{
+					CPLD_EncoderResetZ();
+					Reference.FindRefSign.Z = 1;
+				}
+			}
+		}
+
+		if(Reference.NeedFindAxisSign.U)
+		{
+			if(GET_UREF)
+			{
+				if(Reference.FindRefSign.U == 0)
+				{
+					CPLD_EncoderResetU();
+					Reference.FindRefSign.U = 1;
+				}
+			}
+		}	
+	}	
+}//参考点搜索结束
+
+//自动对刀功能开始区  CH0512
+//自动对刀锁定时停止运动 CH0606
+//有手动对刀模型  CH0606
+void NCRun_ATCJog(void)
+{
+	if( System.FeedAxisBusStyle == 0)	
+	{	//脉冲型
+		if(CPLD_EncoderValue(&X_Encoder))
+			NCCoord_MACValue(&X_Encoder , &X_Servo);			
+		if(CPLD_EncoderValue(&Y_Encoder))
+			NCCoord_MACValue(&Y_Encoder , &Y_Servo);
+		if(CPLD_EncoderValue(&Z_Encoder))
+			NCCoord_MACValue(&Z_Encoder , &Z_Servo);
+	}	
+	// 对刀有效信号处理
+	if(AutoAdjustTool.LockValidSign)
+	{	// 坐标锁定		
+		if(AutoAdjustTool.LockCoordinateSign == 0)
+		{	// 对刀信号有效，坐标锁定			
+			AutoAdjustTool.LockCoordinateSign = 1;
+			AutoAdjustTool.LockCoordinate.U = U_Encoder.MACH_PositionValue;						
+			// 由于搜索参考点为正向定位，所以负方向运动时需+ 间隙值
+			AutoAdjustTool.LockCoordinate.X = X_Encoder.MACH_PositionValue+((OverallSign.MoveSign.X)?(0):(System.Gap.X));
+			// 由于搜索参考点为负向定位，所以正方向运动时需- 间隙值
+			AutoAdjustTool.LockCoordinate.Y = Y_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Y)?(0):(System.Gap.Y));
+			// 由于搜索参考点为负向定位，所以正方向运动时需- 间隙值
+			AutoAdjustTool.LockCoordinate.Z = Z_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Z)?(0):(System.Gap.Z));
+			
+			AutoAdjustTool.LockCoordinateMoveSign.X = OverallSign.MoveSign.X;
+			AutoAdjustTool.LockCoordinateMoveSign.Y = OverallSign.MoveSign.Y;
+			AutoAdjustTool.LockCoordinateMoveSign.Z = OverallSign.MoveSign.Z;
+
+			if(OverallSign.MoveSign.X == MovePositive)
+				AutoAdjustTool.LimitCoordinate.X = AutoAdjustTool.LockCoordinate.X+AATLimitLength;
+			else
+				AutoAdjustTool.LimitCoordinate.X = AutoAdjustTool.LockCoordinate.X-AATLimitLength;
+			if(OverallSign.MoveSign.Y == MovePositive)
+				AutoAdjustTool.LimitCoordinate.Y = AutoAdjustTool.LockCoordinate.Y+AATLimitLength;
+			else
+				AutoAdjustTool.LimitCoordinate.Y = AutoAdjustTool.LockCoordinate.Y-AATLimitLength;
+			if(OverallSign.MoveSign.Z == MovePositive)
+				AutoAdjustTool.LimitCoordinate.Z = AutoAdjustTool.LockCoordinate.Z+AATLimitLength;
+			else
+				AutoAdjustTool.LimitCoordinate.Z = AutoAdjustTool.LockCoordinate.Z-AATLimitLength;
+			// 超速监控
+			if(NC_AREAControl.VNow > 20.0)
+			{	// >1200mm/min alarm
+				Error.AAT_OverSpeedSign = 1;
+				Error.MainErrorSign = 1;
+			}
+			//Timer0.AutoToolLockCounter= Timer0.GenericCounter;
+		}				
+	}
+
+	// 对刀超行程(软限位)信号处理
+	if( AutoAdjustTool.LockCoordinateSign == 1 )
+	{
+		if(AutoAdjustTool.LockCoordinateMoveSign.X == MovePositive)
+		{
+			if(X_Encoder.MACH_PositionValue > AutoAdjustTool.LimitCoordinate.X)
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+		else
+		{
+			if(X_Encoder.MACH_PositionValue < AutoAdjustTool.LimitCoordinate.X)
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+
+		if(AutoAdjustTool.LockCoordinateMoveSign.Y == MovePositive)
+		{
+			if(Y_Encoder.MACH_PositionValue > AutoAdjustTool.LimitCoordinate.Y)
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+		else
+		{
+			if(Y_Encoder.MACH_PositionValue < AutoAdjustTool.LimitCoordinate.Y)
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+
+		if(AutoAdjustTool.LockCoordinateMoveSign.Z == MovePositive)
+		{
+			if( Z_Encoder.MACH_PositionValue > AutoAdjustTool.LimitCoordinate.Z )
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+		else
+		{
+			if( Z_Encoder.MACH_PositionValue < AutoAdjustTool.LimitCoordinate.Z )
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+	}
+}
+
+
+//无手动对刀模型
+void NCRun_ATCAuto(void)
+{
+	if( System.FeedAxisBusStyle == 0 )	
+	{	//脉冲型
+		if(CPLD_EncoderValue(&Z_Encoder))
+			NCCoord_MACValue(&Z_Encoder , &Z_Servo);
+	}		
+	// 对刀有效信号处理
+	if(AutoAdjustTool.LockValidSign)
+	{	// 坐标锁定
+		if(AutoAdjustTool.LockCoordinateSign == 0)
+		{	// 对刀信号有效，坐标锁定
+			AutoAdjustTool.LockCoordinateSign = 1;
+			AutoAdjustTool.LockCoordinate.U = U_Encoder.MACH_PositionValue;						
+			// 由于搜索参考点为正向定位，所以负方向运动时需+ 间隙值
+			AutoAdjustTool.LockCoordinate.X = X_Encoder.MACH_PositionValue+((OverallSign.MoveSign.X)?(0):(System.Gap.X));
+			// 由于搜索参考点为负向定位，所以正方向运动时需- 间隙值
+			AutoAdjustTool.LockCoordinate.Y = Y_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Y)?(0):(System.Gap.Y));
+			// 由于搜索参考点为负向定位，所以正方向运动时需- 间隙值
+			AutoAdjustTool.LockCoordinate.Z = Z_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Z)?(0):(System.Gap.Z));
+			AutoAdjustTool.LockCoordinateMoveSign.Z=OverallSign.MoveSign.Z;
+			if(OverallSign.MoveSign.Z == MovePositive)
+				AutoAdjustTool.LimitCoordinate.Z = AutoAdjustTool.LockCoordinate.Z+AATLimitLength+300;
+			else
+				AutoAdjustTool.LimitCoordinate.Z = AutoAdjustTool.LockCoordinate.Z-(AATLimitLength+300);
+			// 超速监控
+			if(NC_AREAControl.VNow > 20.0)
+			{	// >1200mm/min alarm
+				Error.AAT_OverSpeedSign = 1;
+				Error.MainErrorSign = 1;
+			}		
+			Timer0.AutoToolLockCounter= Timer0.GenericCounter;
+		}		
+		
+		//坐标锁定后对转接代码终点坐标修改
+		if(AutoAdjustTool.LockCoordinateSign == 1)
+		{
+			if( (AutoAdjustTool.ZDealEndSign == 0) && (OverallSign.EveryAxisCoinValid))
+			{
+				if(get_delta_time(Timer0.AutoToolLockCounter)>300)//300ms
+				{
+					if( NC_AREAControl.VNow == 0 )
+					{
+						AutoAdjustTool.ZDealEndSign = 1;
+						OverallSign.STDLastMoveGCode.EndPoint.Z = OverallSign.ABS_Coordinate.Z;
+						OverallSign.SPCLastMoveGCode.EndPoint.Z = OverallSign.ABS_Coordinate.Z;
+						NCRunSign.NewAreaSign = 0;		
+						NCRunSign.XYZ_Over = 1;	
+						STDNCSign.XYZ_Over = 1;			
+						SPCNCSign.XYZ_Over = 1;	
+						NCCoord_WorkToMACToLinear(&OverallSign.ABS_Coordinate, &NC_AREAControl.OldPointMACHPulseOut);
+					}		
+				}
+			}
+			else
+			{
+				Timer0.AutoToolLockCounter = Timer0.GenericCounter;
+			}
+		}
+	}
+
+	// 对刀超行程(软限位)信号处理
+	if( AutoAdjustTool.LockCoordinateSign == 1 )
+	{
+		if(AutoAdjustTool.LockCoordinateMoveSign.Z == MovePositive)
+		{
+			if( Z_Encoder.MACH_PositionValue > AutoAdjustTool.LimitCoordinate.Z)
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+		else
+		{
+			if( Z_Encoder.MACH_PositionValue < AutoAdjustTool.LimitCoordinate.Z)
+			{
+				Error.AAT_OverTravel = 1;
+				Error.MainErrorSign = 1;			
+			}
+		}
+	}
+}
+
+//有手动对刀模型  CH0606
+void NCRun_ATC(void)
+{
+	if(AutoAdjustTool.LevelChangeSign == 0)
+		AutoAdjustTool.LockValidSign = (sCPLD_IO_In4Register.bit.ATCLock)?1:0;
+	else
+		AutoAdjustTool.LockValidSign = (!sCPLD_IO_In4Register.bit.ATCLock)?1:0;	
+	if(sCPLD_IO_In4Register.bit.ATCTrack == 0)	//自动对刀超行程开关：1-ON 未过行程0-OFF 过行程 
+	{
+		Error.AAT_OverTravel = 1;
+		Error.MainErrorSign = 1;
+		return ;
+	}
+	if(AutoAdjustTool.FunctionSign==0)
+		return ;
+	//自动对刀功能
+	if(AutoAdjustTool.Style == 0)
+	{	
+		//无手动对刀模型
+		NCRun_ATCAuto();	
+	}
+	else if(AutoAdjustTool.Style == 1)
+	{	
+		//有手动对刀模型
+		NCRun_ATCJog();			
+	}	
+}
+
+void NCRun_Gcode(void)
+{      
+	if(S_Spindle.RigidBackToolSign)
+	{
+		if(S_Spindle.RigidBackToolCompleteSign)
+			return ;		
+	}
+		
+	if( (SPCNCSign.GetPositionSign) ||(STDNCSign.GetPositionSign) ||(NCRunSign.GetPositionSign))// 需要获得稳定的坐标值
+	{  		
+	   	// CPLD_ReadIOIn1();
+		if(OverallSign.EveryAxisCoinValid)
+		{
+			if(get_delta_time(Timer0.GetPositionCounter) >  100)		//100ms
+			{                 
+				SPCNCSign.XYZ_Over = 1;
+				STDNCSign.XYZ_Over = 1;
+				NCRunSign.XYZ_Over = 1;				
+				if( NCCoord_GetAndCheck() == FALSE)
+				{	//未获得正确坐标, 重新获取  (这里如果一直需要获取稳定坐标的话，则出现死循环，需要复位)
+					Timer0.GetPositionCounter = Timer0.GenericCounter;
+					return ;
+				}				
+				SPCNCSign.GetPositionSign = 0;
+				STDNCSign.GetPositionSign = 0;
+				NCRunSign.GetPositionSign = 0;
+				OverallSign.SPCLastMoveGCode.EndPoint = OverallSign.ABS_Coordinate;		//um
+
+				if(STDNCSign.AddLineSign == 0)
+				{	
+					if(NCRunSign.SingleModifyOffsetOrCompesationSign == 1)
+					{
+						//NCRunSign.SingleModifyOffsetOrCompesationSign = 0;
+						if(OverallSign.Z_CompesationLengthDelta != 0)						
+							NCRun_STDRenewCode();						
+						return ;
+					}
+					//单段退出时不能变化此值，不然造成代码终点继承错误
+					OverallSign.STDLastMoveGCode.EndPoint = OverallSign.ABS_Coordinate; //um	
+				}
+			}
+		}	 
+		else
+		{
+			Timer0.GetPositionCounter = Timer0.GenericCounter;
+		}		
+		return ;	
+	}
+
+	if(System.FeedAxisBusStyle == 0)	//脉冲控制型
+	{
+		//CH0903
+		if((OverallSign.Int4IdleSign>30) & ( OverallSign.InterpolationRunCnt < OverallSign.InterpolationSendCnt ) )
+		{
+			if(System.RunState == 0)
+			{
+				//IRQ_disable(IRQ_EVT_EXTINT4);
+				IRQ_DISABLE(IRQNUM_PLUSE);
+				//CPLD_ReadIOIn3();				
+				//if(OverallSign.EveryAxisOverValid)
+				//	IRQ_set(IRQ_EVT_EXTINT4);
+					
+				//IRQ_enable(IRQ_EVT_EXTINT4);
+				IRQ_ENABLE(IRQNUM_PLUSE);
+			}
+			else
+			{
+				OverallSign.Int4IdleSign = 0;
+				return ;
+			}			
+		}
+	}
+
+	if(OverallSign.NCSign == NCSIGN_STD)	
+	{
+		if(S_Spindle.RunModeSign == S_RunModeRIGID)
+		{	//刚性攻牙插补缓冲区要尽量小
+			if((OverallSign.InterpolationSendCnt-OverallSign.InterpolationRunCnt) > RIGID_INTERPOLATIONBUFLENGTH )
+				return ;
+			
+		}
+		else if(AutoAdjustTool.FunctionSign)
+		{	//对刀时插补缓冲区要尽量小
+			if((OverallSign.InterpolationSendCnt-OverallSign.InterpolationRunCnt) >AutoAdjust_INTERPOLATIONBUFLENGTH)		
+				return ;			
+		}
+		else
+		{
+			if((OverallSign.InterpolationSendCnt-OverallSign.InterpolationRunCnt) > (INTERPOLATIONBUFLENGTH-5))
+				return;
+		}
+	}
+	else if(OverallSign.NCSign == NCSIGN_SPC)
+	{
+		if((OverallSign.InterpolationSendCnt-OverallSign.InterpolationRunCnt) > SPC_INTERPOLATIONBUFLENGTH)	
+			return ;		
+		//SPC功能启动等待标志,防止启动时频繁加减速，造成震动
+		if(get_delta_time(Timer0.SPCStartCounter) <  50)		//60ms
+			return ;
+		
+	}
+
+	if( (OverallSign.NCSign == NCSIGN_STD) && (STDNCSign.XYZ_Over) )		//STD代码完成
+	{	
+		OverallSign.LastCodeOverSign = 0;		
+		if(STDNCSign.RealRunCount == STDNCSign.RealSendCount) 
+		{			
+			if(NCRunSign.RealRunCount != NCRunSign.RealSendCount)
+			{
+				Error.InterpolationOver = 3;
+				high_error();	
+			}			
+			if(OverallSign.EveryAxisCoinValid)
+			{
+				NC_AREAControl.VNow = 0;
+				OverallSign.LastCodeOverSign = 1;//CH0507			
+			}
+		
+			return ;
+		}
+		
+		if(STDNCSign.AddLineSign)
+		{
+			if(AddLineNCSign.RealRunCount < AddLineNCSign.RealSendCount)
+			{
+				STDNCSign.PrecalCode = 0;	//执行新代码,需重新计算
+				STDNCSign.XYZ_Over = 0; 	
+				AddLineNCSign.RealRunCount++;
+				if( AddLineGCodeBuffer[(AddLineNCSign.RealRunCount-1)%STDGCODE_MOD].MoveCodeSign != 0)
+				{
+					NCRunSign.RealRunCount++;
+					NCRunSign.PrecalCode = 0;
+					NCRunSign.XYZ_Over = 0;		
+				}
+			}
+			else 
+			{
+				AddLineNCSign.XYZ_Over	= 1;
+				STDNCSign.AddLineSign	= 0;
+				NCRunSign.RealSendCount	= 0;
+				NCRunSign.RealRunCount	= 0;
+				NCRunSign.EndCodeCount	= 0;
+				NCRunSign.VeVmCalCount  = 0;
+				NC_AREAControl.Pointer_EndCode = NCRunSign.RealRunCount;
+				NCRunSign.NewAreaSign = 0;
+				STDNCSign.LastRealSendCount = STDNCSign.RealRunCount;
+				while(STDNCSign.LastRealSendCount<STDNCSign.RealSendCount)
+				{						
+					psGCodeBufferNCRun= &GCodeBuffer[(STDNCSign.LastRealSendCount++)%STDGCODE_MOD];					
+					if( psGCodeBufferNCRun->MoveCodeSign != 0)					
+						NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ] = *psGCodeBufferNCRun;			
+				}				
+				STDNCSign.LastRealSendCount = STDNCSign.RealSendCount;
+				STDNCSign.SingleRunOver = 1;
+				STDNCSign.Waitsign = 1;
+				STDNCSign.VeVmCalCount  = 0;
+				return ;
+			}
+		}		
+		else if(STDNCSign.SingleModeSign)
+		{
+			psGCodeBufferNCRun= &GCodeBuffer[(STDNCSign.RealRunCount-1) % STDGCODE_MOD];
+			if( psGCodeBufferNCRun->SendCount ==GCodeBuffer[(STDNCSign.RealRunCount) % STDGCODE_MOD].SendCount ) 
+			{
+ 				STDNCSign.RealRunCount++;				
+				STDNCSign.PrecalCode = 0;	//执行新代码,需重新计算
+				STDNCSign.XYZ_Over = 0;
+				if(psGCodeBufferNCRun->MoveCodeSign != 0)
+				{
+					NCRunSign.RealRunCount++;
+					NCRunSign.PrecalCode = 0;
+					NCRunSign.XYZ_Over = 0;
+				}
+			}
+			else 
+			{
+				if(STDNCSign.NeedRunSingleSign == 1)
+			    {
+					if(OverallSign.EveryAxisCoinValid)
+					{
+						STDNCSign.SingleRunOver = 1;
+						STDNCSign.Waitsign = 1;
+						STDNCSign.NeedRunSingleSign = 0;
+						//记忆单段节点绝对坐标位置
+						NC_AREAControl.SingleAddLineOldPoint = NC_AREAControl.NowValue;
+					}
+					else
+					{
+						return ;
+					}
+				}
+				else
+				{
+					return ;
+				}	
+			}
+		}		
+		else if(STDNCSign.RealSendCount > STDNCSign.RealRunCount)
+		{
+			STDNCSign.RealRunCount++;				
+			STDNCSign.PrecalCode = 0;	//执行新代码,需重新计算
+			STDNCSign.XYZ_Over = 0; 			
+			if( GCodeBuffer[ (STDNCSign.RealRunCount-1)%STDGCODE_MOD ].MoveCodeSign != 0)
+			{
+				NCRunSign.RealRunCount++;
+				NCRunSign.PrecalCode = 0;
+				NCRunSign.XYZ_Over = 0;				
+			}
+			
+		}
+	}
+	else if((OverallSign.NCSign == NCSIGN_SPC) && (SPCNCSign.XYZ_Over))		//SPC代码完成
+	{		
+		OverallSign.LastCodeOverSign = 0;	
+		if(SPCNCSign.RealRunCount == SPCNCSign.RealSendCount) 
+		{ 			
+			if(OverallSign.EveryAxisCoinValid)
+			{
+				NC_AREAControl.VNow = 0;
+				OverallSign.LastCodeOverSign = 1;
+				if(OverallSign.HardLimitNeedGetPositionSign == 1)				
+					SPCNCSign.GetPositionSign = 1;				
+			}
+			return ;
+		}	        
+		SPCNCSign.RealRunCount++;      
+		SPCNCSign.PrecalCode = 0;	//执行新代码,需重新计算
+		SPCNCSign.XYZ_Over = 0;   
+		NCRunSign.RealRunCount++;
+		NCRunSign.PrecalCode = 0;
+		NCRunSign.XYZ_Over = 0;	
+				
+	}                                
+	
+	if( (SPCNCSign.XYZ_Over == 0) || (STDNCSign.XYZ_Over == 0) )	//新代码执行区
+	{
+		if(OverallSign.NCSign == NCSIGN_STD)
+		{
+			if(STDNCSign.AddLineSign)
+			{		
+				psGCodeBufferNCRun = &AddLineGCodeBuffer[(AddLineNCSign.RealRunCount-1) % ADDGCODE_MOD];
+				if(psGCodeBufferNCRun->CMD1 < 4)
+					NCArea_Run();				
+				else if(( psGCodeBufferNCRun->CMD1==0x64) &&(psGCodeBufferNCRun->CMD2==0xff) )	//有时会有空代码
+				{
+					STDNCSign.XYZ_Over = 1;
+				}
+				return ;
+			}			
+			psGCodeBufferNCRun = &GCodeBuffer[(STDNCSign.RealRunCount)?((STDNCSign.RealRunCount-1) % STDGCODE_MOD):(0)];			
+			//程序存在逻辑错误(进入死循环)
+			if(STDNCSign.BreakSign)
+			{
+				if((psGCodeBufferNCRun->CMD1 < 4)||(psGCodeBufferNCRun->CMD1 == 30)||(psGCodeBufferNCRun->CMD1 == 31))
+				{
+					if(STDNCSign.GetPositionSign)
+					{
+						while(STDNCSign.GetPositionSign);
+						return ;
+					}
+				}
+			}
+			switch(psGCodeBufferNCRun->CMD1)	
+			{
+				case 0: NCArea_Run();break;
+				case 1: NCArea_Run();break;
+				case 2: NCArea_Run();break;
+				case 3: NCArea_Run();break;
+				case 4: NCRun_STDG04();break;
+				//case 9: 	STDNCSign.XYZ_Over=1;break;
+				//case 17:	STDNCSign.XYZ_Over=1;break;
+				//case 18:	STDNCSign.XYZ_Over=1;break;
+				//case 19:	STDNCSign.XYZ_Over=1;break;
+				case 30:	NCArea_Run();break;
+				case 31:	NCArea_Run();break;
+				//case 41:	STDNCSign.XYZ_Over=1;break;
+				//case 42:	STDNCSign.XYZ_Over=1;break;
+				//case 43:	STDNCSign.XYZ_Over=1;break;
+				case 51:	NCRun_STDG51();break;
+				//case 54:	STDNCSign.XYZ_Over=1;break;
+				//case 55:	STDNCSign.XYZ_Over=1;break;
+				//case 56:	STDNCSign.XYZ_Over=1;break;
+				//case 57:	STDNCSign.XYZ_Over=1;break;
+				//case 58:	STDNCSign.XYZ_Over=1;break;
+				//case 59:	STDNCSign.XYZ_Over=1;break; 	
+				//case 61:	STDNCSign.XYZ_Over=1;break;
+				//case 64:	STDNCSign.XYZ_Over=1;break; 	
+				//case 80:	STDNCSign.XYZ_Over=1;break; 
+				case 0x64: NCRun_STD64FS();break;
+				case 0x65: NCRun_STD65M();break;					
+				default:	STDNCSign.XYZ_Over=1;break;		
+			}	
+		}
+		//else if(OverallSign.NCSign == NCSIGN_SPC)
+		else
+		{
+			//把代码打入代码缓冲区
+			NCArea_Run();
+		}			
+	}	                     
+}
+

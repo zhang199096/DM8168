@@ -1,0 +1,218 @@
+<!DOCTYPE Project SYSTEM "http://www.slickedit.com/dtd/vse/10.0/vpj.dtd">
+<Project
+    Version="10.0"
+    VendorName="SlickEdit"
+    WorkingDir=".">
+    <Config
+        Name="Debug"
+        Type="cpp"
+        DebugCallbackName="gdb"
+        OutputFile="%bdSEKDSP"
+        CompilerConfigName="Latest Version">
+        <Menu>
+            <Target
+                Name="Compile"
+                MenuCaption="&amp;Compile"
+                CaptureOutputWith="ProcessBuffer"
+                OutputExts="*.o"
+                SaveOption="SaveCurrent"
+                RunFromDir="%rw">
+                <Exec CmdLine='cc -c -g %i %defd -o "%bd%n.o" "%f"'/>
+            </Target>
+            <Target
+                Name="Link"
+                MenuCaption="&amp;Link">
+                <Exec CmdLine='cc -g -o "%o" %f %libs'/>
+            </Target>
+            <Target
+                Name="Build"
+                MenuCaption="&amp;Build"
+                CaptureOutputWith="ProcessBuffer"
+                SaveOption="SaveWorkspaceFiles"
+                RunFromDir="%rw">
+                <Exec CmdLine='"%(VSLICKBIN1)vsbuild" build "%w" "%r"'/>
+            </Target>
+            <Target
+                Name="Rebuild"
+                MenuCaption="&amp;Rebuild"
+                CaptureOutputWith="ProcessBuffer"
+                SaveOption="SaveWorkspaceFiles"
+                RunFromDir="%rw">
+                <Exec CmdLine='"%(VSLICKBIN1)vsbuild" rebuild "%w" "%r"'/>
+            </Target>
+            <Target
+                Name="Debug"
+                MenuCaption="&amp;Debug"
+                SaveOption="SaveNone"
+                BuildFirst="1"
+                CaptureOutputWith="ProcessBuffer"
+                RunFromDir="%rw">
+                <Exec CmdLine='vsdebugio -prog "%o"'/>
+            </Target>
+            <Target
+                Name="Execute"
+                MenuCaption="E&amp;xecute"
+                SaveOption="SaveNone"
+                BuildFirst="1"
+                CaptureOutputWith="ProcessBuffer"
+                RunFromDir="%rw">
+                <Exec CmdLine='"%o"'/>
+            </Target>
+        </Menu>
+        <Includes>
+            <Include Dir="C:/Ti/ccsv5/tools/compiler/c6000_7.4.2/include/"/>
+            <Include Dir="C:/Ti/bios_6_35_01_29/packages/ti/bios/include/"/>
+        </Includes>
+    </Config>
+    <Config
+        Name="Release"
+        Type="cpp"
+        DebugCallbackName="gdb"
+        OutputFile="%bdSEKDSP"
+        CompilerConfigName="Latest Version">
+        <Menu>
+            <Target
+                Name="Compile"
+                MenuCaption="&amp;Compile"
+                CaptureOutputWith="ProcessBuffer"
+                SaveOption="SaveCurrent"
+                OutputExts="*.o"
+                RunFromDir="%rw">
+                <Exec CmdLine='cc -c -O %i %defd -o "%bd%n.o" "%f"'/>
+            </Target>
+            <Target
+                Name="Link"
+                MenuCaption="&amp;Link">
+                <Exec CmdLine='cc -O -o "%o" %f %libs'/>
+            </Target>
+            <Target
+                Name="Build"
+                MenuCaption="&amp;Build"
+                CaptureOutputWith="ProcessBuffer"
+                SaveOption="SaveWorkspaceFiles"
+                RunFromDir="%rw">
+                <Exec CmdLine='"%(VSLICKBIN1)vsbuild" build "%w" "%r"'/>
+            </Target>
+            <Target
+                Name="Rebuild"
+                MenuCaption="&amp;Rebuild"
+                CaptureOutputWith="ProcessBuffer"
+                SaveOption="SaveWorkspaceFiles"
+                RunFromDir="%rw">
+                <Exec CmdLine='"%(VSLICKBIN1)vsbuild" rebuild "%w" "%r"'/>
+            </Target>
+            <Target
+                Name="Debug"
+                MenuCaption="&amp;Debug"
+                SaveOption="SaveNone"
+                BuildFirst="1"
+                CaptureOutputWith="ProcessBuffer"
+                RunFromDir="%rw">
+                <Exec CmdLine='vsdebugio -prog "%o"'/>
+            </Target>
+            <Target
+                Name="Execute"
+                MenuCaption="E&amp;xecute"
+                SaveOption="SaveNone"
+                BuildFirst="1"
+                CaptureOutputWith="ProcessBuffer"
+                RunFromDir="%rw">
+                <Exec CmdLine='"%o"'/>
+            </Target>
+        </Menu>
+        <Includes>
+            <Include Dir="C:/Ti/ccsv5/tools/compiler/c6000_7.4.2/include/"/>
+            <Include Dir="C:/Ti/bios_6_35_01_29/packages/ti/bios/include/"/>
+        </Includes>
+    </Config>
+    <Rules Name="Compile">
+        <Rule
+            InputExts="*.s"
+            OutputExts="*.o"
+            LinkObject="1">
+            <Exec CmdLine='as -o "%bd%n.o" "%f"'/>
+        </Rule>
+    </Rules>
+    <Files>
+        <Folder
+            Name="Bitmaps"
+            Filters="*.bmp"/>
+        <Folder
+            Name="Header Files"
+            Filters="*.h;*.H;*.hh;*.hpp;*.hxx;*.inc;*.sh;*.cpy;*.if">
+            <F N="../include/area_code_rec.h"/>
+            <F N="../include/area_control.h"/>
+            <F N="../include/area_control_extend1.h"/>
+            <F N="../include/area_control_extend3.h"/>
+            <F N="../arm/arm_global.h"/>
+            <F N="../arm/cmdhandle.h"/>
+            <F N="../include/common.h"/>
+            <F N="../include/cpld.h"/>
+            <F N="../include/cputimers.h"/>
+            <F N="../include/datatype.h"/>
+            <F N="../include/dec6713_main.h"/>
+            <F N="../include/int_code.h"/>
+            <F N="../include/key.h"/>
+            <F N="../include/run_nc.h"/>
+            <F N="../include/sci.h"/>
+            <F N="../include/sharemem.h"/>
+            <F N="../include/spi.h"/>
+            <F N="../include/structcode.h"/>
+            <F N="../include/structpacket.h"/>
+            <F N="../include/structpara.h"/>
+            <F N="../include/structpoint.h"/>
+            <F N="../include/usr_prm.h"/>
+        </Folder>
+        <Folder
+            Name="Other Files"
+            Filters=""/>
+        <Folder
+            Name="Resource Files"
+            Filters="*.ico;*.cur;*.dlg"/>
+        <Folder
+            Name="Source Files"
+            Filters="*.c;*.C;*.cc;*.cpp;*.cp;*.cxx;*.c++;*.prg;*.pas;*.dpr;*.asm;*.s;*.bas;*.java;*.cs;*.sc;*.e;*.cob;*.html;*.rc;*.tcl;*.py;*.pl;*.d">
+            <F N="../src/area_code_rec.c"/>
+            <F N="../src/area_control.c"/>
+            <F N="../src/area_control_extend1.c"/>
+            <F N="../src/area_control_extend3.c"/>
+            <F N="../arm/arm_global.c"/>
+            <F N="../arm/cmdhandle.c"/>
+            <F N="../src/cpld.c"/>
+            <F N="../src/cputimer.c"/>
+            <F N="../src/dec6713_main.c"/>
+            <F N="../src/dsp6713_globalvariabledefs.c"/>
+            <F N="../src/int_code.c"/>
+            <F N="../arm/keyHandle.c"/>
+            <F N="../src/main_dsp.c"/>
+            <F N="../src/run_nc.c"/>
+            <F N="../src/sci.c"/>
+            <F N="../src/sharemem.c"/>
+        </Folder>
+        <Folder
+            Name="arm"
+            Filters="">
+            <F N="../arm/alarm.c"/>
+            <F N="../arm/alarm.h"/>
+            <F N="../arm/armdatatype.h"/>
+            <F N="../arm/def.h"/>
+            <F N="../arm/gcompile.c"/>
+            <F N="../arm/gcompile.h"/>
+            <F N="../arm/gui.h"/>
+            <F N="../arm/key.c"/>
+            <F N="../arm/keyhandle.h"/>
+            <F N="../arm/lkbus.h"/>
+            <F N="../arm/main_host.c"/>
+            <F N="../arm/spi.c"/>
+            <F N="../arm/spi.h"/>
+            <F N="../arm/sysparam.c"/>
+            <F N="../arm/sysparam.h"/>
+            <F N="../arm/task2.c"/>
+            <F N="../arm/task2.h"/>
+            <F N="../arm/taskglobal.c"/>
+            <F N="../arm/taskglobal.h"/>
+            <F N="../arm/toolcompen.c"/>
+            <F N="../arm/toolcompen.h"/>
+        </Folder>
+    </Files>
+</Project>

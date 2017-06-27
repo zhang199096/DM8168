@@ -1,0 +1,576 @@
+#ifndef _STRUCT_CODE_H_
+#define _STRUCT_CODE_H_
+
+#include "datatype.h"
+
+typedef struct
+//typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+}tsCODE_SUB;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S F;	
+}tsCODE_F;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S S;	
+}tsCODE_S;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S IV;
+	INT32S V;
+	
+}tsCODE_G00;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令(8=整圆)
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S I;
+	INT32S J;
+	INT32S R;
+	INT32S S;
+	INT32S E;	
+}tsCODE_G02;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S P;		
+}tsCODE_G04;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令(8=整圆)
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S I;
+	INT32S J;
+	INT32S R;
+	INT32S S;
+	INT32S E;
+	INT32S Z;	
+}tsCODE_G30;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S H;		
+}tsCODE_G43;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S X;
+	INT32S Y;
+	INT32S Z;		
+}tsCODE_G50;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S I;
+	INT32S J;
+	INT32S K;
+	INT32S D;	
+}tsCODE_G51;
+
+typedef struct
+//typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+}tsCODE_G54;
+
+typedef struct
+//typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+}tsCODE_MSUB;
+
+typedef struct
+//typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S T;	
+}tsCODE_M06;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S E;	
+}tsCODE_M251;
+
+typedef struct
+//typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令	
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S E;		
+}tsCODE_M253;
+
+#if 0
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S L;
+	INT32S P;
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S IV;
+	INT32S V;
+	INT32S R;	
+}tsDSP_CODE_G10;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S IV;
+	INT32S V;
+}tsDSP_CODE_G28;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;	
+}tsDSP_CODE_G40;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S D;	
+}tsDSP_CODE_G41;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32U H;		
+}tsDSP_CODE_G43;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S IV;
+	INT32S V;	
+}tsDSP_CODE_G52;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S E;
+}tsDSP_CODE_G68;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;
+	INT32S Q;
+	INT32S D;
+}tsDSP_CODE_G73;
+
+//typedef struct
+typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;
+	INT32S P;
+	INT32S Q;	
+	INT32S F;
+	INT32S S;		
+	INT32S E;
+	INT32S T;		
+}tsDSP_CODE_G74;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;
+	INT32S I;
+	INT32S J;
+}tsDSP_CODE_G76;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;			
+}tsDSP_CODE_G81;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;	
+	INT32S P;		
+}tsDSP_CODE_G82;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;
+	INT32S Q;	
+	INT32S D;	
+}tsDSP_CODE_G83;
+
+//typedef struct
+typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;
+	INT32S P;
+	INT32S Q;	
+	INT32S F;
+	INT32S S;		
+	INT32S E;
+	INT32S T;
+}tsDSP_CODE_G84;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;		
+}tsDSP_CODE_G85;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;	
+	INT32S P;	
+}tsDSP_CODE_G86;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;
+	INT32S I;
+	INT32S J;	
+}tsDSP_CODE_G87;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S R;	
+	INT32S P;
+}tsDSP_CODE_G89;
+
+//typedef struct
+typedef __packed struct
+{
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S IV;
+	INT32S V;
+}tsDSP_CODE_G92;
+
+//定义圆周钻孔功能
+//typedef struct
+typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;			//定义起点X
+	INT32S Y;			//定义起点Y
+	INT32S Z;			//定义起点Z
+	INT32S R;			//定义参考点R
+	INT32S P;			//定义暂停P
+	INT32S Q;			//定义步进量Q
+	INT32S F;			//定义进给速度
+	INT32S S;			//定义转速
+	INT32S E;
+	INT32S T;			//定义类型
+	INT32S I;			//定义圆心
+	INT32S J;			//定义圆心
+	INT32S K;			//定义横向孔数量
+	INT32S A;			//定义角度增量
+}tsDSP_CODE_G200;
+
+//定义阵列钻孔功能
+//typedef struct
+typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;			//定义起点X
+	INT32S Y;			//定义起点Y
+	INT32S Z;			//定义起点Z
+	INT32S R;			//定义参考点R
+	INT32S P;			//定义暂停P
+	INT32S Q;			//定义步进量Q
+	INT32S F;			//定义进给速度
+	INT32S S;			//定义转速
+	INT32S E;
+	INT32S T;			//定义类型
+	INT32S I;			//定义步进量X
+	INT32S J;			//定义步进量Y
+	INT32S K;			//定义横向孔数量
+	INT32S L;			//定义纵向孔数量
+}tsDSP_CODE_G201;
+
+//定义铣模框功能
+//typedef struct
+typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;			//定义起点X
+	INT32S Y;			//定义起点Y
+	INT32S Z;			//定义起点Z
+	INT32S W;			//定义宽度
+	INT32S L;			//定义长度
+	INT32S Q;			//定义步进量
+	INT32S T;			//定义类型	
+}tsDSP_CODE_G210;
+
+//定义铣模槽功能
+//typedef struct
+typedef __packed struct
+{	
+	INT16U Length;		//代码长度
+	INT8U CMDMain;		//代码主命令
+	INT8U CMDSub;		//代码从命令
+	INT32U SendCountD;	//发送至DSP的实际代码条数
+	INT32U SendCountA;	//ARM已处理的实际代码条数	
+	INT32S X;			//定义起点X
+	INT32S Y;			//定义起点Y
+	INT32S Z;			//定义起点Z
+	INT32S H;			//定义深度
+	INT32S W;			//定义宽度
+	INT32S L;			//定义长度
+	INT32S Q;			//定义步进量
+	INT32S D;			//定义深度步进量
+	INT32S T;			//定义类型	
+}tsDSP_CODE_G211;
+
+#endif
+
+#endif

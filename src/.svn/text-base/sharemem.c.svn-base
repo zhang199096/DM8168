@@ -1,0 +1,311 @@
+/*******************************************************************
+* file: sharemem.h
+* author: vinge
+* description: share memory management functions;
+               mostly cycle buf functions
+* version: 2014/3/25 first edition
+********************************************************************
+*/
+
+#include "../include/sharemem.h"
+
+#ifdef ARM_SIDE
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+int memfile; //memory file
+#endif
+
+#define SHAREMEM_START_ADDR 0X98000000
+#define SHAREMEM_SIZE       1024*1024*16  //16M
+#define CYCLEBUF_START_OFFSET   (1024)
+#define LISTBUF_START_OFFSET    (1024*1024*2)
+#define LISTBUF_SHM_MAGIC       LISTBUF_START_OFFSET
+
+//define a array space as sharememory for arm and dsp data exchange
+INT32U* shareMemoryAddr; // 8m  share memory
+//--------------------------------------------------------------------
+//define cycle buffer for task communicate
+PCycleBuf cycleBufList;
+
+INT32U cycbufCellSizeArray[CYCBUF_INUSE]={
+    CYCBUFSIZE_EVENT,
+    CYCBUFSIZE_EVENT,
+    CYCBUFSIZE_KEY,
+    CYCBUFSIZE_GCODE
+};
+INT32U cycbufCellCountArray[CYCBUF_INUSE]={
+    CYCBUFLEN_EVENT,
+    CYCBUFLEN_EVENT,
+    CYCBUFLEN_KEY,
+    CYCBUFLEN_GCODE
+};
+//define a table that infos directly write in and show to others
+#define SHM_RDY_MAGICNUM  0XFAEBDC01
+INT32U* pSHM_MAGIC;
+INT32U* parm2dspPKG;
+INT32U* pdsp2armPKG;
+INT32U* parm2guiPKG;
+INT32U* pdsp2guiPKG;
+
+INT32U* pPARADSPB0_1;
+INT32U* pPARADSPB0_2;
+INT32U* pPARADSPSERVO;
+INT32U* pPARALINEAR; 
+//----------------------------------------------------
+INT32S shm_init()
+{
+#ifdef ARM_SIDE //use mmap to init sharemem
+    int n,fd;
+
+    memfile=open("/dev/mem",O_RDWR|O_SYNC);
+    if(memfile==-1){
+        return -1;
+    }
+    shareMemoryAddr=mmap(NULL,SHAREMEM_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED,memfile,SHAREMEM_START_ADDR);
+    if(shareMemoryAddr==0){
+        return -1;
+    }
+#else   //dsp code
+    shareMemoryAddr=(INT32U*)SHAREMEM_START_ADDR;
+#endif
+    return 1;
+}
+#ifdef ARM_SIDE
+INT32S shm_Exit()
+{
+    close(memfile);
+    munmap(shareMemoryAddr,SHAREMEM_SIZE);
+    return 1;
+}
+#endif
+//create a cycle buf, register the list info,
+//count should be real need count+1,since one cell is allways empty
+INT32U shm_cycBufCreate(INT32U index, INT32U cellsizedw, INT32U cellcount)
+{
+    if((cycleBufList[index].cellSize!=0)
+       ||((index>0)&&(cycleBufList[index-1].cellSize==0))
+        ||(cellsizedw==0)||(cellcount==0))
+    { //it had been used
+        return 0;
+    }
+    cycleBufList[index].cellSize=cellsizedw;
+    cycleBufList[index].cellCount=cellcount;
+    cycleBufList[index].readPtr=0;
+    cycleBufList[index].writePtr=0;
+    if(index==0)
+    {
+        cycleBufList[index].startOffset=CYCLEBUF_START_OFFSET;
+    }else{
+        cycleBufList[index].startOffset=cycleBufList[index-1].endOffset+1; //one seperate;
+    }
+
+    cycleBufList[index].endOffset=cycleBufList[index].startOffset+
+        cellsizedw*cellcount;
+    return 1;
+}
+//just get the read ptr and use the data in it, if you don't copy the data;
+//a shm_cycBufRead must be call after data process done;
+// cell pointer is return if ok , NULL if buf empty
+INT32U* shm_cycBufReadptr(INT32U index)
+{
+    if(cycleBufList[index].readPtr==cycleBufList[index].writePtr)
+    {
+        return NULL;
+    }
+    return shareMemoryAddr+cycleBufList[index].startOffset
+            +cycleBufList[index].cellSize
+            *((cycleBufList[index].readPtr+1)%cycleBufList[index].cellCount);
+}
+//copy the data out and increse read pointer;
+//if null is given ,just increase pointer
+// 1  is return if ok , 0 if buf empty
+// it reaturn the read ptr+1 pos ptr
+INT32U  shm_cycBufRead(INT32U index,INT32U* dataptr,INT32U dwordlen)
+{
+    INT32U* tempaddr;
+    INT32U ct;
+    if(cycleBufList[index].readPtr==cycleBufList[index].writePtr)
+    {
+        return 0;
+    }
+    if(dwordlen>cycleBufList[index].cellSize)
+        dwordlen=cycleBufList[index].cellSize;
+    if(dataptr!=NULL) //null mean data had read with the readptr function
+    {
+        tempaddr=shareMemoryAddr+cycleBufList[index].startOffset
+                +cycleBufList[index].cellSize
+                *((cycleBufList[index].readPtr+1)%cycleBufList[index].cellCount);
+        //memcpy(dataptr,tempaddr, cycleBufList[index].cellsize);
+        for(ct=0;ct<dwordlen;ct++)
+            *dataptr++=*tempaddr++;
+    }
+    //increase the readptr
+    cycleBufList[index].readPtr=(cycleBufList[index].readPtr+1)%
+        cycleBufList[index].cellCount;
+    return 1;
+}
+INT32U  shm_cycBufReadValue(INT32U index,INT32U* dataptr)
+{
+    INT32U* tempaddr;
+    if(cycleBufList[index].readPtr==cycleBufList[index].writePtr)
+    {
+        return 0;
+    }
+
+    if(dataptr!=NULL) //null mean data had read with the readptr function
+    {
+        tempaddr=shareMemoryAddr+cycleBufList[index].startOffset
+                +cycleBufList[index].cellSize
+                *((cycleBufList[index].readPtr+1)%cycleBufList[index].cellCount);
+        //memcpy(dataptr,tempaddr, cycleBufList[index].cellsize);
+        *dataptr=*tempaddr;
+    }
+    //increase the readptr
+    cycleBufList[index].readPtr=(cycleBufList[index].readPtr+1)%
+        cycleBufList[index].cellCount;
+    return 1;
+}
+//get the write ptr to write
+INT32U* shm_cycBufWriteptr(INT32U index)
+{
+    INT32U* tempaddr;
+    if(shm_cycBufIsFull(index))
+        return NULL;
+    tempaddr=shareMemoryAddr+cycleBufList[index].startOffset
+        +cycleBufList[index].cellSize
+        *((cycleBufList[index].writePtr+1)%cycleBufList[index].cellCount);
+    return tempaddr;
+}
+// write a data to cycle buf ,return 1 if ok , if full return 0;
+// increase ptr before real write;
+INT32U  shm_cycBufWrite(INT32U index,INT32U* dataptr,INT32U dwordlen)
+{
+    INT32U* tempaddr;
+    INT32U ct;
+    if(shm_cycBufIsFull(index))
+    {
+        // put some debug function for alert 
+        return 0;
+    }
+    if(dwordlen>cycleBufList[index].cellSize)
+        return 0;
+    if(dataptr!=NULL) //null mean data had write with writeptr function
+    {
+        tempaddr=shareMemoryAddr+cycleBufList[index].startOffset
+            +cycleBufList[index].cellSize
+            *((cycleBufList[index].writePtr+1)%cycleBufList[index].cellCount);
+        for(ct=0;ct<dwordlen;ct++)
+            *tempaddr++=*dataptr++;
+    }
+    cycleBufList[index].writePtr=(cycleBufList[index].writePtr+1)%
+        cycleBufList[index].cellCount;
+   return 1;
+}
+//write just one dword or less than that, for easy to use
+INT32U  shm_cycBufWriteValue(INT32U index,INT32U data)
+{
+    INT32U* tempaddr;
+    if(shm_cycBufIsFull(index))
+        return 0;
+
+    tempaddr=shareMemoryAddr+cycleBufList[index].startOffset
+        +cycleBufList[index].cellSize
+        *((cycleBufList[index].writePtr+1)%cycleBufList[index].cellCount);
+
+    *tempaddr=data;
+    cycleBufList[index].writePtr=(cycleBufList[index].writePtr+1)%
+        cycleBufList[index].cellCount;
+   return 1;
+}
+INT32U  shm_cycBufIsFull(INT32U index)
+{
+    INT32U newpos=(cycleBufList[index].writePtr+1)%
+        cycleBufList[index].cellCount;
+    if(newpos==cycleBufList[index].readPtr)
+        return 1;
+    else
+        return 0;
+}
+INT32U  shm_cycBufIsEmpty(INT32U index)
+{
+   if(cycleBufList[index].readPtr==cycleBufList[index].writePtr)
+       return 1;
+   else
+       return 0;
+}
+// no readed content in the buf
+INT32U  shm_cycBufCount(INT32U index)
+{
+    INT32U count;
+    if(cycleBufList[index].writePtr>=cycleBufList[index].readPtr)
+    {
+        count=cycleBufList[index].writePtr-cycleBufList[index].readPtr;
+    }else{
+        count=cycleBufList[index].writePtr+cycleBufList[index].cellCount
+        -cycleBufList[index].readPtr;
+    }
+    return count;
+
+}
+// reaturn free cell count in the cycle buf
+INT32U shm_cycBufFreeCount(INT32U index)
+{
+    return cycleBufList[index].cellCount-shm_cycBufCount(index);
+}
+//-------------------------------------------------------------------------------
+INT32S shm_cycBufInitAll()
+{
+    INT32U i,j;
+    INT32U *ptr;
+    if(shm_init()==-1){
+        return -1;
+    }
+    //init address of all buffer
+    cycleBufList=(PCycleBuf)(shareMemoryAddr);
+    pSHM_MAGIC  =(INT32U*)(shareMemoryAddr+(SHM_MAGIC_OFFSET>>2));
+ 
+
+    parm2dspPKG =(INT32U*)(shareMemoryAddr+(SHM_ARM2DSPPKG_OFFSET>>2)); //from half of he sharemem
+    pdsp2armPKG =(INT32U*)(shareMemoryAddr+(SHM_DSP2ARMPKG_OFFSET>>2));
+    parm2guiPKG =(INT32U*)(shareMemoryAddr+(SHM_ARM2GUIPKG_OFFSET>>2));
+    pdsp2guiPKG =(INT32U*)(shareMemoryAddr+(SHM_DSP2GUIPKG_OFFSET>>2));
+    pPARADSPB0_1 =(INT32U*)(shareMemoryAddr+(SHM_DSPPARAM_OFFSET>>2));
+    pPARADSPB0_2 =(INT32U*)(shareMemoryAddr+((SHM_DSPPARAM_OFFSET+120)>>2));
+    pPARADSPSERVO =(INT32U*)(shareMemoryAddr+(SHM_PARASERVO_OFFSET>>2));
+    pPARALINEAR   =(INT32U*)(shareMemoryAddr+(SHM_PARMLINEAR_OFFSET>>2));    
+
+#ifdef DSP_SIDE
+    ptr=shareMemoryAddr;
+    j=sizeof(TCycleBuf)/4*CYCLEBUF_MAX;
+    for(i=0;i<j;i++)
+    {
+        *ptr++=0;
+    }
+    for(i=0;i<CYCBUF_INUSE;i++)
+    {
+        if(shm_cycBufCreate(i,cycbufCellSizeArray[i],cycbufCellCountArray[i])==0)
+            return 0;
+    }
+
+    pSHM_MAGIC=0; 
+#else  //ARM_SIDE
+    //do nothing, pSHM_MAGIC should be set after data is read
+#endif
+    return 1;
+}
+//---------------------------------------------------------------------------------
+
+/*
+//-------------------------
+void armSendEvent(INT32U event)
+{
+    shm_cycBufWrite(CYCBUF_ARMEVENT,&event,CYCBUFSIZE_EVENT);
+}
+
+void dspSendEvent(INT32U event)
+{
+    shm_cycBufWrite(CYCBUF_DSPEVENT,&event,CYCBUFSIZE_EVENT);
+}*/

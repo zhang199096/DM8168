@@ -1,0 +1,117 @@
+#ifndef _SHAREMEM_H_
+#define _SHAREMEM_H_
+/*
+* file: sharemem.h
+* author: vinge
+* description: share memory management functions;mostly cycle buf functions
+* version: 2014/3/25 first edition
+*/
+//#define ARM_SIDE
+#define DSP_SIDE
+
+#include "datatype.h"
+//has 32 cyclebuf list max
+#define CYCLEBUF_MAX 32;
+
+typedef struct{
+    INT32U cellSize;  //by dword
+    INT32U cellCount;
+    INT32U readPtr;
+    INT32U writePtr;
+    INT32U startOffset;
+    INT32U endOffset;
+}TCycleBuf,*PCycleBuf;
+#ifdef ARM_SIDE  // In arm side code ARM_SIDE should be define here
+INT32S shm_Exit();
+#endif
+//init the cycbuf list for create
+INT32S shm_cycBufInit(INT32U* startaddr);
+//create a cycle buf, register the list info,
+//count should be real need count+1,since one cell is allways empty
+INT32U shm_cycBufCreate(INT32U index, INT32U cellsizedw, INT32U count);
+//just get the read ptr if you don't copy the data;
+//a shm_cycBufRead must be call after data process done;
+// 1 is return if ok , 0 if buf empty
+INT32U* shm_cycBufReadptr(INT32U index);
+//copy the data out and increse read pointer;
+//if null is given ,just increase pointer
+// 1  is return if ok , 0 if buf empty
+INT32U  shm_cycBufRead(INT32U index,INT32U* dataptr,INT32U dwordlen);
+INT32U  shm_cycBufReadValue(INT32U index,INT32U* dataptr);
+// write a data to cycle buf ,return 1 if ok , if full return 0;
+INT32U  shm_cycBufWrite(INT32U index,INT32U* dataptr,INT32U dwordlen);
+INT32U  shm_cycBufWriteValue(INT32U index,INT32U data);
+INT32U* shm_cycBufWriteptr(INT32U index);
+// no readed content in the buf
+INT32U  shm_cycBufCount(INT32U index);
+INT32U  shm_cycBufIsFull(INT32U index);
+INT32U  shm_cycBufIsEmpty(INT32U index);
+// reaturn free cell count in the cycle buf
+INT32U  shm_cycBufFreeCount(INT32U index);
+//-------------------------------------------------------------
+//below it the cycle buffer or info  that shared in sharemems
+
+
+
+#define CYCBUF_ARMEVENT     0
+#define CYCBUF_DSPEVENT     1
+#define CYCBUF_KEY          2  
+#define CYCBUF_GCODE        3
+
+#define CYCBUF_INUSE        4
+
+//all size below is in dword, 4byte
+#define CYCBUFSIZE_EVENT    1   
+#define CYCBUFSIZE_KEY      1
+#define CYCBUFSIZE_GCODE    12   //(sizeof(tsCODE_G30)>>2)
+
+#define CYCBUFLEN_EVENT     64
+#define CYCBUFLEN_KEY       128
+#define CYCBUFLEN_GCODE     200
+
+
+
+extern INT32U cycbufCellSizeArray[CYCBUF_INUSE];
+extern INT32U cycbufCellCountArray[CYCBUF_INUSE];
+//this init the real cycle bufs use in system
+//if noew buf is add, change this functions
+INT32S shm_cycBufInitAll(void);
+//-------------------------------------------------------------------
+//define a table that infos directly write in and show to others
+//it may send a eventto others if needed, mostly the orginal B0 infos
+#define SHM_MAGIC_DSPRDY  0XAB987654
+#define SHM_MAGIC_ARMRDY  0X456789AB
+
+
+#define SHM_MAGIC_OFFSET  LISTBUF_START_OFFSET    //SIEZE 4
+#define SHM_ARM2DSPPKG_OFFSET (SHM_MAGIC_OFFSET+4) //SIZE 1024
+#define SHM_DSP2ARMPKG_OFFSET   (SHM_ARM2DSPPKG_OFFSET+1024) //SIZE 1024
+#define SHM_ARM2GUIPKG_OFFSET   (SHM_DSP2ARMPKG_OFFSET+1024) //SIZE 2048
+#define SHM_DSP2GUIPKG_OFFSET   (SHM_ARM2GUIPKG_OFFSET+2048) //SIZE 2048
+
+
+extern INT32U* pSHM_MAGIC;  //标准位
+extern INT32U* parm2dspPKG;
+extern INT32U* pdsp2armPKG;
+extern INT32U* parm2guiPKG;
+extern INT32U* pdsp2guiPKG;
+
+//参数组类
+#define SHM_DSPPARAM_OFFSET   (SHM_ARM2GUIPKG_OFFSET+2048) //SIZE 1024
+#define SHM_PARASERVO_OFFSET  (SHM_DSPPARAM_OFFSET+1024)   //SIZE 4096
+#define SHM_PARMLINEAR_OFFSET (SHM_PARASERVO_OFFSET+4096)   //SIZE 12040  //301*8*5
+extern INT32U* pPARADSPB0_1;
+extern INT32U* pPARADSPB0_2;
+extern INT32U* pPARADSPSERVO;
+extern INT32U* pPARALINEAR; 
+
+
+#define SHM_CHECK_DSPRDY (*pSHM_MAGIC==SHM_MAGIC_DSPRDY)
+#define SHM_CHECK_ARMRDY (*pSHM_MAGIC==SHM_MAGIC_ARMRDY)
+
+//-------------------------
+#define armSendEvent(event) shm_cycBufWriteValue(CYCBUF_ARMEVENT,event)
+#define dspSendEvent(event) shm_cycBufWriteValue(CYCBUF_DSPEVENT,event)
+
+
+#endif

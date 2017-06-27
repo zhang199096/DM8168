@@ -1,0 +1,1018 @@
+/****************************************************************/
+/* Name :     AREA_CONTROL_extend1.C                            		*/
+/* Function:      NCArea Combined PreCal  and    Run         	 	*/
+/*  Switch PRA:    System.FunctionSelectionSwitch_2  select Aaa  	*/
+/*  Switch PRA:    System.FunctionSelectionSwitch_3  select Dec	*/
+/*  Copyright 2013 by ENJOY LU.                 					 */
+/*  All rights reserved ENJOY LU					.   	      		*/
+/*	Designed by: ENJOY LU									*/
+/****************************************************************/
+
+#include "..\\include\\DEC6713_main.h"
+
+/***************************************************************************/
+/*  Function name: NCAreaBasicCurve()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Function: StandardCurve BasicCurve                            */
+/***************************************************************************/
+void NCArea1_Test( )	
+{
+	static INT32U	I = 3;
+	static FLOAT64	Vnow = 30;
+
+	if(NC_AREAControl.TotalN - NC_AREAControl.I  <  I)
+	{
+		if(NC_AREAControl.VNow > Vnow)
+		{
+			NC_AREAControl.VNow = NC_AREAControl.VNow;
+		}
+	}
+
+	if(NC_AREAControl.VNow > Vnow)
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow;
+	}
+	if(NC_AREAControl.Ve > Vnow)
+	{
+		NC_AREAControl.VNow = NC_AREAControl.VNow;
+	}
+}
+
+
+
+/***************************************************************************/
+/*  Function name: NCAreaBasicCurve()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Function: StandardCurve BasicCurve                            */
+/***************************************************************************/
+INT16U NCArea1_BasicCurve()	
+{	//区域基本曲线
+	NC_AREAControl.DeltaT2		= 0;	
+	NC_AREAControl.DeltaT3 	= 0;
+	NC_AREAControl.DeltaT4 	= 0;	
+	NC_AREAControl.DeltaT6 	= 0;
+	NC_AREAControl.DeltaT7 	= 0;
+	NC_AREAControl.DeltaT8		= 0;
+
+	NC_AREAControl.S2			= 0;	 
+	NC_AREAControl.S3			= 0;
+	NC_AREAControl.S4			= 0;
+	NC_AREAControl.S6 		= 0;
+	NC_AREAControl.S7 		= 0;
+	NC_AREAControl.S8			= 0;	
+	
+	NC_AREAControl.T1 	= NC_AREAControl.DeltaT1;
+	NC_AREAControl.T2 	= NC_AREAControl.T1+NC_AREAControl.DeltaT2;
+	NC_AREAControl.T3 	= NC_AREAControl.T2+NC_AREAControl.DeltaT3;
+	NC_AREAControl.T4 	= NC_AREAControl.T3+NC_AREAControl.DeltaT4;
+	NC_AREAControl.T5 	= NC_AREAControl.T4+NC_AREAControl.DeltaT5;
+	NC_AREAControl.T6 	= NC_AREAControl.T5+NC_AREAControl.DeltaT6;
+	NC_AREAControl.T7 	= NC_AREAControl.T6+NC_AREAControl.DeltaT7;
+	NC_AREAControl.T8 	= NC_AREAControl.T7+NC_AREAControl.DeltaT8;
+	NC_AREAControl.T9 	= NC_AREAControl.T8+NC_AREAControl.DeltaT9;
+	NC_AREAControl.TotalN = divdp(NC_AREAControl.T9, System.Tsample);
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreSmCal()                                   */
+/***************************************************************************/
+void NCArea1_SmCal( )	
+{	//匀速段计算
+	NC_AREAControl.S5 	= NC_AREAControl.Stotal-NC_AREAControl.S1-NC_AREAControl.S9;
+
+	if(NC_AREAControl.VmReal==0) 
+	{
+		NC_AREAControl.DeltaT5 = 3e38;		//趋于无穷
+	}
+	else
+	{
+		if(NC_AREAControl.S5 > 0)
+		{
+			NC_AREAControl.DeltaT5 = divdp(NC_AREAControl.S5, NC_AREAControl.VmReal);
+		}
+		else
+		{
+			NC_AREAControl.S5 = 0;
+			NC_AREAControl.DeltaT5 = 0;
+		}
+	}
+
+	if(NC_AREAControl.DeltaT5 < 1e-6)
+	{
+		NC_AREAControl.S5 	 = 0;
+		NC_AREAControl.DeltaT5 = 0;
+	}
+	NC_AREAControl.Sm 	= NC_AREAControl.S5;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaNoSde()                                   */
+/***************************************************************************/
+void NCArea1_NoSde( )
+{
+	NC_AREAControl.S9			= 0;
+	NC_AREAControl.Sde		= 0;
+	NC_AREAControl.DeltaT9		= 0;
+	NC_AREAControl.VmReal		= NC_AREAControl.Ve;	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaNoSac()                                   */
+/***************************************************************************/
+void NCArea1_NoSac( )
+{
+	NC_AREAControl.Sac		= 0;	
+	NC_AREAControl.S1			= 0;
+	NC_AREAControl.DeltaT1 	= 0;
+	NC_AREAControl.VmReal 	= NC_AREAControl.Vs;	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreSacCal()                                   */
+/***************************************************************************/
+void NCArea1_QuinticSacCal( )	
+{
+	NC_AREAControl.DeltaT1 	= 1.25 * divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Vs), NC_AREAControl.a_ac);
+	NC_AREAControl.S1			= 0.625 * divdp(fabs(powdp(NC_AREAControl.VmReal,2)-powdp(NC_AREAControl.Vs,2)),NC_AREAControl.a_ac);
+
+
+	NC_AREAControl.Sac		= NC_AREAControl.S1;
+}
+
+void NCArea1_SoftExponentSacCal( )	
+{
+	NC_AREAControl.DeltaT1	= NC_AREAControl.Tao_ac * (logdp(NC_AREAControl.VmReal)-logdp(NC_AREAControl.Vs));				
+	NC_AREAControl.S1		= NC_AREAControl.Tao_ac*(NC_AREAControl.VmReal-NC_AREAControl.Vs);
+	NC_AREAControl.Sac	= NC_AREAControl.S1;
+}
+
+void NCArea1_HardExponentSacCal( )	
+{
+	if(fabs(NC_AREAControl.VmReal - NC_AREAControl.Vs)<1e-5)
+	{
+		NC_AREAControl.DeltaT1	= 0;
+	}
+	else
+	{
+		NC_AREAControl.DeltaT1	= NC_AREAControl.Tao_ac *2.0* (logdp(NC_AREAControl.VmReal+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs));	
+	}
+	
+	if(NC_AREAControl.DeltaT1 <= 0)
+	{
+		NC_AREAControl.S1		= 0;
+		NC_AREAControl.Sac	= 0;
+	}
+	else
+	{	
+		NC_AREAControl.S1 = NC_AREAControl.Tao_ac*((NC_AREAControl.VmReal+NC_AREAControl.Vs)* (logdp(NC_AREAControl.VmReal+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs)));
+		NC_AREAControl.Sac = NC_AREAControl.S1;
+	}
+}
+
+void NCArea1_LinearSacCal(FLOAT64 Acc_ac_recip)	
+{
+	NC_AREAControl.DeltaT1		= Acc_ac_recip *fabs(NC_AREAControl.VmReal - NC_AREAControl.Vs);
+	NC_AREAControl.S1			= 0.5*Acc_ac_recip*fabs(powdp(NC_AREAControl.VmReal,2)-powdp(NC_AREAControl.Vs,2));
+	NC_AREAControl.Sac		= NC_AREAControl.S1;
+}
+
+void NCArea1_QuinticSdeCal( )	
+{
+	NC_AREAControl.DeltaT9 	= 1.25 * divdp( fabs(NC_AREAControl.VmReal-NC_AREAControl.Ve), NC_AREAControl.a_de );
+	NC_AREAControl.S9 		= 0.625 * divdp(fabs(powdp(NC_AREAControl.VmReal,2)-powdp(NC_AREAControl.Ve,2)),NC_AREAControl.a_de);		
+	NC_AREAControl.Sde 		= NC_AREAControl.S9;
+}
+
+void NCArea1_ExponentSdeCal( )	
+{
+	if(fabs(NC_AREAControl.VmReal - NC_AREAControl.Ve)<1e-5)
+	{
+		NC_AREAControl.DeltaT9	= 0;
+	}
+	else
+	{
+		NC_AREAControl.DeltaT9	= NC_AREAControl.Tao_de * (logdp(NC_AREAControl.VmReal)-logdp(NC_AREAControl.Ve)); 
+	}	
+	
+	if(NC_AREAControl.DeltaT9 <= 0)
+	{
+		NC_AREAControl.S9 	= 0;
+		NC_AREAControl.Sde 	= 0;
+	}
+	else
+	{	
+		NC_AREAControl.S9		= NC_AREAControl.Tao_de*(NC_AREAControl.VmReal-NC_AREAControl.Ve);		
+		NC_AREAControl.Sde 	= NC_AREAControl.S9;
+	}
+}
+
+void NCArea1_LinearSdeCal( FLOAT64 Acc_de_recip)	
+{
+	NC_AREAControl.DeltaT9		= Acc_de_recip *fabs(NC_AREAControl.VmReal - NC_AREAControl.Ve);
+	NC_AREAControl.S9			= 0.5*Acc_de_recip*fabs(powdp(NC_AREAControl.VmReal,2)-powdp(NC_AREAControl.Ve,2));			
+	NC_AREAControl.Sde 		= NC_AREAControl.S9;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaStableStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_StableStateCal()	
+{	//区域曲线匀速段计算
+	if(NC_AREAControl.Vs < NC_AREAControl.Ve)
+	{
+		NC_AREAControl.SpeedState = NCAREA_ACCELERATING_STATE;
+	}
+	else if(NC_AREAControl.Vs > NC_AREAControl.Ve)
+	{
+		NC_AREAControl.SpeedState = NCAREA_DECELERATING_STATE;
+	}
+	else
+	{	
+		NC_AREAControl.Sac		= 0;
+		NC_AREAControl.Sde		= 0;
+		NC_AREAControl.Sm		= NC_AREAControl.Stotal;
+		NC_AREAControl.VmReal		= NC_AREAControl.Vs;    			
+		NC_AREAControl.DeltaT1		= 0;
+		NC_AREAControl.DeltaT5		= divdp( NC_AREAControl.Stotal, NC_AREAControl.Vs );
+		NC_AREAControl.DeltaT9		= 0;			
+		NC_AREAControl.S1			= 0;
+		NC_AREAControl.S5			= NC_AREAControl.Stotal;				
+		NC_AREAControl.S9			= 0;	
+	}
+	
+	return TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaQuinticAccStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_QuinticAccStateCal()	
+{	//Ve>Vs
+	NCArea1_NoSde( );
+
+	NC_AREAControl.Sac		= 0.625 * divdp(fabs(powdp(NC_AREAControl.VmReal,2)-powdp(NC_AREAControl.Vs,2)),NC_AREAControl.a_ac);
+	if(NC_AREAControl.Sac > NC_AREAControl.Stotal)
+	{
+		NC_AREAControl.VmReal 	= sqrtdp(powdp( NC_AREAControl.Vs, 2 ) + divdp(NC_AREAControl.a_ac*NC_AREAControl.Stotal ,0.625));
+		NC_AREAControl.Ve			= NC_AREAControl.VmReal;
+	}
+	NCArea1_QuinticSacCal( );	
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaSoftExponentAccStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_SoftExponentAccStateCal()	
+{	//Ve>Vs
+	NCArea1_NoSde( );
+
+	NC_AREAControl.Sac	= NC_AREAControl.Tao_ac*(NC_AREAControl.VmReal-NC_AREAControl.Vs);
+	if(NC_AREAControl.Sac > NC_AREAControl.Stotal)
+	{	//不够加速距离，反算时间常数
+		NC_AREAControl.VmReal	= NC_AREAControl.Vs + divdp(NC_AREAControl.Stotal , NC_AREAControl.Tao_ac);
+		NC_AREAControl.Ve		= NC_AREAControl.VmReal;	
+	}
+	
+	NCArea1_SoftExponentSacCal( );
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaHardExponentAccStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_HardExponentAccStateCal()	
+{	//Ve>Vs
+	if(NC_AREAControl.VMin < 1e-2)
+	{
+		NC_AREAControl.VMin = 1e-2;
+	}
+	if(NC_AREAControl.Vs < NC_AREAControl.VMin) 
+ 	{
+ 		NC_AREAControl.Vs = NC_AREAControl.VMin;
+ 	}
+	if(NC_AREAControl.Ve < NC_AREAControl.VMin) 
+ 	{
+ 		NC_AREAControl.Ve = NC_AREAControl.VMin;
+ 	}
+	
+	NCArea1_NoSde( );
+	
+	NC_AREAControl.Sac = NC_AREAControl.Tao_ac*((NC_AREAControl.VmReal+NC_AREAControl.Vs)* (logdp(NC_AREAControl.VmReal+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs)));
+	if(NC_AREAControl.Sac > NC_AREAControl.Stotal)
+	{	//不够加速距离，反算时间常数
+		NC_AREAControl.Tao_ac		= divdp(NC_AREAControl.Stotal , ((NC_AREAControl.VmReal+NC_AREAControl.Vs)* (logdp(NC_AREAControl.VmReal+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs))));
+	}
+	
+	NCArea1_HardExponentSacCal( );	
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+
+/***************************************************************************/
+/*  Function name: NCAreaHardExponentAccStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_LinearAccStateCal()	
+{	//Ve>Vs//加速区域
+	FLOAT64 Acc_ac,Acc_ac_recip;	
+
+	Acc_ac = NC_AREAControl.a_ac;
+	Acc_ac_recip = recipdp(Acc_ac);	//匀加速加速度(斜率)倒数
+
+	NCArea1_NoSde( );
+	
+	NC_AREAControl.Sac = 0.5*Acc_ac_recip*(powdp(NC_AREAControl.Ve,2)-powdp(NC_AREAControl.Vs,2));
+	if(NC_AREAControl.Sac > NC_AREAControl.Stotal)
+	{
+		NC_AREAControl.VmReal		= sqrtdp(powdp(NC_AREAControl.Vs,2)+2*NC_AREAControl.Stotal*Acc_ac);	
+		NC_AREAControl.Ve			= NC_AREAControl.VmReal;
+	}
+	
+	NCArea1_LinearSacCal(Acc_ac_recip);	
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaQuinticDecStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_QuinticDecStateCal()	
+{	//Ve<Vs
+	NCArea1_NoSac( );
+	
+	NC_AREAControl.Sde 		= 0.625 * divdp(fabs(powdp(NC_AREAControl.VmReal,2)-powdp(NC_AREAControl.Ve,2)),NC_AREAControl.a_de); 
+	if(NC_AREAControl.Sde > NC_AREAControl.Stotal)
+	{	//不够减速距离，反算时间常数
+		NC_AREAControl.a_de 		= fabs(0.625 * divdp((powdp(NC_AREAControl.VmReal,2)-powdp(NC_AREAControl.Ve,2)),NC_AREAControl.Stotal));
+	}
+
+	NCArea1_QuinticSdeCal( );
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaExponentDecStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_ExponentDecStateCal()	
+{	//Ve<Vs
+	NCArea1_NoSac( );
+
+	NC_AREAControl.Sde 		= NC_AREAControl.Tao_de*(NC_AREAControl.VmReal-NC_AREAControl.Ve);	
+	if(NC_AREAControl.Sde > NC_AREAControl.Stotal)
+	{	//不够减速距离，反算时间常数
+		NC_AREAControl.Tao_de		= divdp(NC_AREAControl.Stotal , (NC_AREAControl.VmReal-NC_AREAControl.Ve));
+	}
+	
+	NCArea1_ExponentSdeCal( );		
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaLinearDecStateCal()                                   */
+/***************************************************************************/
+INT16U NCArea1_LinearDecStateCal()	
+{	//Ve<Vs//减速区域
+	FLOAT64 Acc_de,Acc_de_recip;	
+
+	Acc_de = NC_AREAControl.a_de;
+	Acc_de_recip = recipdp(Acc_de);	//匀减速加速度(斜率)倒数
+	
+	NCArea1_NoSac( );
+	
+	NC_AREAControl.Sde		= 0.5*Acc_de_recip*(powdp(NC_AREAControl.Vs,2)-powdp(NC_AREAControl.Ve,2));
+	if(NC_AREAControl.Sde >NC_AREAControl.Stotal)
+	{
+		Acc_de 					= divdp((powdp(NC_AREAControl.Vs,2) - powdp(NC_AREAControl.Ve,2)),(2*NC_AREAControl.Stotal));
+		Acc_de_recip 				= recipdp(Acc_de);	//匀减速加速度(斜率)倒数
+		NC_AREAControl.Tao_de_line = NC_AREAControl.Vclamp*Acc_de_recip;	
+	}
+
+	NCArea1_LinearSdeCal( Acc_de_recip);
+	NCArea1_SmCal( );
+	return	TRUE;	
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaSingleBasicJudge()                                   */
+/***************************************************************************/
+void NCArea1_SingleBasicJudge( )
+{	
+	if(NC_AREAControl.Vm < NC_AREAControl.Ve)
+	{//这里需考虑
+		NC_AREAControl.Vm = NC_AREAControl.Ve;
+	}
+	if(NC_AREAControl.Vm < NC_AREAControl.Vs)
+	{
+		NC_AREAControl.Vm = NC_AREAControl.Vs;
+	}
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaQuinticADSingleCal()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaQuinticADSingleCal                          */
+/***************************************************************************/
+INT16U NCArea1_QuinticADSingleCal()	
+{	
+	NCArea1_SingleBasicJudge( );
+	NC_AREAControl.Sac 		= 0.625 * fabs( divdp( (powdp(NC_AREAControl.Vm,2) - powdp(NC_AREAControl.Vs,2)), NC_AREAControl.a_ac) );
+	NC_AREAControl.Sde 		= 0.625 * fabs( divdp( (powdp(NC_AREAControl.Vm,2) - powdp(NC_AREAControl.Ve,2)), NC_AREAControl.a_de) );
+
+	if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 		
+	{	// 有加速段和减速段
+		NC_AREAControl.VmReal = NC_AREAControl.Vm;
+	}
+	else
+	{	
+		FLOAT64 acc;
+		if( NC_AREAControl.Ve >= NC_AREAControl.Vs )
+		{
+			acc = NC_AREAControl.a_ac;
+		}
+		else
+		{
+			acc = NC_AREAControl.a_de;
+		}
+
+		if( fabs(0.625 * ( powdp( NC_AREAControl.Ve, 2 ) - powdp( NC_AREAControl.Vs, 2 ) )) >= (acc*NC_AREAControl.Stotal) )
+		{
+			if( NC_AREAControl.Ve >= NC_AREAControl.Vs )
+			{
+				NC_AREAControl.VmReal 	= sqrtdp(powdp( NC_AREAControl.Vs, 2 ) + divdp(NC_AREAControl.a_ac*NC_AREAControl.Stotal ,0.625));
+				NC_AREAControl.Ve			= NC_AREAControl.VmReal;
+			}
+			else
+			{
+				NC_AREAControl.VmReal = NC_AREAControl.Vs;
+				NC_AREAControl.a_de = divdp( fabs(0.625*( powdp( NC_AREAControl.Ve, 2 ) - powdp( NC_AREAControl.Vs, 2 ))), NC_AREAControl.Stotal);
+			}
+		}
+		else
+		{
+			NC_AREAControl.VmReal = sqrtdp( divdp( ( NC_AREAControl.a_ac * NC_AREAControl.a_de * NC_AREAControl.Stotal * 1.6
+													+ NC_AREAControl.a_de * powdp( NC_AREAControl.Vs, 2 ) 
+													+ NC_AREAControl.a_ac * powdp( NC_AREAControl.Ve, 2 ) ),  
+													( NC_AREAControl.a_ac + NC_AREAControl.a_de ) ) );
+			//NCAreaSpeedWaveFilter(NC_AREAControl.Vs, NC_AREAControl.Ve, NC_AREAControl.Stotal);
+		}
+	}	
+
+	NCArea1_QuinticSacCal( );	
+	NCArea1_QuinticSdeCal( );
+	NCArea1_SmCal( );		
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaSoftExponentSingleStateCal()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaSoftExponentSingleStateCal                          */
+/***************************************************************************/
+INT16U NCArea1_SoftExponentADSingleCal()	
+{	
+	FLOAT64 Tao;	
+	if(NC_AREAControl.VMin < 1e-2)
+	{
+		NC_AREAControl.VMin = 1e-2;
+	}
+	if(NC_AREAControl.Vs <= NC_AREAControl.VMin) 
+ 	{
+ 		NC_AREAControl.Vs = NC_AREAControl.VMin;
+ 	}
+	if(NC_AREAControl.Ve < NC_AREAControl.VMin) 
+ 	{
+ 		NC_AREAControl.Ve = NC_AREAControl.VMin;
+ 	}
+	
+	NCArea1_SingleBasicJudge( );	
+	NC_AREAControl.Sac	= NC_AREAControl.Tao_ac*(NC_AREAControl.Vm-NC_AREAControl.Vs);
+	NC_AREAControl.Sde	= NC_AREAControl.Tao_de*(NC_AREAControl.Vm-NC_AREAControl.Ve);
+
+	if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 		
+	{	// 有加速段和减速段
+		NC_AREAControl.VmReal = NC_AREAControl.Vm;
+	}
+	else 
+	{
+		if( NC_AREAControl.Ve >= NC_AREAControl.Vs )
+		{
+			Tao = NC_AREAControl.Tao_ac;
+		}
+		else
+		{
+			Tao = NC_AREAControl.Tao_de;
+		}
+
+		if( fabs(NC_AREAControl.Ve - NC_AREAControl.Vs)*Tao >= NC_AREAControl.Stotal )
+		{	//不够起始速度区域。
+			if( NC_AREAControl.Ve > NC_AREAControl.Vs )
+			{	
+				NC_AREAControl.VmReal		= divdp(NC_AREAControl.Stotal,NC_AREAControl.Tao_ac)+NC_AREAControl.Vs;
+				NC_AREAControl.Ve			= NC_AREAControl.VmReal;
+			}
+			else if( NC_AREAControl.Ve < NC_AREAControl.Vs )
+			{
+				NC_AREAControl.VmReal 	= NC_AREAControl.Vs;
+				NC_AREAControl.Tao_de 	= divdp( NC_AREAControl.Stotal,  fabs(NC_AREAControl.Vs - NC_AREAControl.Ve));
+			}
+			else
+			{
+				NC_AREAControl.VmReal = NC_AREAControl.Vs;
+			}
+		}
+		else
+		{
+			NC_AREAControl.VmReal = divdp((NC_AREAControl.Stotal+NC_AREAControl.Tao_ac*NC_AREAControl.Vs+NC_AREAControl.Tao_de*NC_AREAControl.Ve), (NC_AREAControl.Tao_ac+NC_AREAControl.Tao_de));
+
+			//NCAreaSpeedWaveFilter(NC_AREAControl.Vs, NC_AREAControl.Ve, NC_AREAControl.Stotal);
+		}
+	}
+
+	NCArea1_SoftExponentSacCal( );
+	NCArea1_ExponentSdeCal( );
+	NCArea1_SmCal( );	
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaHardExponentADSingleCal()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaHardExponentADSingleCal                          */
+/***************************************************************************/
+INT16U NCArea1_HardExponentADSingleCal()	
+{
+	FLOAT64 VmReal,Vback_Min,Vback_Max;					
+
+	if(NC_AREAControl.VMin < 1e-2)
+	{
+		NC_AREAControl.VMin = 1e-2;
+	}
+	if(NC_AREAControl.Vs < NC_AREAControl.VMin) 
+ 	{
+ 		NC_AREAControl.Vs = NC_AREAControl.VMin;
+ 	}
+	if(NC_AREAControl.Ve < NC_AREAControl.VMin) 
+ 	{
+ 		NC_AREAControl.Ve = NC_AREAControl.VMin;
+ 	}	
+	
+	NCArea1_SingleBasicJudge( );	
+	if(fabs(NC_AREAControl.Vm-NC_AREAControl.Vs) < 1e-5) 
+	{
+		NC_AREAControl.Sac = 0;
+	}
+	else
+	{
+		NC_AREAControl.Sac = NC_AREAControl.Tao_ac*((NC_AREAControl.Vm+NC_AREAControl.Vs)* (logdp(NC_AREAControl.Vm+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs)));
+	}
+
+	NC_AREAControl.Sde = NC_AREAControl.Tao_de*(NC_AREAControl.Vm-NC_AREAControl.Ve);
+
+	if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 
+	{	// 有加速段和减速段
+		NC_AREAControl.VmReal = NC_AREAControl.Vm;
+	}
+	else
+	{	
+		if( NC_AREAControl.Ve > NC_AREAControl.Vs )
+		{	//Ve>Vs
+			if((NC_AREAControl.Tao_ac * ((NC_AREAControl.Ve+NC_AREAControl.Vs)* (logdp(NC_AREAControl.Ve+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs)))) > NC_AREAControl.Stotal)
+			{	
+				NC_AREAControl.VmReal		= NC_AREAControl.Ve;
+				NC_AREAControl.Tao_ac		= divdp(NC_AREAControl.Stotal , ((NC_AREAControl.VmReal+NC_AREAControl.Vs)* (logdp(NC_AREAControl.VmReal+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs))));
+			}
+			else
+			{	//递推反算最大速度	
+				Vback_Min 	= NC_AREAControl.Ve;
+				Vback_Max 	= NC_AREAControl.Vm;
+				VmReal 		= Vback_Min + divdp((Vback_Max - Vback_Min),2);
+
+				//递推反算最大速度	
+				do
+				{
+					NC_AREAControl.Sac = NC_AREAControl.Tao_ac * ((VmReal+NC_AREAControl.Vs)* (logdp(VmReal+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs)));
+					NC_AREAControl.Sde = NC_AREAControl.Tao_de * (VmReal - NC_AREAControl.Ve);
+					
+					if((NC_AREAControl.Stotal - (NC_AREAControl.Sac+NC_AREAControl.Sde))>-1e-6)		//这里不能用Ss，要用Stotal
+					{	
+						if(((Vback_Max - VmReal)>=0)&&(((Vback_Max - VmReal)<NC_AREAControl.VMin)))
+						{
+							if((VmReal-NC_AREAControl.Ve)< 2.0*NC_AREAControl.VMin)
+							{
+								NC_AREAControl.VmReal = NC_AREAControl.Ve;
+							}
+							else
+							{
+								NC_AREAControl.VmReal = VmReal;
+							}
+							break;
+						}
+						else 
+						{
+							Vback_Min = VmReal;
+							VmReal = Vback_Min + divdp((Vback_Max-Vback_Min),2);
+						}				
+					}
+					else
+					{
+						Vback_Max = VmReal;
+						VmReal = Vback_Min + divdp((Vback_Max-Vback_Min),2);
+					}
+				}while (1);
+			}
+		}
+		else
+		{	//Ve<=Vs
+			if((NC_AREAControl.Tao_de * (NC_AREAControl.Vs - NC_AREAControl.Ve)) > NC_AREAControl.Stotal)
+			{	//ve<vs && 减速距离不够			
+				NC_AREAControl.VmReal = NC_AREAControl.Vs;
+				NC_AREAControl.Tao_de = divdp(NC_AREAControl.Stotal , (NC_AREAControl.VmReal - NC_AREAControl.Ve));
+			}
+			else
+			{	//递推反算最大速度	
+				Vback_Min = NC_AREAControl.Vs;
+				Vback_Max = NC_AREAControl.Vm;
+				VmReal = Vback_Min + divdp((Vback_Max - Vback_Min),2);
+
+				//递推反算最大速度	
+				do
+				{
+					NC_AREAControl.Sac = NC_AREAControl.Tao_ac * ((VmReal+NC_AREAControl.Vs)* (logdp(VmReal+NC_AREAControl.Vs)-logdp(2.0*NC_AREAControl.Vs)));
+					NC_AREAControl.Sde = NC_AREAControl.Tao_de * (VmReal - NC_AREAControl.Ve);
+					
+					if((NC_AREAControl.Stotal - (NC_AREAControl.Sac+NC_AREAControl.Sde))>-1e-6)
+					{	
+						if(((Vback_Max - VmReal)>=0)&&(((Vback_Max - VmReal)<NC_AREAControl.VMin)))
+						{
+							if((VmReal-NC_AREAControl.Vs)< 2.0*NC_AREAControl.VMin)
+							{
+								NC_AREAControl.VmReal = NC_AREAControl.Vs;
+							}	
+							else
+							{
+								NC_AREAControl.VmReal = VmReal;
+							}							
+							break;
+						}
+						else 
+						{
+							Vback_Min = VmReal;
+							VmReal = Vback_Min + divdp((Vback_Max-Vback_Min),2);
+						}				
+					}
+					else
+					{
+						Vback_Max = VmReal;
+						VmReal = Vback_Min + divdp((Vback_Max-Vback_Min),2);
+					}
+				}while (1);
+			}
+		}
+	}
+
+	NCArea1_HardExponentSacCal( );	
+	NCArea1_ExponentSdeCal( );		
+	NCArea1_SmCal( );	
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaLinearADSingleCal()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaLinearADSingleCal                          */
+/***************************************************************************/
+INT16U NCArea1_LinearADSingleCal()	
+{	
+	FLOAT64 Acc,Acc_ac,Acc_ac_recip,Acc_de,Acc_de_recip;	
+	
+	Acc_ac = NC_AREAControl.a_ac;
+	Acc_de = NC_AREAControl.a_de;
+	
+	Acc_ac_recip = recipdp(Acc_ac);	//匀加速加速度(斜率)倒数
+	Acc_de_recip = recipdp(Acc_de);	//匀减速加速度(斜率)倒数
+
+	NCArea1_SingleBasicJudge( );	
+	NC_AREAControl.Sac = 0.5*Acc_ac_recip*(powdp(NC_AREAControl.Vm,2)-powdp(NC_AREAControl.Vs,2));
+	NC_AREAControl.Sde = 0.5*Acc_de_recip*(powdp(NC_AREAControl.Vm,2)-powdp(NC_AREAControl.Ve,2));
+
+	if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 
+	{	// 有加速段和减速段
+		NC_AREAControl.VmReal		= NC_AREAControl.Vm;
+	}
+	else 
+	{
+		if( NC_AREAControl.Ve >=NC_AREAControl.Vs )
+		{
+			Acc = Acc_ac;
+		}
+		else
+		{
+			Acc = Acc_de;
+		}
+
+		if( fabs( powdp( NC_AREAControl.Ve, 2) - powdp( NC_AREAControl.Vs, 2 ) ) >= (2*Acc*NC_AREAControl.Stotal) )
+		{	//起始终点速度区域不完整
+			if(NC_AREAControl.Ve >= NC_AREAControl.Vs )
+			{	//单加速区域
+				NC_AREAControl.VmReal		= sqrtdp(powdp(NC_AREAControl.Vs,2)+2*NC_AREAControl.Stotal*Acc_ac);	
+				NC_AREAControl.Ve			= NC_AREAControl.VmReal;
+			}
+			else
+			{	//单减速速区域	
+				NC_AREAControl.VmReal	 	= NC_AREAControl.Vs;
+				Acc_de 					= divdp((powdp(NC_AREAControl.Vs,2) - powdp(NC_AREAControl.Ve,2)),(2*NC_AREAControl.Stotal));
+				Acc_de_recip 				= recipdp(Acc_de);	//匀减速加速度(斜率)倒数
+				NC_AREAControl.a_de		= Acc_de;
+			}
+		}
+		else
+		{	//反求最大速度
+			NC_AREAControl.VmReal = sqrtdp( divdp( ( 2*Acc_ac*Acc_de* NC_AREAControl.Stotal 
+												+ Acc_de*powdp( NC_AREAControl.Vs, 2 ) 
+												+ Acc_ac*powdp( NC_AREAControl.Ve, 2 ) ),  
+											(Acc_ac + Acc_de) ) );
+			//NC_AREAControl.Sm	= 0;		
+			//NCAreaSpeedWaveFilter(NC_AREAControl.Vs,NC_AREAControl.Ve, NC_AREAControl.Stotal);
+		}			
+	}
+
+	NCArea1_LinearSacCal(Acc_ac_recip);
+	NCArea1_LinearSdeCal(Acc_de_recip);	
+	NCArea1_SmCal( );	
+	return	TRUE;			
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaQuinticSpecialStateCal()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaQuinticSpecialStateCal                          */
+/***************************************************************************/
+INT16U NCArea1_QuinticSpecialStateCal()	
+{
+	//如果Vs>Vm，那么应该让区域速度急速减到Vm
+	//这里的Sac和S1,S2都认为是减速段，所以加速度都取a_de
+	if(NC_AREAControl.Ve > NC_AREAControl.Vm)
+	{
+		NC_AREAControl.Ve = NC_AREAControl.Vm;
+	}
+	
+	NC_AREAControl.a_ac 		= NC_AREAControl.a_de;
+
+	NC_AREAControl.Sac 		= 0.625 * fabs( divdp( (powdp(NC_AREAControl.Vm,2) - powdp(NC_AREAControl.Vs,2)), NC_AREAControl.a_ac) );
+	NC_AREAControl.Sde 		= 0.625 * fabs( divdp( (powdp(NC_AREAControl.Vm,2) - powdp(NC_AREAControl.Ve,2)), NC_AREAControl.a_de) );
+
+	if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 
+	{	// 有加速段和减速段
+		NC_AREAControl.VmReal = NC_AREAControl.Vm;
+	}
+	else
+	{
+		NC_AREAControl.a_de 	= divdp( fabs( powdp( NC_AREAControl.Vs, 2 ) - powdp( NC_AREAControl.Ve, 2 ) )*0.625, NC_AREAControl.Stotal);
+		NC_AREAControl.a_ac 	= NC_AREAControl.a_de;
+		NC_AREAControl.VmReal = NC_AREAControl.Ve;
+		NC_AREAControl.Sm		= 0;
+	}
+
+	NCArea1_QuinticSacCal( );	
+	NCArea1_QuinticSdeCal( );
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaExponentSpecialStateCal()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaExponentSpecialStateCal                          */
+/***************************************************************************/
+INT16U NCArea1_ExponentSpecialStateCal()	
+{
+	//如果Vs>Vm，那么应该让区域速度急速减到Vm
+	//这里的Sac和S1,S2都认为是减速段，所以加速度都取Tao_de
+	if(NC_AREAControl.Ve > NC_AREAControl.Vm)
+	{
+		NC_AREAControl.Ve = NC_AREAControl.Vm;
+	}
+	
+	NC_AREAControl.Tao_ac 		= NC_AREAControl.Tao_de;
+
+	NC_AREAControl.Sac	= NC_AREAControl.Tao_ac * fabs(NC_AREAControl.Vs-NC_AREAControl.Vm);
+	NC_AREAControl.Sde	= NC_AREAControl.Tao_de * fabs(NC_AREAControl.Vm-NC_AREAControl.Ve);
+
+	if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 
+	{	// 有加速段和减速段
+		NC_AREAControl.VmReal = NC_AREAControl.Vm;
+	}
+	else
+	{
+		NC_AREAControl.Tao_de 	= divdp(NC_AREAControl.Stotal, (NC_AREAControl.Vs - NC_AREAControl.Ve));
+		NC_AREAControl.Tao_ac 		= NC_AREAControl.Tao_de;
+		NC_AREAControl.VmReal 	= NC_AREAControl.Ve;
+		NC_AREAControl.Sm		= 0;
+	}
+
+	if(fabs(NC_AREAControl.VmReal - NC_AREAControl.Vs)<1e-5)
+	{
+		NC_AREAControl.DeltaT1	= 0;
+	}
+	else
+	{
+		if(NC_AREAControl.Vs <= NC_AREAControl.VMin)
+		{
+			NC_AREAControl.DeltaT1	= 0;
+		}
+		else
+		{
+			 if(NC_AREAControl.VmReal <= NC_AREAControl.VMin) 
+		 	{
+		 		NC_AREAControl.VmReal = NC_AREAControl.VMin;
+				if(NC_AREAControl.VmReal <= 0)
+				{
+					NC_AREAControl.DeltaT1	= NC_AREAControl.Tao_ac * (logdp(NC_AREAControl.Vs)-logdp(0.01));
+				}
+				else
+				{
+					NC_AREAControl.DeltaT1	= NC_AREAControl.Tao_ac * (logdp(NC_AREAControl.Vs)-logdp(NC_AREAControl.VmReal));
+				}
+		 	}
+			else
+			{
+				NC_AREAControl.DeltaT1	= NC_AREAControl.Tao_ac * (logdp(NC_AREAControl.Vs)-logdp(NC_AREAControl.VmReal));
+			}
+		}
+	}
+
+	if(NC_AREAControl.DeltaT1 < 1e-6)
+	{
+		NC_AREAControl.S1		= 0;
+		NC_AREAControl.Sac	= 0;
+	}
+	else
+	{	
+		if(NC_AREAControl.VmReal <= 0)
+		{
+			NC_AREAControl.S1		= NC_AREAControl.Tao_ac*(NC_AREAControl.Vs-0.01);
+		}
+		else
+		{
+			NC_AREAControl.S1		= NC_AREAControl.Tao_ac*(NC_AREAControl.Vs-NC_AREAControl.VmReal);
+		}
+		NC_AREAControl.Sac	= NC_AREAControl.S1;
+	}
+	
+	NCArea1_ExponentSdeCal( );		
+	NCArea1_SmCal( );
+	return	TRUE;
+}
+
+/***************************************************************************/
+/*  Function name: NCAreaLinearRatioConstantSpecialStateCal()                                   */
+/* Argument:AREA_CONTROL                                                                       */
+/*  Return value: 0: ;1: */
+/*  Function: NCAreaLinearRatioConstantSpecialStateCal                          */
+/***************************************************************************/
+INT16U NCArea1_LinearSpecialStateCal()	
+{
+	FLOAT64 Acc_ac_recip,Acc_de,Acc_de_recip;	
+
+	Acc_de = NC_AREAControl.a_de;
+	Acc_de_recip = recipdp(Acc_de);	//匀加速加速度(斜率)倒数
+	Acc_ac_recip = Acc_de_recip;
+
+	if(NC_AREAControl.Ve > NC_AREAControl.Vm)
+	{
+		NC_AREAControl.Ve = NC_AREAControl.Vm;
+	}
+
+	NC_AREAControl.Sac = 0.5*Acc_ac_recip*fabs(powdp(NC_AREAControl.Vm,2)-powdp(NC_AREAControl.Vs,2));
+	NC_AREAControl.Sde= 0.5*Acc_de_recip*fabs(powdp(NC_AREAControl.Vm,2)-powdp(NC_AREAControl.Ve,2));
+
+	if(NC_AREAControl.Stotal >= (NC_AREAControl.Sac+NC_AREAControl.Sde)) 
+	{	// 有加速段和减速段
+		NC_AREAControl.VmReal = NC_AREAControl.Vm;
+	}		
+	else
+	{	
+		NC_AREAControl.VmReal		= NC_AREAControl.Ve ;
+		Acc_de 					= divdp((powdp(NC_AREAControl.Vs,2) - powdp(NC_AREAControl.Ve,2)),(2*NC_AREAControl.Stotal));
+		Acc_de_recip 				= recipdp(Acc_de);	//匀减速加速度(斜率)倒数
+		Acc_ac_recip 				= Acc_de_recip;
+		NC_AREAControl.a_de		= Acc_de;
+		NC_AREAControl.a_ac		= NC_AREAControl.a_de;
+		NC_AREAControl.Sm		= 0;
+	}
+	
+	NCArea1_LinearSacCal(Acc_ac_recip);
+	NCArea1_LinearSdeCal( Acc_de_recip);				
+	NCArea1_SmCal( );
+	return TRUE;
+}
+
+void NCArea1_QuinticAccCurveRun( )
+{
+	NC_AREAControl.VNow = -NC_AREAControl.a_ac * divdp(16,(5*powdp(NC_AREAControl.T1,4)))*powdp((NC_AREAControl.CurrentT-divdp(NC_AREAControl.T1,2)),5)
+						+NC_AREAControl.a_ac * NC_AREAControl.CurrentT 
+						-NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1
+						+NC_AREAControl.Vs;
+	NC_AREAControl.Snow = -NC_AREAControl.a_ac * divdp(8,(15*powdp(NC_AREAControl.T1,4)))*powdp((NC_AREAControl.CurrentT-divdp(NC_AREAControl.T1,2)),6)
+						+NC_AREAControl.a_ac * 0.5 * powdp(NC_AREAControl.CurrentT,2)
+						-NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1 * NC_AREAControl.CurrentT
+						+NC_AREAControl.a_ac * divdp(powdp(NC_AREAControl.T1,2) , 120)
+						+(NC_AREAControl.Vs*NC_AREAControl.CurrentT);
+}
+
+void NCArea1_SoftExponentAccCurveRun( )
+{
+	NC_AREAControl.VNow = NC_AREAControl.Vs * expdp(divdp(NC_AREAControl.CurrentT , NC_AREAControl.Tao_ac));
+	NC_AREAControl.Snow = NC_AREAControl.Tao_ac * NC_AREAControl.Vs * ( expdp(divdp(NC_AREAControl.CurrentT , NC_AREAControl.Tao_ac)) -1.0);
+}
+
+void NCArea1_HardExponentAccCurveRun( )
+{
+	if( NC_AREAControl.CurrentT <= divdp(NC_AREAControl.T1,2) ) 
+	{
+		NC_AREAControl.VNow = NC_AREAControl.Vs * expdp(divdp(NC_AREAControl.CurrentT , NC_AREAControl.Tao_ac));
+		NC_AREAControl.Snow = NC_AREAControl.Tao_ac * NC_AREAControl.Vs * ( expdp(divdp(NC_AREAControl.CurrentT , NC_AREAControl.Tao_ac)) -1.0);
+	}
+	else
+	{
+		NC_AREAControl.VNow = NC_AREAControl.Vs + NC_AREAControl.VmReal - divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)*expdp(divdp(-(NC_AREAControl.CurrentT-divdp(NC_AREAControl.T1,2)) , NC_AREAControl.Tao_ac));
+		NC_AREAControl.Snow = (NC_AREAControl.Vs + NC_AREAControl.VmReal) * (NC_AREAControl.CurrentT-divdp(NC_AREAControl.T1,2)) 
+							+ NC_AREAControl.Tao_ac *divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)*expdp(divdp(-(NC_AREAControl.CurrentT-divdp(NC_AREAControl.T1,2)) , NC_AREAControl.Tao_ac))
+							- NC_AREAControl.Tao_ac *divdp((NC_AREAControl.Vs + NC_AREAControl.VmReal ),2.0)
+							+NC_AREAControl.Tao_ac *divdp((NC_AREAControl.VmReal-NC_AREAControl.Vs ),2.0);
+		
+	}
+}
+
+void NCArea1_LinearAccCurveRun( )
+{
+	NC_AREAControl.VNow = NC_AREAControl.CurrentT * NC_AREAControl.a_ac+NC_AREAControl.Vs;
+	NC_AREAControl.Snow = 0.5*NC_AREAControl.a_ac*powdp(NC_AREAControl.CurrentT,2)
+						+NC_AREAControl.Vs*NC_AREAControl.CurrentT;
+}
+
+void NCArea1_QuinticDecCurveRun( )
+{	
+	NC_AREAControl.VNow =  NC_AREAControl.a_de * divdp(16,(5*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*powdp((NC_AREAControl.CurrentT-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),5)
+						-NC_AREAControl.a_de * (NC_AREAControl.CurrentT-NC_AREAControl.T5)
+						+NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5)
+						+NC_AREAControl.VmReal;
+	NC_AREAControl.Snow =  NC_AREAControl.a_de * divdp(8,(15*powdp((NC_AREAControl.T5-NC_AREAControl.T9),4)))*powdp((NC_AREAControl.CurrentT-divdp((NC_AREAControl.T9+NC_AREAControl.T5),2)),6)
+						-NC_AREAControl.a_de * 0.5 * powdp((NC_AREAControl.CurrentT-NC_AREAControl.T5),2)
+						+NC_AREAControl.a_de * 0.1 * (NC_AREAControl.T9-NC_AREAControl.T5) * (NC_AREAControl.CurrentT-NC_AREAControl.T5)
+						-NC_AREAControl.a_de * divdp(powdp((NC_AREAControl.T9-NC_AREAControl.T5),2) , 120)
+						+(NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T5));
+	
+}
+
+void NCArea1_ExponentDecCurveRun( )
+{
+	NC_AREAControl.VNow = NC_AREAControl.VmReal * expdp(-divdp((NC_AREAControl.CurrentT-NC_AREAControl.T5) , NC_AREAControl.Tao_de));
+	NC_AREAControl.Snow = NC_AREAControl.Tao_de * NC_AREAControl.VmReal * (1.0- expdp(-divdp((NC_AREAControl.CurrentT-NC_AREAControl.T5) , NC_AREAControl.Tao_de)));
+}
+
+void NCArea1_LinearDecCurveRun( )
+{
+	NC_AREAControl.VNow = -(NC_AREAControl.CurrentT-NC_AREAControl.T5) * NC_AREAControl.a_de+NC_AREAControl.VmReal;
+	NC_AREAControl.Snow = -0.5*NC_AREAControl.a_de*powdp((NC_AREAControl.CurrentT-NC_AREAControl.T5),2)
+						+NC_AREAControl.VmReal*(NC_AREAControl.CurrentT-NC_AREAControl.T5);
+}
+
+void NCArea1_QuinticSpecialAccCurveRun( )
+{
+	NC_AREAControl.VNow = NC_AREAControl.a_ac * divdp(16,(5*powdp(NC_AREAControl.T1,4)))*powdp((NC_AREAControl.CurrentT-divdp(NC_AREAControl.T1,2)),5)
+						-NC_AREAControl.a_ac * NC_AREAControl.CurrentT 
+						+NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1
+						+NC_AREAControl.Vs;
+	NC_AREAControl.Snow = NC_AREAControl.a_ac * divdp(8,(15*powdp(NC_AREAControl.T1,4)))*powdp((NC_AREAControl.CurrentT-divdp(NC_AREAControl.T1,2)),6)
+						-NC_AREAControl.a_ac * 0.5 * powdp(NC_AREAControl.CurrentT,2)
+						+NC_AREAControl.a_ac * 0.1 * NC_AREAControl.T1 * NC_AREAControl.CurrentT
+						-NC_AREAControl.a_ac * divdp(powdp(NC_AREAControl.T1,2) , 120)
+						+(NC_AREAControl.Vs*NC_AREAControl.CurrentT);
+}
+
+void NCArea1_ExponentSpecialAccCurveRun( )
+{
+	NC_AREAControl.VNow = NC_AREAControl.Vs * expdp(-divdp(NC_AREAControl.CurrentT , NC_AREAControl.Tao_ac));
+	NC_AREAControl.Snow = NC_AREAControl.Tao_ac*NC_AREAControl.Vs*(1.0- expdp(-divdp(NC_AREAControl.CurrentT , NC_AREAControl.Tao_ac)));
+}
+
+void NCArea1_LinearSpecialAccCurveRun( )
+{
+	NC_AREAControl.VNow = -NC_AREAControl.CurrentT * NC_AREAControl.a_ac+NC_AREAControl.Vs;
+	NC_AREAControl.Snow = -0.5*NC_AREAControl.a_ac*powdp(NC_AREAControl.CurrentT,2)
+						+NC_AREAControl.Vs*NC_AREAControl.CurrentT;
+}
+

@@ -1,0 +1,100 @@
+#ifndef __TASK2_H__
+#define __TASK2_H__
+#include "taskglobal.h"
+void Task2_main(void );
+void keyInterval(void);
+void initCNCSystem(void);
+void handleEvent(void);
+void handleEventAck(void);
+void armDspCom(void);
+void armCMDB0(U32 cmd);
+void armCMDB1(void);
+void armCMDB2(U8 axis);
+void armCMDB3(U8* pgcode);
+void armCMDB4(void);
+void armCMDB0Ack(void);
+void armCMDB1Ack(void);
+void armCMDB2Ack(void);
+void armCMDB3Ack(void);
+void armCMDB4Ack(void);
+void armDSPackCMD1(void);
+void armDSPackCMD2(void);
+void armDSPackCMD3(void);
+//**************************************************************************
+void task2FindReference(void);
+void task2FindReferenceAck(void);
+//void alarmCheck(void);
+void limitAlarmAutoClear(void);
+void jogCode(U16 jogkey);
+void whellCode(void);
+void whellInterval(void);
+void whellPuseGen(U32 prevWhellCTValue);
+void whellGenEvent(S32 delta);
+void whellRunInterval(void);
+void autoRepositionAfterAlarm(void);
+void runBatCode(void);
+void sysModeChange(U8 keyval);
+void sysSingleModeChage(void);
+void mannualrun(U16 keyval,U16 prev);
+void goZero(U8 isABS,U8 xz);
+/*
+void keyHandle(void);
+void interfaceKeyHandle(U16 key);
+void funcKeyHandle(U8 key);
+void gradeKeyHandle(U8 key);
+//U8 transKeyValue(U8 key);
+*/
+void coordUpdate(void );
+//void coordTrace(void);
+void workCoordSet(S32 newval,U8 xz);
+void workCoordClear(void);
+void workCoordXHalf(void);
+void relateCoordSet(S32 Newval,U8 xz);
+void coordOffsetAck(void);
+void fileSystemHandle(void);
+void showHint(U16 hint, U16 delay);
+
+void AssistenFunction(void);
+void MDIFunction(void);
+void coordSetInRun(void);
+void TOOLstand(void);
+void ToolChangeHandle(void);
+void chuckCtrl(void);
+void clearToolCompOffset(U8 xz);
+void setToolCompOffset(S32 newCoord,U8 xz);
+void setToolCompOffsetSpot(U8 xz);
+void adjustToolCompOffset(S32 adjval,U8 xz);
+void adjCoordShiftAfterToolCompSet(void);
+void setToolCompR(S32 r);
+void adjToolCompR(S32 r);
+void setToolCompTdir(U8 dir);
+void setCoordRefp(S32 newval, U8 xz);
+void setCoordRefpSpot(U8 xz);
+void setGlobalVar(F64 val);
+void SendSTDGcode(void);
+void sendFaitCode(U32 sendcount);
+void sendBreakPointState();
+void traceDSPrun(void);
+
+void IOhandle(void);
+void callPlcLight(void);
+void plcInterface(void);
+
+void Trace(void);//刀路图形主函数
+void Trace_DrawHLine(S32 x,S32 y,S32 len,S32 solid,S32 broken,S32 maxx,S32 maxy,U16* buf,U16 colour);
+void Trace_DrawVLine(S32 x, S32 y, S32 len,S32 solid,S32 broken,S32 maxx,S32 maxy,U16* buf,U16 colour);
+void Trace_LineDraw(S32 Sx,S32 Sy,S32 Ex,S32 Ey,S32 solid,S32 broken,S32 maxx,S32 maxy,U16* buf,U16 colour);
+void Trace_ArcDraw(S32 Cx,S32 Cy,S32 R,S32 S,S32 E,S32 maxx,S32 maxy,U16* buf,U16 colour);
+void Trace_DrawPixel(S32 x,S32 y,S32 maxx,S32 maxy,U16* buf,U16 colour);//所有仿真画图最终都调用画点函数，方便去除不再图形范围内的点
+void Trace_Record_Data(U8 gnum,S32 sx,S32 sz,S32 ex,S32 ez,S32 cx,S32 cz,S32 sa,S32 ea,S32 r);//记录轨迹
+void Trace_Autofix(void);//自适应
+void Trace_Re_Print(void);//重画或重编译
+S32  Trace_GetX(S32 x); 
+S32  Trace_GetZ(S32 z);
+void Trace_Real_Coord(void);//记录实际轨迹
+S32  Trace_Zoom_In(S32 scale);
+S32  Trace_Zoom_Out(S32 scale);
+S32  Trace_Fix_Scale(S32 scale);
+void Trace_Fix_Center(void);
+#endif 
+

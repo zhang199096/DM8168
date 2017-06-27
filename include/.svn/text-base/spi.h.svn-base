@@ -1,0 +1,33 @@
+#ifndef __SPI_H__
+#define __SPI_H__
+#include "datatype.h"
+
+// if ok ,return 1 ,if fail return <=0
+INT32S spi_init(void);
+/*
+INT32S spi_readID(INT8U *value);
+INT32S spi_readStatuReg(INT8U *value);
+INT32S spi_writeStatuReg(INT8U *value);
+INT32S spi_writeEnable(void);
+*/
+
+INT8U  spi_readU8(INT32U address);
+INT16U spi_readU16(INT32U address);
+INT32U spi_readU32(INT32U address);
+INT32S spi_read(INT32U address,INT8U *value,INT32U count);
+
+INT32S spi_writeU8(INT32U address,INT8U value);
+INT32S spi_writeU16(INT32U address,INT16U value);
+INT32S spi_writeU32(INT32U address, INT32U value);
+INT32S spi_write(INT32U address,INT8U *value,INT32U count);
+void testspi();
+#define IIC_Read    spi_read
+#define IIC_Read1   spi_readU8
+#define IIC_Read2   spi_readU16
+#define IIC_Read4   spi_readU32
+#define IIC_Write   spi_write
+#define IIC_Write1  spi_writeU8
+#define IIC_Write2  spi_writeU16
+#define IIC_Write4  spi_writeU32
+
+#endif

@@ -1,0 +1,2084 @@
+#include "..\\include\\DEC6713_main.h"
+#include <string.h>
+#define mbWHEEL_X		(1<<0)
+#define mbWHEEL_Y		(1<<1)
+#define mbWHEEL_Z		(1<<2)
+#define mbWHEEL_IV		(1<<3)
+#define mbWHEEL_V		(1<<4)
+#define mbWHEEL_X1		(1<<5)
+#define mbWHEEL_X10	(1<<6)
+#define mbWHEEL_X100	(1<<7)
+#define mbWHEEL_X1000	(1<<8)
+#define mbWHEEL_AXIS	(0x1F)
+#define mbWHEEL_GRADE	(0x1E0)
+#define SCIA_SPCDEBUG	0
+
+#if SCIA_SPCDEBUG
+INT32U SPCFeedIndex;
+INT32U SPCFeedBuf[512];
+INT32U SPCPulseBuf[512];
+INT32U SPCTimeBuf[512];
+INT32U SPCRunBuf[512];
+#endif
+/*
+INT16U SCIA_TxIndex=0;
+INT16U SCIA_TxTotal=0;
+INT16U SCIA_RxIndex=0;
+INT16U SCIA_RxTotal=0;
+*/
+INT16U SCIB_TxIndex=0;
+INT16U SCIB_TxTotal=0;
+INT16U SCIB_RxIndex=0;
+INT16U SCIB_RxTotal=0;
+/*
+INT8U SCIA_TxBuf[UARTA_TXBUFSIZE];	
+INT8U SCIA_RxBuf[UARTA_RXBUFSIZE];
+*/
+#define UARTB_TXRXBUFSIZE 64
+INT8U SCIB_TxBuf[UARTB_TXRXBUFSIZE];	
+INT8U SCIB_RxBuf[UARTB_TXRXBUFSIZE];	
+
+tsSCIPARA sSCIPara;				//串行通讯用参数
+
+
+
+//定义通讯协议包结构体指针
+
+tsSPIN_PACKETIN *psSPINPackeIn;              //VT输入 
+tsSPIN_PACKETOUT *psSPINPackeOut;            //VT输出
+
+tsDSP_PACKET_TEMP *psDSPPacketTemp;          //SCIA_Rxbuf
+
+tsDSP_PACKETIN_SPC *psDSPPacketInSPC;        //B4
+tsDSP_PACKETIN_STD *psDSPPacketInSTD;        //B3
+tsDSP_PACKETIN_SERVO *psDSPPacketInServo;    //Servo
+tsDSP_PACKETIN_ALM *psDSPPacketInALM;        
+tsDSP_PACKETIN_COM *psDSPPacketInCOM;        //B0
+tsDSP_PACKET_STATE *psDSPState;        //B0 BACK TO ARM
+//tsDSP_PACKETIN_SYS *psDSPPacketInSYS;        //B1
+tsDSP_PACKETIN_LINEAR *psDSPPacketInLinear;  //B2
+
+tsDSP_PACKETOUT_ALM *psDSPPacketOutALM;      //back-06
+tsDSP_PACKETOUT_CMD *psDSPPacketOutCMD;      //back-信息码为空
+tsDSP_PACKETOUT_SERVO *psDSPPacketOutServo;
+tsDSP_PACKETOUT_B0 *psDSPPacketOutB0;        //back-b0
+tsDSP_PACKETOUT_B5 *psDSPPacketOutB5;        //back-b5
+tsDSP_PACKETOUT_B6 *psDSPPacketOutB6;        //back-b6
+
+tsDSP_PACKETIN_COM_JOGGRADE sDSPPacketInCOMJogGrade;        
+tsDSP_PACKETIN_COM_HANDGRADE sDSPPacketInCOMHandGrade;
+
+INT16U halfCRC[16]=
+{
+	0x0000, 0x1081, 0x2102, 0x3183, 0x4204, 0x5285, 0x6306, 0x7387,
+	0x8408, 0x9489, 0xa50a, 0xb58b, 0xc60c, 0xd68d, 0xe70e, 0xf78f	
+};
+
+INT16U Packet_CRCGet(INT8U *ptr)
+{//DSP接收ARM数据包校核
+	INT16U len;
+	INT16U crc;
+	INT8U da;
+	crc=0;
+	len=*ptr+(*(ptr+1)<<8);
+	while(len--)
+	{
+		da=(crc & 0xf);
+		crc >>=4;
+		crc ^=halfCRC[da ^(*ptr & 0x0f)];
+		da=(crc & 0xf);
+		crc >>=4;
+		crc ^=halfCRC[da ^(*ptr >> 4)];
+		ptr++;
+	}
+	return crc;
+}
+
+void Packet_CRCMake(INT8U *ptr)
+{//B0等数据包校核
+	INT16U len;
+	INT16U crc;
+	INT8U da;
+	crc=0;
+	len=*ptr+(*(ptr+1)<<8);
+	while(len--)
+	{
+		da=(crc & 0xf);
+		crc >>=4;
+		crc ^=halfCRC[da ^(*ptr & 0x0f)];
+		da=(crc & 0xf);
+		crc >>=4;
+		crc ^=halfCRC[da ^(*ptr >> 4)];
+		ptr++;
+	}
+	*ptr++=crc;
+	*ptr++=crc>>8;
+	*ptr++=0xBB;
+}
+/*
+INT8U Packet_SumCheck(INT8U *ptr)
+{
+	INT16U len;
+	INT16U Check,Sum;
+	len=*ptr+(*(ptr+1)<<8);
+	if(len>62)
+		return FAIL;
+	Sum=0;
+	while(len--)
+	{
+		Sum+=*ptr++;
+	}
+	Check=*ptr+(*(ptr+1)<<8);
+	return ((Check==Sum)?OK: FAIL);
+}
+
+void Packet_SumMake(INT8U *ptr)
+{
+	INT16U len;
+	INT16U Sum;
+	len=*ptr+(*(ptr+1)<<8);
+
+	if(len>62)
+		return ;
+	Sum=0;
+	while(len--)
+	{
+		Sum+=*ptr++;
+	}
+	*ptr++=Sum;
+	*ptr=Sum>>8;
+}
+*/
+//CRC16通讯循环码校验程序CH0804
+//校验除CRC16校验码的其它数据
+INT16U Packet_CRC16Get(INT8U *pData, INT16U Length)
+{//VT主轴变频器数据包校核
+	INT16U i;
+	INT16U CRCResult=0xffff;
+	while(Length--)
+	{
+		CRCResult ^= *pData++;
+		for(i=0;i<8;i++)
+		{
+			if(CRCResult & 0x01)
+				CRCResult = (CRCResult>>1) ^ 0xa001;
+			else			
+				CRCResult = CRCResult>>1;						
+		}
+	}
+	return(CRCResult);		
+
+	//交换CRC16校验和高低字节
+	//return(CRCResult = ((CRCResult&0xff)<<8) |(CRCResult>>8));		
+}
+
+
+INT8U ARM_MainCMD_B0_HandJudge(void)
+{		
+	if(System.SPCLocateOver==FAIL)
+		return FAIL;
+	if((OverallSign.RapidFeedrateOverride  ==0)||(OverallSign.FeedrateOverride==0))
+		return FAIL;
+	if((SPCNCSign.RealSendCount-SPCNCSign.RealRunCount)>8)
+		return FAIL;
+	if(System.HandGrade==0)
+		return FAIL;	
+	
+	if(sDSPPacketInCOMHandGrade.IV)
+	{
+		if(System.A4_Model==0)
+			return FAIL;
+		sCPLD_IO_Out2Register.bit.A4LOCK = 1;
+		if(sCPLD_IO_In4Register.bit.A4LOCK==FAIL)
+			return FAIL;
+	}
+	else if(sDSPPacketInCOMHandGrade.V)
+	{
+		if(System.A5_Model==0)
+			return FAIL;
+		sCPLD_IO_Out2Register.bit.A5LOCK = 1;
+		if(sCPLD_IO_In4Register.bit.A5LOCK==FAIL)
+			return FAIL;
+	}
+	
+	//if((System.A4_Model)||(System.A5_Model))
+	if(sDSPPacketInCOMHandGrade.X ||sDSPPacketInCOMHandGrade.Y ||sDSPPacketInCOMHandGrade.Z)
+	{
+		if(System.A4_Model)
+		{
+			sCPLD_IO_Out2Register.bit.A4LOCK = 0;
+			if(sCPLD_IO_In4Register.bit.A4LOCK==OK)
+				return FAIL;
+		}
+		if(System.A5_Model)
+		{
+			sCPLD_IO_Out2Register.bit.A5LOCK = 0;
+			if(sCPLD_IO_In4Register.bit.A5LOCK==OK)
+				return FAIL;
+		}
+	}	
+	if(System.HandGradeBk != System.HandGrade)
+		return FAIL;		
+	if(System.HandPulseBk == System.HandPulse)
+		return FAIL;
+	//System.LastHandPulseVar = System.HandPulseVar;
+	System.HandPulseVar=System.HandPulse-System.HandPulseBk;
+	
+	/*
+	if(System.LastHandPulseVar != 0)
+	{
+	    if(divdp(System.HandPulseVar,System.LastHandPulseVar)> 10.0)
+			System.HandPulseVar = 10 * System.LastHandPulseVar;      //+ -同方向
+	}
+	*/
+	
+	//增加电子手轮模态下限位保护
+	if((System.SoftLimit)||(System.HardLimit))
+	{
+		if((System.SoftLimit & BIT0)||(System.HardLimit & BIT0))
+		{
+			if(sDSPPacketInCOMHandGrade.X)
+			if(System.HandPulseVar>0)
+				return FAIL;
+		}
+		if((System.SoftLimit & BIT8)||(System.HardLimit & BIT8))
+		{
+			if(sDSPPacketInCOMHandGrade.X)
+				if(System.HandPulseVar<0)
+				return FAIL;
+		}
+		if((System.SoftLimit & BIT1)||(System.HardLimit & BIT1))
+		{
+			if(sDSPPacketInCOMHandGrade.Y)
+			if(System.HandPulseVar>0)
+				return FAIL;
+		}
+		if((System.SoftLimit & BIT9)||(System.HardLimit & BIT9))
+		{
+			if(sDSPPacketInCOMHandGrade.Y)
+			if(System.HandPulseVar<0)	
+				return FAIL;
+		}
+		if((System.SoftLimit & BIT2)||(System.HardLimit & BIT2))
+		{
+			if(sDSPPacketInCOMHandGrade.Z)
+			if(System.HandPulseVar>0)	
+				return FAIL;
+		}
+		if((System.SoftLimit & BIT10)||(System.HardLimit & BIT10))
+		{
+			if(sDSPPacketInCOMHandGrade.Z)
+			if(System.HandPulseVar<0)	
+				return FAIL;
+		}		
+	}
+	return OK;
+}
+
+//系统检测参考点无效时自动限制处理
+void ARM_MainCMD_B0_Hand(void) 
+{
+	FLOAT64 TimeNum;
+	INT32S Pulse,Feed,SendCount;
+	tsGCODE  *psNowCode;
+	
+	Pulse=System.HandPulseVar;
+	if(sDSPPacketInCOMHandGrade.G10)
+		Pulse *=10;
+	else if(sDSPPacketInCOMHandGrade.G100||sDSPPacketInCOMHandGrade.G1000)
+	{
+		if(System.SoftLimit||System.HardLimit)
+			Pulse *=10;				
+		else
+			//Pulse *=1000;	
+			Pulse*=((sDSPPacketInCOMHandGrade.G100)?100:1000);																		
+	}
+	else if(!sDSPPacketInCOMHandGrade.G1)
+	{
+		return ;
+	}	
+	
+	OverallSign.LastCodeOverSign = 0;		
+	// SPC启动延时，防止代码不连续，造成频繁加减速
+	if( (SPCNCSign.RealSendCount==SPCNCSign.RealRunCount) && (SPCNCSign.XYZ_Over==1) )	
+	{
+		Timer0.SPCStartCounter = Timer0.GenericCounter;		
+	}
+	
+	TimeNum=get_delta_time(Timer0.JogStartCounter);
+	if(TimeNum<=0.1)
+		return ;
+	//避免因通讯阻断而出现异常数据的修正处理
+	if(TimeNum>100.0)
+	{
+		TimeNum=20;
+	}	
+
+	Feed = labs(Pulse)*60/TimeNum;   	//(60*1000/20/1000)
+	
+	//Feed *=0.5;
+	if(Feed<100)
+		Feed =100;	
+	if(Feed>20000)
+	{
+		Feed=5000;
+		return ;	
+	}
+	#if 0
+	if(Feed>3000)
+	{
+		Feed=3000;	
+	}
+	#endif
+	
+	#if  SCIA_SPCDEBUG
+	SPCRunBuf[SPCFeedIndex]=SPCNCSign.RealSendCount-SPCNCSign.RealRunCount;
+	SPCPulseBuf[SPCFeedIndex]=Pulse;
+	SPCTimeBuf[SPCFeedIndex]=TimeNum;
+	SPCFeedBuf[SPCFeedIndex++]=Feed;
+	if(SPCFeedIndex > 511)
+	{
+		SPCFeedIndex = 0;
+	}
+	#endif	
+	
+	SPCNCSign.RealSendCount++;
+	psNowCode=&SPCGCodeBuffer[(SPCNCSign.RealSendCount-1) % SPCGCODE_MOD];	
+	psNowCode->SendCount =SPCNCSign.RealSendCount; 	
+	psNowCode->CMD1 = 1;
+	psNowCode->StartPoint = OverallSign.SPCLastMoveGCode.EndPoint;	
+	psNowCode->EndPoint=psNowCode->StartPoint;
+	if(sDSPPacketInCOMHandGrade.X)		
+	{
+		psNowCode->EndPoint.X+=Pulse;				
+	}	
+	else if(sDSPPacketInCOMHandGrade.Y)		
+	{
+		psNowCode->EndPoint.Y+=Pulse;				
+	}
+	else if(sDSPPacketInCOMHandGrade.Z)		
+	{
+		psNowCode->EndPoint.Z+=Pulse;				
+	}
+	
+	SPC_JudgeSoftLimit(psNowCode);
+	
+	psNowCode->ORTM252Angle = 0;	
+	SPCNCSign.F = divdp(Feed, 60.0) * System.SPCShakeSign;
+	psNowCode->Feedrate = SPCNCSign.F;
+	SPC_Deal_Line(psNowCode);
+	
+	OverallSign.SPCLastMoveGCode.EndPoint = psNowCode->EndPoint;	
+	S_Spindle.RunModeSign = S_RunModeGeneric;
+	
+	psNowCode->VeCalSign = 0; 	// 清Ve已计算标志
+	psNowCode->MoveCodeSign = 0;
+		
+	SPCNCSign.LastRealSendCount=SPCNCSign.RealSendCount - SPCNCSign.RealRunCount-(NCRunSign.RealSendCount - NCRunSign.RealRunCount);
+	while(SPCNCSign.LastRealSendCount)
+	{
+		SendCount=(SPCNCSign.RealSendCount-SPCNCSign.LastRealSendCount)%SPCGCODE_MOD;
+		SPCGCodeBuffer[SendCount].MoveCodeSign = 1;
+		NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ] = SPCGCodeBuffer[SendCount];	
+		SPCNCSign.LastRealSendCount--;
+	}
+	
+	SPCNCSign.LastRealSendCount = SPCNCSign.RealSendCount;	
+}
+
+INT8U ARM_MainCMD_B0_JogJudge(void)
+{	
+	if(System.SPCLocateOver==FAIL)
+		return FAIL;
+    if((OverallSign.RapidFeedrateOverride  ==0)||(OverallSign.FeedrateOverride==0))
+		return FAIL;
+	if((SPCNCSign.RealSendCount-SPCNCSign.RealRunCount)>8)
+		return FAIL;
+	
+	//四五轴控制特殊判读
+	//此处需进行输出输入的控制信息的处理，保证实时性控制要求
+	if((sDSPPacketInCOMJogGrade.IVAdd)||(sDSPPacketInCOMJogGrade.IVSub))
+	{
+		if(System.A4_Model==0)
+			return FAIL;
+		sCPLD_IO_Out2Register.bit.A4LOCK = 1;
+		if(sCPLD_IO_In4Register.bit.A4LOCK==FAIL)
+			return FAIL;					
+	}
+	else if((sDSPPacketInCOMJogGrade.VAdd)||(sDSPPacketInCOMJogGrade.VSub))
+	{
+		if(System.A5_Model==0)
+			return FAIL;
+		sCPLD_IO_Out2Register.bit.A5LOCK = 1;
+		if(sCPLD_IO_In4Register.bit.A5LOCK==FAIL)
+			return FAIL;					
+	}
+	else
+	{
+		System.JogAxiss=0;		
+		if(sDSPPacketInCOMJogGrade.XSub||sDSPPacketInCOMJogGrade.XAdd)							
+			if((!sDSPPacketInCOMJogGrade.XSub)||(!sDSPPacketInCOMJogGrade.XAdd))								
+				System.JogAxiss++;	
+		if(sDSPPacketInCOMJogGrade.YSub||sDSPPacketInCOMJogGrade.YAdd)							
+			if((!sDSPPacketInCOMJogGrade.YSub)||(!sDSPPacketInCOMJogGrade.YAdd))									
+				System.JogAxiss++;		
+		if(sDSPPacketInCOMJogGrade.ZSub||sDSPPacketInCOMJogGrade.ZAdd)							
+			if((!sDSPPacketInCOMJogGrade.ZSub)||(!sDSPPacketInCOMJogGrade.ZAdd))									
+				System.JogAxiss++;
+		if(System.JogAxiss==0)
+			return FAIL;
+		if((System.SoftLimit)||(System.HardLimit))
+		{
+			if((System.SoftLimit & BIT0)||(System.HardLimit & BIT0))
+			{
+				if(sDSPPacketInCOMJogGrade.XAdd)
+					return FAIL;
+			}
+			if((System.SoftLimit & BIT8)||(System.HardLimit & BIT8))
+			{
+				if(sDSPPacketInCOMJogGrade.XSub)
+					return FAIL;
+			}
+			if((System.SoftLimit & BIT1)||(System.HardLimit & BIT1))
+			{
+				if(sDSPPacketInCOMJogGrade.XAdd)
+					return FAIL;
+			}
+			if((System.SoftLimit & BIT9)||(System.HardLimit & BIT9))
+			{
+				if(sDSPPacketInCOMJogGrade.YSub)
+					return FAIL;
+			}
+			if((System.SoftLimit & BIT2)||(System.HardLimit & BIT2))
+			{
+				if(sDSPPacketInCOMJogGrade.ZAdd)
+					return FAIL;
+			}
+			if((System.SoftLimit & BIT10)||(System.HardLimit & BIT10))
+			{
+				if(sDSPPacketInCOMJogGrade.ZSub)
+					return FAIL;
+			}		
+		}
+	}	
+	if((System.A4_Model)||(System.A5_Model))
+	{
+		if(sDSPPacketInCOMJogGrade.XAdd
+           ||sDSPPacketInCOMJogGrade.YAdd
+           ||sDSPPacketInCOMJogGrade.ZAdd
+		   ||sDSPPacketInCOMJogGrade.XSub
+           ||sDSPPacketInCOMJogGrade.YSub
+           ||sDSPPacketInCOMJogGrade.ZSub)
+		{
+			if(System.A4_Model)
+			{
+				sCPLD_IO_Out2Register.bit.A4LOCK = 0;
+				if(sCPLD_IO_In4Register.bit.A4LOCK==OK)
+					return FAIL;	
+			}	
+			if(System.A5_Model)
+			{
+				sCPLD_IO_Out2Register.bit.A5LOCK = 0;
+				if(sCPLD_IO_In4Register.bit.A5LOCK==OK)
+					return FAIL;	
+			}	
+		}
+	}	
+	
+	return OK;
+}
+
+//系统检测参考点无效时自动限制处理
+void ARM_MainCMD_B0_Jog(void) 
+{
+	FLOAT64 TimeNum,PosAdd;
+	INT32S PosNum,Feed,SendCount;
+	tsGCODE  *psNowCode;
+	extern INT8U jogGrade;
+	if(jogGrade==0)
+    {
+        Feed = System.JogGrade1;
+    }else if(jogGrade==1)
+    {
+        Feed = System.JogGrade2;
+    }else if(jogGrade==2)
+    {
+        Feed = System.JogGrade3;
+    }/*
+	if(psDSPPacketInCOM->SPCMode & BIT5)
+		Feed = System.JogGrade2;//sParaDspB0_2Buf.FeedLJogGrade2;
+	else if(psDSPPacketInCOM->SPCMode & BIT6)
+		Feed = System.JogGrade3;//sParaDspB0_2Buf.FeedLJogGrade3;
+	else
+		Feed = System.JogGrade1;//sParaDspB0_2Buf.FeedLJogGrade1;
+	*/
+	OverallSign.LastCodeOverSign = 0;		
+	// SPC启动延时，防止代码不连续，造成频繁加减速
+	if( (SPCNCSign.RealSendCount==SPCNCSign.RealRunCount) && (SPCNCSign.XYZ_Over==1) )	
+	{
+		Timer0.SPCStartCounter = Timer0.GenericCounter;		
+		//PosAdd = Feed * psDSPPacketInCOM->GradeG0*50;
+        PosAdd = Feed * OverallSign.RapidFeedrateOverride*50;
+	}
+	else if(SPCNCSign.RealSendCount==0)	
+	{
+		PosAdd = Feed * OverallSign.RapidFeedrateOverride*50;
+	}
+	else
+	{
+		TimeNum=get_delta_time(Timer0.JogStartCounter);
+		//避免因通讯阻断而出现异常数据的修正处理
+		if(TimeNum>500)
+			TimeNum=20;
+		PosAdd = Feed * OverallSign.RapidFeedrateOverride*TimeNum;
+	}
+	if(System.JogAxiss==2)						
+		PosAdd=PosAdd*0.707/600;						
+	else if(System.JogAxiss==3)
+		PosAdd=PosAdd*0.577/600;
+	else
+		PosAdd=PosAdd/600;
+	PosNum = PosAdd*1.5;
+	//Timer0.JogStartCounter = Timer0.GenericCounter;	
+	
+	SPCNCSign.RealSendCount++;
+	psNowCode=&SPCGCodeBuffer[(SPCNCSign.RealSendCount-1) % SPCGCODE_MOD];	
+	psNowCode->SendCount =SPCNCSign.RealSendCount; 	
+	psNowCode->CMD1 = 0;
+	psNowCode->StartPoint = OverallSign.SPCLastMoveGCode.EndPoint;	
+	psNowCode->EndPoint = psNowCode->StartPoint;
+	
+	if(sDSPPacketInCOMJogGrade.XSub)
+	{									
+		psNowCode->EndPoint.X-= PosNum;										
+	}
+	else if(sDSPPacketInCOMJogGrade.XAdd)
+	{									
+		psNowCode->EndPoint.X+= PosNum;										
+	}
+	if(sDSPPacketInCOMJogGrade.YSub)
+	{									
+		psNowCode->EndPoint.Y-= PosNum;																			
+	}
+	else if(sDSPPacketInCOMJogGrade.YAdd)
+	{									
+		psNowCode->EndPoint.Y+= PosNum;			
+	}
+	if(sDSPPacketInCOMJogGrade.ZSub)
+	{									
+		psNowCode->EndPoint.Z-= PosNum;																					
+	}
+	else if(sDSPPacketInCOMJogGrade.ZAdd)
+	{									
+		psNowCode->EndPoint.Z+= PosNum;																		
+	}
+	
+	SPC_JudgeSoftLimit(psNowCode);
+		
+	psNowCode->ORTM252Angle = 0;	
+	SPCNCSign.F = divdp(Feed, 60.0) * System.SPCShakeSign;
+	psNowCode->Feedrate = SPCNCSign.F;
+	SPC_Deal_Line(psNowCode);
+	
+	OverallSign.SPCLastMoveGCode.EndPoint = psNowCode->EndPoint;	
+	S_Spindle.RunModeSign = S_RunModeGeneric;
+	
+	psNowCode->VeCalSign = 0; 	// 清Ve已计算标志
+	psNowCode->MoveCodeSign = 0;
+		
+	SPCNCSign.LastRealSendCount=SPCNCSign.RealSendCount - SPCNCSign.RealRunCount-(NCRunSign.RealSendCount - NCRunSign.RealRunCount);
+	while(SPCNCSign.LastRealSendCount)
+	{
+		SendCount=(SPCNCSign.RealSendCount-SPCNCSign.LastRealSendCount)%SPCGCODE_MOD;
+		SPCGCodeBuffer[SendCount].MoveCodeSign = 1;
+		NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ] = SPCGCodeBuffer[SendCount];	
+		SPCNCSign.LastRealSendCount--;
+	}
+	
+	SPCNCSign.LastRealSendCount = SPCNCSign.RealSendCount;
+}
+
+void ARM_MainCMD_B0(void) 
+{
+	OverallSign.ABSORG_M_Coordinate.X = psDSPPacketInCOM->OrginX;
+	OverallSign.ABSORG_M_Coordinate.Y = psDSPPacketInCOM->OrginY;
+	OverallSign.ABSORG_M_Coordinate.Z = psDSPPacketInCOM->OrginZ;
+	
+	OverallSign.ABS_OffsetCoordinateBak.X = psDSPPacketInCOM->OffsetX;
+	OverallSign.ABS_OffsetCoordinateBak.Y = psDSPPacketInCOM->OffsetY;
+	OverallSign.ABS_OffsetCoordinateBak.Z = psDSPPacketInCOM->OffsetZ;
+	
+	STDNCSign.ZSafeHeight = psDSPPacketInCOM->SafeZ;
+	OverallSign.Z_CompesationLengthBak = psDSPPacketInCOM->ToolZ;	
+
+	OverallSign.RapidFeedrateOverride_Bak = psDSPPacketInCOM->GradeG0;		
+	OverallSign.FeedrateOverride_Bak = psDSPPacketInCOM->GradeG1;
+	S_Spindle.SpindleGrade_Bak = psDSPPacketInCOM->GradeS;
+
+	if((OverallSign.FeedrateOverride != OverallSign.FeedrateOverride_Bak) ||
+		(OverallSign.RapidFeedrateOverride != OverallSign.RapidFeedrateOverride_Bak)||
+		(S_Spindle.SpindleGrade != S_Spindle.SpindleGrade_Bak) )
+	{
+		if((++sSCIPara.SCIA_GradeCount > 1)||(STDNCSign.SingleModeSign == 1))
+		{
+			OverallSign.FeedrateOverride = OverallSign.FeedrateOverride_Bak;
+			OverallSign.RapidFeedrateOverride = OverallSign.RapidFeedrateOverride_Bak;
+			S_Spindle.SpindleGrade = S_Spindle.SpindleGrade_Bak;
+			sSCIPara.SCIA_GradeCount = 0;
+		}
+	}
+	else
+	{
+		sSCIPara.SCIA_GradeCount = 0;
+	}
+
+	if(psDSPPacketInCOM->Packet1 & 0x01)
+	{
+		sSCIPara.SCIA_BackCmdNo = 1;
+	}
+	else if(psDSPPacketInCOM->Packet1 & 0x02)
+	{
+		sSCIPara.SCIA_BackCmdNo = 2;
+	}
+	else if(psDSPPacketInCOM->Packet1 & 0x04)
+	{
+		sSCIPara.SCIA_BackCmdNo = 3;
+	}
+
+	//INFO1
+	if(psDSPPacketInCOM->Info1 & 0x01)	
+		STD_run_NC_initial();
+	if(psDSPPacketInCOM->Info1 & 0x02)
+	{
+		if(Error.MainErrorSign==0)
+			CPLD_ServoOn();
+		else if(Error.AAT_OverTravel == 0)
+			CPLD_ServoOff();		
+	}
+	else
+	{
+		CPLD_ServoOff();
+		SPC_run_NC_initial();
+		STD_run_NC_initial();
+		OverallSign.NCSign = NCSIGN_NONE;
+	}
+	if(psDSPPacketInCOM->Info1 & 0x04)
+	{
+		STDNCSign.GetPositionSign = 1;
+		SPCNCSign.GetPositionSign = 1;
+		Timer0.GetPositionCounter = Timer0.GenericCounter;
+	}
+	if(psDSPPacketInCOM->Info1 & 0x08)	
+	{
+		#if SCIA_SPCDEBUG
+		SPCFeedIndex=0;
+		#endif
+		System.HandPulseVar = 0;
+		SPC_run_NC_initial();	
+	}	
+	//bit4=1 ARM进入单段功能
+	if(psDSPPacketInCOM->Info1 & 0x10)		
+	{
+		if(STDNCSign.SingleModeSign == 0)
+		{
+			STDNCSign.SingleModeSign = 1;
+			STDNCSign.NeedRunSingleSign = 1;
+			STDNCSign.SingleRunOver = 0;
+			NCAreaSingle.GetNextSendCount = 0;
+			NCAreaSingle.AreaGCodeLastRealSendCount = 0;
+			//NCRunSign.SingleModifyOffsetOrCompesationSign = 2;		//进入单断作变档处理
+		}
+	}
+	else
+	{
+		STDNCSign.SingleModeSign = 0;		
+	}
+	OverallSign.NCSignBk = (psDSPPacketInCOM->Info1 & 0x60) >>5;
+	if(OverallSign.NCSignBk == NCSIGN_SPC)
+	{
+		if((STDNCSign.SingleModeSign)&&(STDNCSign.NeedRunSingleSign == 0))		//单段状态		
+			STDNCSign.AddLineSign = 0;		//防止未完成上一次加线功能时不能再加线		
+		OverallSign.ABS_OffsetCoordinate.X=0;
+		OverallSign.ABS_OffsetCoordinate.Y=0;
+		OverallSign.ABS_OffsetCoordinate.Z=0;
+	}
+	else if(OverallSign.NCSignBk== NCSIGN_STD)
+	{
+		if((OverallSign.ABS_OffsetCoordinate.X != OverallSign.ABS_OffsetCoordinateBak.X)
+				||(OverallSign.ABS_OffsetCoordinate.Y != OverallSign.ABS_OffsetCoordinateBak.Y)
+				||(OverallSign.ABS_OffsetCoordinate.Z != OverallSign.ABS_OffsetCoordinateBak.Z)
+				||(OverallSign.NCSign != NCSIGN_STD))
+		{
+			OverallSign.ABS_OffsetCoordinate = OverallSign.ABS_OffsetCoordinateBak;
+			if(STDNCSign.SingleModeSign == 1)
+			{
+				NCRunSign.SingleModifyOffsetOrCompesationSign = 1;
+				STDNCSign.GetPositionSign = 1;
+				SPCNCSign.GetPositionSign = 1;
+				Timer0.GetPositionCounter = Timer0.GenericCounter;
+			}
+		}				
+	}
+	else
+	{
+		// 通常状态下主轴恢复通常模式
+		S_Spindle.RunModeSign = S_RunModeGeneric;	
+		OverallSign.ABS_OffsetCoordinate.X=0;
+		OverallSign.ABS_OffsetCoordinate.Y=0;
+		OverallSign.ABS_OffsetCoordinate.Z=0;
+	}
+	OverallSign.NCSign =OverallSign.NCSignBk;
+	//bit7=1 单段功能单条标志
+	if(psDSPPacketInCOM->Info1 & 0x80)	
+	{
+		if(STDNCSign.SingleModeSign == 1)
+		{
+			if((STDNCSign.NeedRunSingleSign == 0)&&(STDNCSign.Waitsign == 0))
+			{	
+				STDNCSign.SingleRunOver = 0;
+				STDNCSign.NeedRunSingleSign = 1;
+				STDNCSign.RealRunCount++;	
+				STDNCSign.PrecalCode = 0;
+				STDNCSign.XYZ_Over = 0; 				
+				if( GCodeBuffer[ (STDNCSign.RealRunCount-1)%STDGCODE_MOD ].MoveCodeSign == 1 )
+				{
+					NCRunSign.RealRunCount++;
+					NCRunSign.PrecalCode = 0;
+					NCRunSign.XYZ_Over = 0;
+				}				
+				NCAreaSingle.GetNextSendCount = 0;
+				NCAreaSingle.AreaGCodeLastRealSendCount = 0;
+				//initial NC_AREAControl
+				NC_AREAControl.VNow = 0;
+			}
+		}			
+	}
+
+	//INFO2
+		
+	OverallSign.BFChageOverrideSpeedSign = (psDSPPacketInCOM->Info2 & 0x20)?1:0;	//BF双速齿轮箱换档标志
+	S_Spindle.ReachSetSpeedJudgeSign = (psDSPPacketInCOM->Info2 & 0x40)?1:0;		//主轴达到设定速度判断标志.0:判断;1:不判断.
+	
+	//INFOR3
+	Reference.NeedFindAxisSign.X = (psDSPPacketInCOM->Info3 & 0x01)?1:0;
+	Reference.NeedFindAxisSign.Y = (psDSPPacketInCOM->Info3 & 0x02)?1:0;
+	Reference.NeedFindAxisSign.Z = (psDSPPacketInCOM->Info3 & 0x04)?1:0;
+	Reference.NeedFindAxisSign.U = (psDSPPacketInCOM->Info3 & 0x40)?1:0;	
+	if(psDSPPacketInCOM->Info3 & 0x80)
+	{
+		if(Reference.SearchRefSign == 0)
+		{			
+			Reference.SearchRefSign = 1;
+			Reference.RefStep = 0;
+			Reference.FindRefSign.X = 0;
+			Reference.FindRefSign.Y = 0;
+			Reference.FindRefSign.Z = 0;
+			//复位参考点信号输入						
+			//取消复位参考点信号输入
+			RESET_REF;		
+		}
+	}
+	else
+	{
+		Reference.SearchRefSign= 0;
+	}
+	
+	//INFOR4
+	if(!((OverallSign.NCSign==1)&&((OverallSign.RapidFeedrateOverride_Bak)||(OverallSign.FeedrateOverride_Bak))))
+	{	
+		if(AutoAdjustTool.FunctionSign == 0)
+		{	
+			//自动对刀功能无效		
+			if(S_Spindle.RunModeSign==S_RunModeGeneric)
+			{	
+				//定位和攻牙模式下不允许切换主轴按键
+				if(psDSPPacketInCOM->Info4 & 0x1)
+				{
+					S_Spindle.RunSign = S_CW; 
+				}
+				else if(psDSPPacketInCOM->Info4 & 0x2)
+				{
+					S_Spindle.RunSign = S_CCW; 
+				}
+				else
+				{
+					S_Spindle.RunSign = S_STOP;	
+				}
+			}
+		}
+	}	
+	//bit2=1 单段重定位标志
+	if(psDSPPacketInCOM->Info4 & 0x4)
+	{
+		if(STDNCSign.AddLineSign == 0)
+		{
+			STDNCSign.SingleRunOver = 0;
+			STDNCSign.AddLineSign = 1;
+			STDNCSign.GetPositionSign = 1;	//重定位坐标
+			NCRunSign.SingleModifyOffsetOrCompesationSign = 0;
+			STD_Add_Code();
+		}
+	}	
+	//程式预演功能
+	if(OverallSign.NCSign ==NCSIGN_STD)
+	{
+		if(psDSPPacketInCOM->Info4 & 0x8)
+			STDNCSign.ProgramPreRunSign = 1;
+		else
+			STDNCSign.ProgramPreRunSign = 0;
+	}
+	if(psDSPPacketInCOM->Info4 & 0x10)
+	{
+		if(AutoAdjustTool.FunctionSign == 0)
+		{
+			AutoAdjustTool.FunctionSign = 1;
+			AutoAdjustTool.LockCoordinateSign = 0;
+			AutoAdjustTool.ZDealEndSign = 0;						
+		}
+	}
+	else
+	{
+		AutoAdjustTool.FunctionSign = 0;
+	}
+	//攻丝回退功能   
+	if(psDSPPacketInCOM->Info4 & 0x20)
+	{
+		if(S_Spindle.RigidBackToolSign == 0)
+		{
+			S_Spindle.RigidBackToolSign = 1;
+			S_Spindle.RigidBackToolCompleteSign = 0;
+		}
+	}
+	//  断点处理标志
+	if(psDSPPacketInCOM->Info4 & 0x40)
+	{
+		STDNCSign.BreakSign = 1;
+	}
+	else
+	{
+		if(STDNCSign.BreakSign == 1)
+			STDNCSign.BreakSignBk=1;		
+		STDNCSign.BreakSign = 0;		
+	}
+	// 换刀标志
+	STDNCSign.ChangeToolSign = (psDSPPacketInCOM->Info4 & 0x80)?1:0;
+
+	//INFOR5-6
+	if(OverallSign.NCSign != NCSIGN_STD)
+	{	
+		// 非正式G 代码加工中
+		S_Spindle.SpinSpeedSet = psDSPPacketInCOM->Info5+((INT16U)psDSPPacketInCOM->Info6<<8);
+	}	
+	
+	//INFOR7 //A4 轴锁紧命令	
+	OverallSign.SPC_HandwheelSim = (psDSPPacketInCOM->Info7 & 0x08)?1:0;
+	
+	//INFOR8 原来是自动对刀模型设置，由于B1模块中有，在此已删除	
+	AutoAdjustTool.Style = psDSPPacketInCOM->Info8;
+
+	//INFO9暂未使用
+	//INF10暂未使用
+
+	//处理输出控制信息
+	sCPLD_IO_Out2Register.bit.A4LOCK = (psDSPPacketInCOM->OutInfo8 & 0x01)?(0):(1);
+	sCPLD_IO_Out2Register.bit.A5LOCK = (psDSPPacketInCOM->OutInfo8 & 0x02)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT3 = (psDSPPacketInCOM->OutInfo8 & 0x04)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT4 = (psDSPPacketInCOM->OutInfo8 & 0x08)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT5 = (psDSPPacketInCOM->OutInfo8 & 0x10)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT6 = (psDSPPacketInCOM->OutInfo8 & 0x20)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT7 = (psDSPPacketInCOM->OutInfo8 & 0x40)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT8 = (psDSPPacketInCOM->OutInfo8 & 0x80)?(0):(1);	
+	//rCPLD_IO_OUT2= sCPLD_IO_Out2Register.all;
+	GPIOoutput_flush();
+	System.SPCMode=psDSPPacketInCOM->SPCMode;
+
+	//处理电子手轮功能
+	if(psDSPPacketInCOM->SPCMode & BIT0)
+	{
+		//System.SPCRunCount=(System.SPCRunCount+1)%2;
+		//System.SPCRunCount=0;
+		//if(System.SPCRunCount==0)
+		{
+			tsDSP_HANDGRADE temp;
+			//sDSPPacketInCOMHandGrade=(tsDSP_PACKETIN_COM_HANDGRADE)(tsWHEELRegister.all&0x7F);//(tsDSP_PACKETIN_COM_HANDGRADE *)&psDSPPacketInCOM->HandGrade;
+			temp.all=tsWHEELRegister.all&0x7F;
+			sDSPPacketInCOMHandGrade=temp.bit;
+
+			//System.HandPulse=psDSPPacketInCOM->HandPulse;
+			//System.HandGrade=psDSPPacketInCOM->HandGrade;
+            //改为直接从寄存器读出。
+            System.HandPulse =W_Encoder.MACH_PositionValue;
+            System.HandGrade = tsWHEELRegister.all&0x7F;
+			if(ARM_MainCMD_B0_HandJudge()==OK)		
+			{
+				ARM_MainCMD_B0_Hand();
+			}	
+			Timer0.JogStartCounter = Timer0.GenericCounter;
+			System.HandPulseBk=System.HandPulse;
+			System.HandGradeBk=System.HandGrade;
+		}	
+	}	
+
+	//处理手动控制功能
+	if(psDSPPacketInCOM->SPCMode & BIT1)
+	{
+		//System.SPCRunCount=(System.SPCRunCount+1)%2;
+		//System.SPCRunCount=0;
+		//if(System.SPCRunCount==0)
+		{
+			extern INT16U multiKey;
+			tsDSP_JOGGRADE temp;
+			temp.all=multiKey;
+			sDSPPacketInCOMJogGrade =temp.bit;
+			//sDSPPacketInCOMJogGrade =(tsDSP_PACKETIN_COM_JOGGRADE)multiKey;
+			//(tsDSP_PACKETIN_COM_JOGGRADE *)&psDSPPacketInCOM->JogGrade;
+			if(ARM_MainCMD_B0_JogJudge()==OK)		
+			{
+				ARM_MainCMD_B0_Jog();
+			}
+			Timer0.JogStartCounter = Timer0.GenericCounter;
+		}	
+	}
+	
+	//齿轮箱控制功能屏蔽
+/*	#if 0
+	System.GearDownRate = psDSPPacketInCOM->Info16;		
+	if(System.GearDownRate == 0)	
+		System.GearDownRate = 1;
+	#endif   */
+	System.GearDownRate = 1;
+	System.SpindleOneRing_EncoderRealDegree = divdp(360000000 , System.SpindleAxisMinUnit)*System.GearDownRate;
+	if((OverallSign.Z_CompesationLengthBak != OverallSign.Z_CompesationLength)&&(OverallSign.NCSign == NCSIGN_STD))
+	{
+		OverallSign.Z_CompesationLengthDelta = OverallSign.Z_CompesationLengthBak - OverallSign.Z_CompesationLength;
+		OverallSign.Z_CompesationLength = OverallSign.Z_CompesationLengthBak;		
+		if(STDNCSign.SingleModeSign == 1)
+		{
+			NCRunSign.SingleModifyOffsetOrCompesationSign = 1;
+			STDNCSign.GetPositionSign = 1;
+			SPCNCSign.GetPositionSign = 1;
+			Timer0.GetPositionCounter = Timer0.GenericCounter;
+		}
+	}
+	else
+	{
+		if(NCRunSign.SingleModifyOffsetOrCompesationSign == 0)
+		{
+			OverallSign.Z_CompesationLengthDelta = 0;
+		}
+	}
+	
+	if(System.ReferenceFrameMode == REF_XYZ)
+	{	
+		//如果为三轴系统，绝对坐标与名义坐标相统一
+		OverallSign.MYORG_M_Coordinate = OverallSign.ABSORG_M_Coordinate;
+	}
+
+	//计算工件坐标系相对名义坐标系的偏置坐标
+	OverallSign.ABS_MY_OffsetCoordinate.X = OverallSign.ABSORG_M_Coordinate.X-OverallSign.MYORG_M_Coordinate.X+OverallSign.ABS_OffsetCoordinate.X;
+	OverallSign.ABS_MY_OffsetCoordinate.Y = OverallSign.ABSORG_M_Coordinate.Y-OverallSign.MYORG_M_Coordinate.Y+OverallSign.ABS_OffsetCoordinate.Y;
+	OverallSign.ABS_MY_OffsetCoordinate.Z = OverallSign.ABSORG_M_Coordinate.Z-OverallSign.MYORG_M_Coordinate.Z+OverallSign.ABS_OffsetCoordinate.Z;
+}
+
+
+void ARM_MainCMD_B3(void) 
+{	
+	//INT8U *pCodeHead;
+	tsCODE_SUB *psCodeInfo;	
+	//循环解释各条代码并做相应处理
+	/*
+	pCodeHead=psDSPPacketInSTD->Info;
+	for(i=0;i<psDSPPacketInSTD->Packet;i++)
+	{	
+		psCodeInfo=(tsCODE_SUB *)pCodeHead;
+		pCodeHead+=psCodeInfo->Length;	*/
+		psCodeInfo=(tsCODE_SUB *)shm_cycBufReadptr(CYCBUF_GCODE);
+		STDNCSign.LastRealSendCount = STDNCSign.RealSendCount;	
+		STD_Rec_All(psCodeInfo);		
+		if(Error.NCCodeBreak)
+			return ;
+		if(STDNCSign.AddLineSign)
+		{
+			if((OverallSign.FlexuousAxisSign.X) || (OverallSign.FlexuousAxisSign.Y) ||(OverallSign.FlexuousAxisSign.Z))
+			{
+				OverallSign.FlexuousAxisSign.X = 0;
+				OverallSign.FlexuousAxisSign.Y = 0;
+				OverallSign.FlexuousAxisSign.Z = 0;
+			}
+		}
+		else if(STDNCSign.ArmAgainSendGcodeSign)
+		{
+			STDNCSign.ArmAgainSendGcodeSign = 0;
+		}
+		else
+		{	
+			tsGCODE *psNowCode;
+			psNowCode=&GCodeBuffer[(STDNCSign.RealSendCount-1) % STDGCODE_MOD];
+			if(STDNCSign.BreakSign == 0)
+			{
+				if(STDNCSign.BreakSignBk)
+				{
+					STDNCSign.BreakSignBk=0;	
+				}
+				else if(STDNCSign.RealSendCount>1)					
+				{
+					if(labs(psNowCode->SendCount-GCodeBuffer[(STDNCSign.RealSendCount-2) % STDGCODE_MOD].SendCount) > 1)
+					{
+						if(!(System.FunctionSelectionSwitch_01 & 0x04))							
+						{	
+							//ARM->DSP发送G代码条数(SendCount)不连续警告
+							Error.NCCodeBreak = 1;		
+							Error.MainErrorSign = 1;
+							high_error();		//CH0904
+							return ;
+						}							
+					}	
+				}				
+			}						
+			psNowCode->VeCalSign = 0;
+			if((psNowCode->CMD1<4)||(psNowCode->CMD1==30)||(psNowCode->CMD1==31))
+			{
+				psNowCode->MoveCodeSign = 1;
+				NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ]=*psNowCode;
+				if(psNowCode->FlexuousAxisSign == 1)
+				{	//记录当前抖动嫌疑条指针...					
+					OverallSign.FlexuousNCAREARealSendCount = NCRunSign.RealSendCount;
+				}
+			}
+			else if((psNowCode->CMD1 == 0x65) && (psNowCode->CMD2 == 0xfb))
+			{
+				psNowCode->MoveCodeSign = 2;
+				NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ]=*psNowCode;
+			}
+			else
+			{
+				psNowCode->MoveCodeSign = 0;	
+			}
+		}
+}
+
+void ARM_MainCMD_B4(void) 
+{	
+	INT32S SendCount;
+	tsGCODE  *psNowCode;
+	
+	OverallSign.LastCodeOverSign = 0;		//CH0512	
+	// SPC启动延时，防止代码不连续，造成频繁加减速
+	if( (SPCNCSign.RealSendCount==SPCNCSign.RealRunCount) && (SPCNCSign.XYZ_Over==1) )	
+		Timer0.SPCStartCounter = Timer0.GenericCounter;	
+	//重发代码作废处理
+	if(psDSPPacketInSPC->SendCount == SPCNCSign.RealSendCount)
+		return ;	
+	SPCNCSign.RealSendCount = psDSPPacketInSPC->SendCount;
+	psNowCode=&SPCGCodeBuffer[(SPCNCSign.RealSendCount-1) % SPCGCODE_MOD];	
+	psNowCode->SendCount =SPCNCSign.RealSendCount; 	
+	if(psNowCode->SendCount>1)
+	{
+		if(labs(psNowCode->SendCount-SPCGCodeBuffer[(SPCNCSign.RealSendCount-2) % SPCGCODE_MOD].SendCount) >= 2)
+		{
+			Error.NCCodeBreak = 1;		//ARM->DSP发送G代码条数(SendCount)不连续警告
+			return ;
+		}
+	}
+	
+	psNowCode->CMD1 = 1;
+	psNowCode->StartPoint = OverallSign.SPCLastMoveGCode.EndPoint;	
+	psNowCode->EndPoint.X = psDSPPacketInSPC->PosX;
+	psNowCode->EndPoint.Y = psDSPPacketInSPC->PosY;
+	psNowCode->EndPoint.Z = psDSPPacketInSPC->PosZ;
+	
+	SPC_JudgeSoftLimit(psNowCode);
+	
+	psNowCode->ORTM252Angle = psDSPPacketInSPC->Angle;	
+	SPCNCSign.F = divdp(psDSPPacketInSPC->Feed, 60.0) * System.SPCShakeSign;
+	psNowCode->Feedrate = SPCNCSign.F;
+	SPC_Deal_Line(psNowCode);
+	
+	OverallSign.SPCLastMoveGCode.EndPoint = psNowCode->EndPoint;
+
+	if(psDSPPacketInSPC->Info1 & 0x01) 	// 主轴定位
+	{
+		if(S_Spindle.SpindleControlStyle == S_STYLE_RIGIDGENERIC)
+		{	
+			// 通用定位方式
+			if((S_Spindle.RunModeSign!=S_RunModeORTM252)||(!S_Spindle.ORTCompleteSign)||(S_Spindle.ORTM252Angle!=psNowCode->ORTM252Angle))
+			{
+				//复位参考点信号输入
+				SET_CLRREF;
+
+				S_Spindle.RunModeSign = S_RunModeORTM252;
+				if((psNowCode->ORTM252Angle<0) || (psNowCode->ORTM252Angle>360000))
+				{	
+					S_Spindle.SpeedHz = 0;
+					Error.ORTError = 1;
+				}
+				
+				S_Spindle.ORTM252Angle = psNowCode->ORTM252Angle;			
+				Timer0.ORTM252Counter = Timer0.GenericCounter;
+				S_Spindle.ORTM252CounterTimer = 0;
+				S_Spindle.ORTCompleteSign = 0;
+				Reference.FindRefSign.U = 0;				
+				CPLD_EncoderResetU();
+				Reference.FindRefSign.U = 1; 		
+				
+				//取消复位参考点信号输入
+				CLR_CLRREF ;			
+				if(S_Spindle.RunSign == S_CCW)
+				{
+					SpindleOutSignal.bit.CCW = 1;
+					SpindleOutSignal.bit.CW = 0;
+				}
+				else 
+				{
+					SpindleOutSignal.bit.CCW = 0;
+					SpindleOutSignal.bit.CW = 1;
+				}		
+			}
+		}	
+	}
+	if(psDSPPacketInSPC->Info1 & 0x02) 	// 主轴定位清除
+	{
+		S_Spindle.RunModeSign = S_RunModeGeneric;
+	}
+		
+	psNowCode->VeCalSign = 0; 	// 清Ve已计算标志
+	psNowCode->MoveCodeSign = 0;
+
+	#if 0
+	a = NCRunSign.RealSendCount - NCRunSign.RealRunCount;
+	b = SPCNCSign.RealSendCount - SPCNCSign.RealRunCount;
+	c = b-a;
+	for( i=1; i<=c; i++)
+	{
+		SPCGCodeBuffer[ (SPCNCSign.RealSendCount-c+i-1)%SPCGCODE_MOD ].MoveCodeSign = 1;
+		NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ]
+			= SPCGCodeBuffer[ (SPCNCSign.RealSendCount-c+i-1)%SPCGCODE_MOD ];	
+	}
+	#endif
+	
+	SPCNCSign.LastRealSendCount=SPCNCSign.RealSendCount - SPCNCSign.RealRunCount-(NCRunSign.RealSendCount - NCRunSign.RealRunCount);
+	while(SPCNCSign.LastRealSendCount)
+	{
+		SendCount=(SPCNCSign.RealSendCount-SPCNCSign.LastRealSendCount)%SPCGCODE_MOD;
+		SPCGCodeBuffer[SendCount].MoveCodeSign = 1;
+		NCAreaGCodeBuffer[ (NCRunSign.RealSendCount++)%STDGCODE_MOD ] = SPCGCodeBuffer[SendCount];	
+		SPCNCSign.LastRealSendCount--;
+	}
+	
+	SPCNCSign.LastRealSendCount = SPCNCSign.RealSendCount;
+}
+
+void ARM_BackCMD_06(void)
+{
+	psDSPPacketOutALM->Head=0xaa;
+	psDSPPacketOutALM->Length=sizeof(tsDSP_PACKETOUT_ALM)-6;
+	psDSPPacketOutALM->Port = 0xb0;			//站点地址
+	psDSPPacketOutALM->Protocal = 0x0f;		
+	psDSPPacketOutALM->Command = 0x06;	
+	psDSPPacketOutALM->Packet = 0x00;		
+
+	psDSPPacketOutALM->Servo50 = Error.ServoSpindleAlarmCode.X;
+	psDSPPacketOutALM->Servo51 = Error.ServoSpindleAlarmCode.Y;
+	psDSPPacketOutALM->Servo52 = Error.ServoSpindleAlarmCode.Z;
+	psDSPPacketOutALM->Servo53 = 0;
+	psDSPPacketOutALM->Servo54 = 0;
+	psDSPPacketOutALM->Servo55 = 0;
+	psDSPPacketOutALM->Servo70 = Error.ServoSpindleAlarmCode.U;
+	memset(psDSPPacketOutALM->Bak1,0x0,13*2);
+	psDSPPacketOutALM->Servo50Seq= Error.ServoSpindleSystemParaDifferentNum.X;
+	psDSPPacketOutALM->Servo51Seq= Error.ServoSpindleSystemParaDifferentNum.Y;
+	psDSPPacketOutALM->Servo52Seq= Error.ServoSpindleSystemParaDifferentNum.Z;
+	psDSPPacketOutALM->Servo53Seq= 0;
+	psDSPPacketOutALM->Servo54Seq= 0;
+	psDSPPacketOutALM->Servo55Seq= 0;
+	psDSPPacketOutALM->servo70Seq= Error.ServoSpindleSystemParaDifferentNum.U;
+	memset(psDSPPacketOutALM->Bak2,0x0,13);
+	memset(&psDSPPacketOutALM->Info1,0x0,20);
+	
+	if( Error.ServoAlarm.X ==1 )
+	{
+		psDSPPacketOutALM->Info1 |= 0x01;		//BIT0 X轴伺服报警		1:报警有效
+	}
+	if( Error.ServoAlarm.Y ==1 )
+	{
+		psDSPPacketOutALM->Info1 |= 0x02;		//BIT1 Y轴伺服报警		1:报警有效
+	}
+	if( Error.ServoAlarm.Z ==1 )
+	{
+		psDSPPacketOutALM->Info1 |= 0x04;		//BIT2 Z轴伺服报警		1:报警有效
+	}
+	if( Error.ServoAlarm.U ==1 )
+	{
+		psDSPPacketOutALM->Info1 |= 0x40;		//BIT6 U轴伺服报警		1:报警有效
+	}
+	
+	if( Error.EncoderError.X )
+	{
+		psDSPPacketOutALM->Info2 |= 0x01;		//BIT0  X轴编码器报警  		1: 报警有效
+	}
+	if( Error.EncoderError.Y )
+	{
+		psDSPPacketOutALM->Info2 |= 0x02;		//BIT1  Y轴编码器报警  		1: 报警有效
+	}
+	if( Error.EncoderError.Z )
+	{
+		psDSPPacketOutALM->Info2 |= 0x04;		//BIT2  Z轴编码器报警  		1: 报警有效
+	}	
+	if( Error.EncoderError.U )
+	{
+		psDSPPacketOutALM->Info2 |= 0x40;		//BIT6  主轴编码器报警  		1: 报警有效
+	}						
+	
+	if( Error.ORTError )
+	{
+		psDSPPacketOutALM->Info3 |= 0x01;		//BIT0  主轴定位偏移报警  					1: 报警有效
+	}
+	if( Error.AAT_OverTravel )
+	{
+		psDSPPacketOutALM->Info3 |= 0x02;		//BIT1  自动对刀功能中超行程报警  		1: 报警有效
+	}
+	if( Error.AAT_OverSpeedSign )
+	{
+		psDSPPacketOutALM->Info3 |= 0x04;		//BIT2  自动对刀进给速度超速报警  		1: 报警有效
+	}
+	if( Error.InsideRAMCheckError)
+	{
+		psDSPPacketOutALM->Info3 |= 0x08;		//BIT3  DSP芯片内部RAM检验出错报警  		1: 报警有效
+	}
+	if( Error.OutsideRAMCheckError )
+	{
+		psDSPPacketOutALM->Info3 |= 0x10;		//BIT4  DSP芯片外部RAM检验出错报警  		1: 报警有效
+	}
+	if( Error.CompDataCheckError)
+	{
+		psDSPPacketOutALM->Info3 |= 0x20;		//BIT5  DSP非线性补偿数据检验出错报警  	1: 报警有效
+	}	
+	
+		
+	if( Error.NCCodeBreak )
+	{
+		psDSPPacketOutALM->Info4 |= 0x01;		//BIT0  ARM向DSP发送代码不连续报警1: 报警有效
+	}
+	if( Error.TrackRunOutError )
+	{
+		psDSPPacketOutALM->Info4 |= 0x04;		//BIT2  DSP轨迹超程报警  			1: 报警有效
+	}
+	if( Error.InterpolationOver )
+	{
+		psDSPPacketOutALM->Info4 |= 0x08;		//BIT3  DSP插补量过大报警  		1: 报警有效
+	}
+	if( Error.SCIBComError)
+	{
+		psDSPPacketOutALM->Info4 |= 0x10;		// 主轴板与DSP 通讯报警		1: 报警有效	
+	}
+
+	psDSPPacketOutALM->AlmTrackOver=Error.TrackRunOutError;		//轨迹超程报警号	
+	psDSPPacketOutALM->AlmInterpolateOver=Error.InterpolationOver;	//插补量过大报警号
+	
+	psDSPPacketOutALM->ComID=sSCIPara.SCIA_ComID;
+
+	Packet_CRCMake((INT8U *)&psDSPPacketOutCMD->Length);
+	//SCIA_TxTotal = psDSPPacketOutCMD->Length+4;	
+}
+
+//响应-- SERVO_50系统数据通讯包协议
+void ARM_BackCMD_CMD(void)
+{
+	psDSPPacketOutCMD->Head=0xaa;
+	psDSPPacketOutCMD->Length=sizeof(tsDSP_PACKETOUT_CMD)-6;
+	psDSPPacketOutCMD->Port=0xb0;			//站点地址
+	psDSPPacketOutCMD->Protocal= 0x0f;		
+	psDSPPacketOutCMD->Command= sSCIPara.SCIA_MainCMD;		
+	psDSPPacketOutCMD->Packet= 0x00;		
+	psDSPPacketOutCMD->ComID=sSCIPara.SCIA_ComID;
+	Packet_CRCMake((INT8U *)&psDSPPacketOutCMD->Length);
+	//SCIA_TxTotal = psDSPPacketOutCMD->Length+4;	
+}
+
+void ARM_BackCMD_B0(void)
+{
+    FLOAT64 FloatSpeed;
+	
+	psDSPPacketOutB0->Head=0xaa;
+	psDSPPacketOutB0->Length=sizeof(tsDSP_PACKETOUT_B0)-8;
+	psDSPPacketOutB0->Port = 0xb0;			//站点地址
+	psDSPPacketOutB0->Protocal = 0x0f;		
+	psDSPPacketOutB0->Command = 0xb0;		
+	psDSPPacketOutB0->Packet = 0x00;
+	psDSPPacketOutB0->StdRunCount = (STDNCSign.RealRunCount)?(GCodeBuffer[(STDNCSign.RealRunCount-1) % STDGCODE_MOD].SendCount):(0);
+	psDSPPacketOutB0->SpcRunCount = (SPCNCSign.RealRunCount)?(SPCGCodeBuffer[(SPCNCSign.RealRunCount-1) % SPCGCODE_MOD].SendCount):(0);
+	if( OverallSign.NCSign)
+	{
+		FloatSpeed = (System.FunctionSelectionSwitch_07 & 0x01)?(NC_AREAControl.Vm):(NC_AREAControl.VNow);
+		if(OverallSign.NCSign == NCSIGN_STD)
+			psDSPPacketOutB0->Feed=FloatSpeed*60/System.STDShakeSign;
+		else
+			psDSPPacketOutB0->Feed=FloatSpeed*60/System.SPCShakeSign;
+	}
+	else
+	{
+		psDSPPacketOutB0->Feed = 0;
+	}
+	psDSPPacketOutB0->Speed =(System.FunctionSelectionSwitch_07 & 0x02)?(S_Spindle.SpinSpeedSet*S_Spindle.SpindleGrade*0.1):(S_Spindle.RealDisplaySpeed);	
+	
+	// 自动对刀锁定坐标  CH0506
+	if((AutoAdjustTool.FunctionSign) && (AutoAdjustTool.LockCoordinateSign) && (AutoAdjustTool.LockValidSign) )
+	{
+		psDSPPacketOutB0->MacX = AutoAdjustTool.LockCoordinate.X;	
+		psDSPPacketOutB0->MacY = AutoAdjustTool.LockCoordinate.Y;	
+		psDSPPacketOutB0->MacZ = AutoAdjustTool.LockCoordinate.Z;	
+	}
+	else
+	{
+		// 由于搜索参考点为正向定位，所以负方向运动时需+ 间隙值
+		psDSPPacketOutB0->MacX = X_Encoder.MACH_PositionValue+((OverallSign.MoveSign.X)?(0):(System.Gap.X));
+		psDSPPacketOutB0->MacY = Y_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Y)?(0):(System.Gap.Y));
+		psDSPPacketOutB0->MacZ = Z_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Z)?(0):(System.Gap.Z));
+	}
+	psDSPPacketOutB0->MacIV = 0;
+	psDSPPacketOutB0->MacV  = 0;
+	
+	if(S_Spindle.RunModeSign == S_RunModeRIGID)
+	{
+		psDSPPacketOutB0->MacVI = fabs(S_Spindle.DeltaSbyRigidKp/S_Spindle.RigidKp)*1000.0;	//unit:um  for test
+	}
+	else
+	{
+		psDSPPacketOutB0->MacVI = NC_AREAControl.VNow*1000.0;
+	}	
+	if(S_Spindle.RunModeSign != S_RunModeRIGID) //攻牙时角度不限制  Ch20101203 by royalqing
+	{
+		if(U_Encoder.MACH_PositionValue<0)
+		{
+			U_Encoder.MACH_PositionValue =U_Encoder.MACH_PositionValue%System.SpindleOneRing_EncoderRealDegree+System.SpindleOneRing_EncoderRealDegree;
+		}
+		if(U_Encoder.MACH_PositionValue>=System.SpindleOneRing_EncoderRealDegree)
+		{	
+			U_Encoder.MACH_PositionValue = U_Encoder.MACH_PositionValue%System.SpindleOneRing_EncoderRealDegree;		
+		}
+	}
+	psDSPPacketOutB0->Angle = divdp(U_Encoder.MACH_PositionValue,System.GearDownRate);	
+
+	//INFOR1
+	psDSPPacketOutB0->Info1 = 0;
+	if( OverallSign.NCSign == NCSIGN_SPC )
+	{
+		//可继续发SPC G代码,缓冲区未满或非获得定位点状态
+		if(((SPCNCSign.RealRunCount+SPCGCODE_MOD-2)>SPCNCSign.RealSendCount) && (SPCNCSign.GetPositionSign ==0)) 		
+			psDSPPacketOutB0->Info1 |= 0x01;			
+	}	
+	if( OverallSign.NCSign == NCSIGN_STD )
+	{
+		//可继续发STD G代码,缓冲区未满或非获得定位点状态
+		if(((STDNCSign.RealRunCount+STDGCODE_MOD-80)>STDNCSign.RealSendCount) && (STDNCSign.GetPositionSign ==0)) 
+			psDSPPacketOutB0->Info1 |= 0x02;	
+	}	
+	//DSP_B0模块报警
+	if(Error.MainErrorSign) 	
+		psDSPPacketOutB0->Info1 |= 0x04;			
+	//BIT4  单段单条运行结束标志（1有效）
+	if((STDNCSign.SingleModeSign) && (STDNCSign.SingleRunOver)&&(STDNCSign.Waitsign == 1)) 
+	{
+		if(OverallSign.NCSign == NCSIGN_STD)
+		{
+			STDNCSign.Waitsign = 0;
+			psDSPPacketOutB0->Info1 |= 0x10;			
+		}	
+	}	
+	System.SPCLocateOver=FAIL;
+	if(((OverallSign.NCSign==NCSIGN_STD)&&(STDNCSign.GetPositionSign == 0))
+        ||((OverallSign.NCSign==NCSIGN_SPC)&&(SPCNCSign.GetPositionSign == 0)))
+	{
+		psDSPPacketOutB0->Info1 |=0x20;		//DSP获得稳定反馈坐标值标志
+		System.SPCLocateOver=OK;
+	}
+	//自动对刀功能各轴坐标锁定标志
+	if((AutoAdjustTool.FunctionSign) && (AutoAdjustTool.LockCoordinateSign)) 
+	{
+		if(AutoAdjustTool.Style)
+		{	
+			//有手动对刀模式
+			psDSPPacketOutB0->Info1 |=0x40;
+		}
+		else if(AutoAdjustTool.ZDealEndSign)
+		{	
+			//无手动对刀模式
+			psDSPPacketOutB0->Info1 |=0x40;
+		}
+	}	
+	//最后一条代码走完标志  1－走完   
+	if(OverallSign.LastCodeOverSign)
+		psDSPPacketOutB0->Info1 |=0x80;
+	
+	//INFOR2
+	psDSPPacketOutB0->Info2 = 0;						
+	if(GET_XPOS==0) 
+		psDSPPacketOutB0->Info2 |= 0x01;
+	if(GET_YPOS==0)
+		psDSPPacketOutB0->Info2 |= 0x02;
+	if(GET_ZPOS==0)
+		psDSPPacketOutB0->Info2 |= 0x04;	
+	if(GET_APOS==0)
+		psDSPPacketOutB0->Info2 |= 0x08;
+	
+	//INFOR3
+	psDSPPacketOutB0->Info3 = 0;						
+	if(GET_XNEG==0) 
+		psDSPPacketOutB0->Info3 |= 0x01;
+	if(GET_YNEG==0)
+		psDSPPacketOutB0->Info3 |= 0x02;
+	if(GET_ZNEG==0)
+		psDSPPacketOutB0->Info3 |= 0x04;
+	if(GET_ANEG==0)
+		psDSPPacketOutB0->Info3 |= 0x08;	
+
+	//INFOR4
+	psDSPPacketOutB0->Info4 = 0;	
+	if(GET_XCOIN) 
+		psDSPPacketOutB0->Info4 |= 0x01;	
+	if(GET_YCOIN)
+		psDSPPacketOutB0->Info4 |= 0x02;	
+	if(GET_ZCOIN)
+		psDSPPacketOutB0->Info4 |= 0x04;	
+	if(GET_ACOIN) 
+		psDSPPacketOutB0->Info4 |= 0x08;	
+
+	//INFOR5
+	psDSPPacketOutB0->Info5	 = 0;	
+	if(Reference.SearchRefSign==1)		
+	{
+		if(Reference.FindRefSign.X)
+			psDSPPacketOutB0->Info5 |= 0x01;
+		if(Reference.FindRefSign.Y) 
+			psDSPPacketOutB0->Info5 |= 0x02;
+		if(Reference.FindRefSign.Z) 
+			psDSPPacketOutB0->Info5 |= 0x04;
+		if(Reference.FindRefSign.A) 
+			psDSPPacketOutB0->Info5 |= 0x08;		
+		if(Reference.FindRefSign.U) 
+			psDSPPacketOutB0->Info5 |= 0x40;
+	}	
+
+	//INFOR6
+	psDSPPacketOutB0->Info6 = OverallSign.NCSign & 0x03;
+	if(S_Spindle.ORTCompleteSign == 1)
+		psDSPPacketOutB0->Info6 |=0x04;	
+	if(sSCIPara.SCIB_ResendCount > 6) 	
+		psDSPPacketOutB0->Info6 |=0x20;	//DSP与主轴驱动器通讯阻断
+
+	
+	psDSPPacketOutB0->Info7=0;
+	psDSPPacketOutB0->Info8=0;
+	psDSPPacketOutB0->Info9=0;
+
+	
+	if((SPCNCSign.RealRunCount>0)&&(OverallSign.NCSign==NCSIGN_SPC))
+	{
+		INT16U Feed;
+		Feed=SPCGCodeBuffer[(SPCNCSign.RealRunCount-1) % SPCGCODE_MOD].Feedrate*60;
+		psDSPPacketOutB0->Info10=Feed;
+		psDSPPacketOutB0->Info11=Feed>>8;
+	}	
+	else
+	{	
+		psDSPPacketOutB0->Info10=0;
+		psDSPPacketOutB0->Info11=0;
+	}	
+	psDSPPacketOutB0->Info12=sSCIPara.SCIA_ErrorCount;
+	psDSPPacketOutB0->Info13 = S_Spindle.TorqueAbs;	
+
+	//INFOR14-INFOR17	版本日期返回
+	psDSPPacketOutB0->Info14 = 14;	//年	20130711
+	psDSPPacketOutB0->Info15 = 5;	//月
+	psDSPPacketOutB0->Info16 = 12;	//日
+	psDSPPacketOutB0->Info17 = 0x00;	//版本 V3.0.0
+	
+	//INFOR18
+	psDSPPacketOutB0->Info18 = 0;
+	if(sCPLD_IO_In4Register.bit.IN7 == 1)  
+		psDSPPacketOutB0->Info18 |= 0x01;
+	if(sCPLD_IO_In4Register.bit.IN8 == 1)  
+		psDSPPacketOutB0->Info18 |= 0x02;
+
+	//INFOR19
+	psDSPPacketOutB0->Info19 = 0;
+	if(sCPLD_IO_In4Register.bit.ATCLock== 1)
+		psDSPPacketOutB0->Info19 |=0x01;
+	if(sCPLD_IO_In4Register.bit.ATCTrack== 0)
+		psDSPPacketOutB0->Info19 |=0x02;	
+	if((sCPLD_IO_In4Register.bit.A4LOCK == 0)&&(!(System.FunctionSelectionSwitch_11 & 0x08)))
+		psDSPPacketOutB0->Info19 |=0x04;
+	if((sCPLD_IO_In4Register.bit.A4LOCK == 1)&&(!(System.FunctionSelectionSwitch_11 & 0x08)))
+		psDSPPacketOutB0->Info19 |=0x08;
+	if((sCPLD_IO_In4Register.bit.IN5 == 0)&&(!(System.FunctionSelectionSwitch_11 & 0x10)))
+		psDSPPacketOutB0->Info19 |=0x10;
+	if((sCPLD_IO_In4Register.bit.IN6 == 0)&&(!(System.FunctionSelectionSwitch_11 & 0x20)))
+		psDSPPacketOutB0->Info19 |=0x20;
+	if((sCPLD_IO_In4Register.bit.IN7 == 0)&&(!(System.FunctionSelectionSwitch_11 & 0x40)))
+		psDSPPacketOutB0->Info19 |=0x40;	
+	if((sCPLD_IO_In4Register.bit.IN8 == 0)&&(!(System.FunctionSelectionSwitch_11 & 0x80)))
+		psDSPPacketOutB0->Info19 |=0x80;
+	
+	//INFOR20
+	psDSPPacketOutB0->Info20 = 0;
+	if((sCPLD_IO_Out2Register.bit.A4LOCK == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x01)))
+		psDSPPacketOutB0->Info20 |=0x01;	
+	if((sCPLD_IO_Out2Register.bit.A5LOCK == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x02)))
+		psDSPPacketOutB0->Info20|=0x02;
+	if((sCPLD_IO_Out2Register.bit.OUT3 == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x04)))
+		psDSPPacketOutB0->Info20 |=0x04;
+	if((sCPLD_IO_Out2Register.bit.OUT4 == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x08)))
+		psDSPPacketOutB0->Info20 |=0x08;
+	if((sCPLD_IO_Out2Register.bit.OUT5 == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x10)))
+		psDSPPacketOutB0->Info20 |=0x10;
+	if((sCPLD_IO_Out2Register.bit.OUT6 == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x20)))
+		psDSPPacketOutB0->Info20 |=0x20;
+	if((sCPLD_IO_Out2Register.bit.OUT7 == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x40)))
+		psDSPPacketOutB0->Info20 |=0x40;
+	if((sCPLD_IO_Out2Register.bit.OUT8 == 0)&&(!(System.FunctionSelectionSwitch_12 & 0x80)))
+		psDSPPacketOutB0->Info20 |=0x80;
+	
+	psDSPPacketOutB0->ComID= sSCIPara.SCIA_ComID;		
+	Packet_CRCMake((INT8U *)&psDSPPacketOutB0->Length);
+	//SCIA_TxTotal = psDSPPacketOutB0->Length+4;
+
+	//进行软限位信息处理
+	System.SoftLimit=0;
+	if((System.SPCMode & BIT7)&&(!(System.SPCMode & BIT2)))
+	{
+		if(psDSPPacketOutB0->MacX > System.XLimitPos)
+			System.SoftLimit |= BIT0;
+		if(psDSPPacketOutB0->MacY > System.YLimitPos)
+			System.SoftLimit |= BIT1;
+		if(psDSPPacketOutB0->MacZ > System.ZLimitPos)
+			System.SoftLimit |= BIT2;
+		if(psDSPPacketOutB0->MacX < System.XLimitNeg)
+			System.SoftLimit |= BIT8;
+		if(psDSPPacketOutB0->MacY < System.YLimitNeg)
+			System.SoftLimit |= BIT9;
+		if(psDSPPacketOutB0->MacZ < System.ZLimitNeg)
+			System.SoftLimit |= BIT10;		
+	}	
+	//进行硬限位信息处理
+	System.HardLimit=psDSPPacketOutB0->Info2+((INT16U)psDSPPacketOutB0->Info3<<8);	
+}
+
+//响应-- 读多条诊断代码数据通讯包协议
+void ARM_BackCMD_B5(void)
+{
+	INT32U StartCount,TotalCount;
+	tsGCODE *psNowCode;
+	tsDSP_PACKETOUT_B5SUB *psB5CodeSub;
+
+	psDSPPacketOutB5->Head=0xaa;
+	psDSPPacketOutB5->Length=sizeof(tsDSP_PACKETOUT_B5)-8;
+	psDSPPacketOutB5->Port = 0xb0;			//站点地址
+	psDSPPacketOutB5->Protocal = 0x0f;		
+	psDSPPacketOutB5->Command = 0xb5;		
+	psDSPPacketOutB5->Packet = 0x00;		
+	STDNCSign.RealRunCount = Error.RealRunCount;
+	StartCount = (STDNCSign.RealRunCount>10)?(STDNCSign.RealRunCount-10):(0);
+	TotalCount=StartCount+15;
+	psB5CodeSub=psDSPPacketOutB5->sCode;
+	while(StartCount < TotalCount)	
+	{		
+		if(StartCount)
+			psNowCode= &GCodeBuffer[(StartCount-1)%STDGCODE_MOD];
+		else
+			psNowCode= &GCodeBuffer[0];	
+		psB5CodeSub->SendCount=psNowCode->SendCount;
+		psB5CodeSub->CMDMain=psNowCode->CMD1; 
+		psB5CodeSub->CMDSub=psNowCode->CMD2;	
+		psB5CodeSub->sPointS.X=psNowCode->StartPoint.X;
+		psB5CodeSub->sPointS.Y=psNowCode->StartPoint.Y;
+		psB5CodeSub->sPointS.Z=psNowCode->StartPoint.Z;
+		psB5CodeSub->sPointS.IV=0;
+		psB5CodeSub->sPointS.V=0;
+		psB5CodeSub->sPointE.X=psNowCode->EndPoint.X;
+		psB5CodeSub->sPointE.Y=psNowCode->EndPoint.Y;
+		psB5CodeSub->sPointE.Z=psNowCode->EndPoint.Z;
+		psB5CodeSub->sPointE.IV=0;
+		psB5CodeSub->sPointE.V=0;		
+		psB5CodeSub->sPointC.X=psNowCode->CenterPoint.X;
+		psB5CodeSub->sPointC.Y=psNowCode->CenterPoint.Y;
+		psB5CodeSub->sPointC.Z=psNowCode->CenterPoint.Z;
+		psB5CodeSub->AngleS = divdp( divdp( psNowCode->StartAngle*PI, 180.0 ) , System.UnitTo_d );
+		psB5CodeSub->AngleE = divdp( divdp( psNowCode->EndAngle*PI, 180.0 ), System.UnitTo_d );
+		psB5CodeSub->Stotal = divdp( psNowCode->Stotal, System.UnitTo_mm );		
+		psB5CodeSub->FeedRate = psNowCode->Feedrate;
+		psB5CodeSub->Vm = psNowCode->Vm;
+		psB5CodeSub->Ve = psNowCode->Ve;
+		psB5CodeSub->Radius = psNowCode->Radius;
+		
+		StartCount++;
+		psB5CodeSub++;
+	}
+	psDSPPacketOutB5->ComID = sSCIPara.SCIA_ComID;	
+	Packet_CRCMake((INT8U *)&psDSPPacketOutB5->Length);
+	//SCIA_TxTotal = psDSPPacketOutB5->Length+4;
+}
+
+//响应-- 读DSP运动诊断信息数据通讯包协议
+void ARM_BackCMD_B6(void)
+{
+	psDSPPacketOutB6->Head=0xaa;
+	psDSPPacketOutB6->Length=sizeof(tsDSP_PACKETOUT_B6)-8;
+	psDSPPacketOutB6->Port = 0xb0;			//站点地址
+	psDSPPacketOutB6->Protocal = 0x0f;		
+	psDSPPacketOutB6->Command = 0xb6;		
+	psDSPPacketOutB6->Packet = 0x00;
+
+	psDSPPacketOutB6->sInfo.N = Error.RealRunCount;	
+	psDSPPacketOutB6->sInfo.Pointer_StartCode = NC_AREAControl_Error.Pointer_StartCode;
+	psDSPPacketOutB6->sInfo.Pointer_EndCode = NC_AREAControl_Error.Pointer_EndCode;
+	psDSPPacketOutB6->sInfo.Pointer_FirstInflexionCode = NC_AREAControl_Error.Pointer_FirstInflexionCode;
+	psDSPPacketOutB6->sInfo.Pointer_SecondInflexionCode = NC_AREAControl_Error.Pointer_SecondInflexionCode;
+	psDSPPacketOutB6->sInfo.Ss = NC_AREAControl_Error.Ss;
+	psDSPPacketOutB6->sInfo.Vg1 = 0;
+	psDSPPacketOutB6->sInfo.Vg2 = 0;
+	psDSPPacketOutB6->sInfo.SingleSign = 0;
+	psDSPPacketOutB6->sInfo.Stotal = divdp( NC_AREAControl_Error.Stotal, System.UnitTo_mm );
+	psDSPPacketOutB6->sInfo.CurrentStotal = divdp( NC_AREAControl_Error.CurrentStotal, System.UnitTo_mm );
+	psDSPPacketOutB6->sInfo.CurrentStotalLast = divdp( NC_AREAControl_Error.CurrentStotalLast, System.UnitTo_mm );
+	psDSPPacketOutB6->sInfo.Snow = divdp( NC_AREAControl_Error.Snow, System.UnitTo_mm );
+	psDSPPacketOutB6->sInfo.DeltaSnow = divdp( NC_AREAControl_Error.DeltaSnow, System.UnitTo_mm );
+	psDSPPacketOutB6->sInfo.I = NC_AREAControl_Error.I;
+	psDSPPacketOutB6->sInfo.TotalN = NC_AREAControl_Error.TotalN;
+	psDSPPacketOutB6->sInfo.Vs = NC_AREAControl_Error.Vs;
+	psDSPPacketOutB6->sInfo.Vm = NC_AREAControl_Error.Vm;
+	psDSPPacketOutB6->sInfo.VmReal = NC_AREAControl_Error.VmReal;
+	psDSPPacketOutB6->sInfo.Ve = NC_AREAControl_Error.Ve;
+	psDSPPacketOutB6->sInfo.VNow = NC_AREAControl_Error.VNow;
+	psDSPPacketOutB6->sInfo.VNowOut = NC_AREAControl_Error.VNowOut;
+	psDSPPacketOutB6->sInfo.Vmin = NC_AREAControl_Error.VMin;
+	psDSPPacketOutB6->sInfo.VChangeSign = NC_AREAControl_Error.VChangeSign;
+	psDSPPacketOutB6->sInfo.CurveClassNumber = 0;
+	psDSPPacketOutB6->sInfo.StotalReal= 0;
+	psDSPPacketOutB6->sInfo.StotalLast = NC_AREAControl_Error.SnowLast;
+	psDSPPacketOutB6->sInfo.Sac = NC_AREAControl_Error.Sac;
+	psDSPPacketOutB6->sInfo.Sm = NC_AREAControl_Error.Sm;
+	psDSPPacketOutB6->sInfo.Sde = NC_AREAControl_Error.Sde;
+	psDSPPacketOutB6->sInfo.SA = 0;
+	psDSPPacketOutB6->sInfo.S1 = NC_AREAControl_Error.S1;
+	psDSPPacketOutB6->sInfo.S2 = NC_AREAControl_Error.S2;
+	psDSPPacketOutB6->sInfo.S3 = NC_AREAControl_Error.S3;
+	psDSPPacketOutB6->sInfo.S4 = NC_AREAControl_Error.S4;
+	psDSPPacketOutB6->sInfo.S5 = NC_AREAControl_Error.S5;
+	psDSPPacketOutB6->sInfo.T1 = NC_AREAControl_Error.T1;
+	psDSPPacketOutB6->sInfo.T2 = NC_AREAControl_Error.T2;
+	psDSPPacketOutB6->sInfo.T3 = NC_AREAControl_Error.T3;
+	psDSPPacketOutB6->sInfo.T4= NC_AREAControl_Error.T4;
+	psDSPPacketOutB6->sInfo.T5 = NC_AREAControl_Error.T5;
+	psDSPPacketOutB6->sInfo.DeltaT1 = NC_AREAControl_Error.DeltaT1;
+	psDSPPacketOutB6->sInfo.DeltaT2 = NC_AREAControl_Error.DeltaT2;
+	psDSPPacketOutB6->sInfo.DeltaT3= NC_AREAControl_Error.DeltaT3;
+	psDSPPacketOutB6->sInfo.DeltaT4 = NC_AREAControl_Error.DeltaT4;
+	psDSPPacketOutB6->sInfo.DeltaT5 = NC_AREAControl_Error.DeltaT5;
+	psDSPPacketOutB6->sInfo.a_ac = NC_AREAControl_Error.a_ac;
+	psDSPPacketOutB6->sInfo.a_de = NC_AREAControl_Error.a_de;
+	psDSPPacketOutB6->sInfo.CurrentT = NC_AREAControl_Error.CurrentT;
+	psDSPPacketOutB6->sInfo.sNowValue.X = NC_AREAControl_Error.NowValue.X;
+	psDSPPacketOutB6->sInfo.sNowValue.Y = NC_AREAControl_Error.NowValue.Y;
+	psDSPPacketOutB6->sInfo.sNowValue.Z = NC_AREAControl_Error.NowValue.Z;
+	psDSPPacketOutB6->sInfo.sNowValue.IV = 0;
+	psDSPPacketOutB6->sInfo.sNowValue.V= 0;
+	psDSPPacketOutB6->sInfo.sNowValue.VI = 0;
+	psDSPPacketOutB6->sInfo.sOldValue.X = NC_AREAControl_Error.DeltaStep.X;
+	psDSPPacketOutB6->sInfo.sOldValue.Y = NC_AREAControl_Error.DeltaStep.Y;
+	psDSPPacketOutB6->sInfo.sOldValue.Z = NC_AREAControl_Error.DeltaStep.Z;
+	psDSPPacketOutB6->sInfo.sOldValue.IV = 0;
+	psDSPPacketOutB6->sInfo.sOldValue.V = 0;
+	psDSPPacketOutB6->sInfo.sOldValue.VI = 0;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulse.X = STDNCSign_Error.RealRunCount;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulse.Y = STDNCSign_Error.RealSendCount;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulse.Z = STDNCSign_Error.LastRealSendCount;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulse.IV = STDNCSign_Error.VeVmCalCount;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulse.V = STDNCSign_Error.BreakSign;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulse.VI = 0;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulseOut.X = NC_AREAControl_Error.NowPointMACHPulseOut.X;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulseOut.Y = NC_AREAControl_Error.NowPointMACHPulseOut.Y;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulseOut.Z = NC_AREAControl_Error.NowPointMACHPulseOut.Z;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulseOut.IV = 0;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulseOut.V = 0;
+	psDSPPacketOutB6->sInfo.sNowPointMACPulseOut.VI = 0;
+	psDSPPacketOutB6->sInfo.sEndPointMACPulseOut.X = NC_AREAControl_Error.EndPointMachPulseOut.X;
+	psDSPPacketOutB6->sInfo.sEndPointMACPulseOut.Y = NC_AREAControl_Error.EndPointMachPulseOut.Y;
+	psDSPPacketOutB6->sInfo.sEndPointMACPulseOut.Z = NC_AREAControl_Error.EndPointMachPulseOut.Z;
+	psDSPPacketOutB6->sInfo.sEndPointMACPulseOut.IV = 0;
+	psDSPPacketOutB6->sInfo.sEndPointMACPulseOut.V = 0;
+	psDSPPacketOutB6->sInfo.sEndPointMACPulseOut.VI = 0;
+	psDSPPacketOutB6->sInfo.RealSendCount = NC_AreaRunNCSign_Error.RealSendCount;
+	psDSPPacketOutB6->sInfo.RealRunCount = NC_AreaRunNCSign_Error.RealRunCount;
+	psDSPPacketOutB6->sInfo.sServoUnit.X = X_Encoder.Resolution;
+	psDSPPacketOutB6->sInfo.sServoUnit.Y = Y_Encoder.Resolution;
+	psDSPPacketOutB6->sInfo.sServoUnit.Z = Z_Encoder.Resolution;
+	psDSPPacketOutB6->sInfo.sServoUnit.IV = 0;
+	psDSPPacketOutB6->sInfo.sServoUnit.V = 0;
+	psDSPPacketOutB6->sInfo.sServoUnit.VI =0;
+	psDSPPacketOutB6->sInfo.SpindleUnit = U_Encoder.Resolution;	
+	psDSPPacketOutB6->sInfo.sSerVoPosition.X = X_Encoder.MACH_PositionValue;
+	psDSPPacketOutB6->sInfo.sSerVoPosition.Y = Y_Encoder.MACH_PositionValue;
+	psDSPPacketOutB6->sInfo.sSerVoPosition.Z = Z_Encoder.MACH_PositionValue;
+	psDSPPacketOutB6->sInfo.sSerVoPosition.IV = 0;
+	psDSPPacketOutB6->sInfo.sSerVoPosition.V = 0;
+	psDSPPacketOutB6->sInfo.sSerVoPosition.VI = 0;
+	psDSPPacketOutB6->sInfo.SpindlePosition = U_Encoder.MACH_PositionValue;	
+	memset(psDSPPacketOutB6->sInfo.Bak,0x0,56*4);
+	psDSPPacketOutB6->ComID = sSCIPara.SCIA_ComID;	
+	Packet_CRCMake((INT8U *)&psDSPPacketOutB6->Length);
+	//SCIA_TxTotal = psDSPPacketOutB6->Length+4;
+}
+
+/***************************************************************************/
+/*  Function name: ARM_comA()                                   */
+/*  Argument:NO     	                                    */
+/*  Return value:		0:ARM<->DSP.COM false;1:ARM<->DSP.COM OK  */
+/*  Function: Receive code from ARM Function                                           */
+/***************************************************************************/
+void SCIA_ComARM(void) 
+{  
+   INT32U i;
+   if(!shm_cycBufIsEmpty(CYCBUF_ARMEVENT))
+   {
+        INT32U event=psDSPPacketTemp->Command;
+		switch(event)
+		{   /*
+			case 0x06: 	break;		
+			case 0x50: 	ARM_MainCMD_Servo(&X_Servo);break;		
+			case 0x51: 	ARM_MainCMD_Servo(&Y_Servo);break;		
+			case 0x52: 	ARM_MainCMD_Servo(&Z_Servo);break;		
+			case 0x53: 	ARM_MainCMD_Servo(&IV_Servo);break;		
+			case 0x54: 	ARM_MainCMD_Servo(&V_Servo);break;		
+			case 0x55: 	ARM_MainCMD_Servo(&VI_Servo);break;		
+			case 0x70: 	ARM_MainCMD_70();break;	*/  
+            //case 0xb1: 	ARM_MainCMD_B1();break;	
+              	
+			case 0xb0: 	ARM_MainCMD_B0();break;		
+				
+			case 0xb2: 	ARM_MainCMD_B2();break;		
+			//case 0xb3: 	ARM_MainCMD_B3();break;		
+			case 0xb4: 	ARM_MainCMD_B4();break;		
+			case 0xb5: 	break;		
+			case 0xb6: 	break;		
+			default:    break;	
+		}											
+        shm_cycBufRead(CYCBUF_ARMEVENT, &event, 1);
+    	switch(event)
+    	{
+    		case 0x06: 	ARM_BackCMD_06();break;		
+    		case 0x50: 	ARM_BackCMD_CMD();break;		
+    		case 0x51: 	ARM_BackCMD_CMD();break;		
+    		case 0x52: 	ARM_BackCMD_CMD();break;		
+    		case 0x53: 	ARM_BackCMD_CMD();break;		
+    		case 0x54: 	ARM_BackCMD_CMD();break;		
+    		case 0x55: 	ARM_BackCMD_CMD();break;		
+    		case 0x70: 	ARM_BackCMD_CMD();break;		
+    		case 0xb0: 	ARM_BackCMD_B0();break;		
+    		case 0xb1: 	ARM_BackCMD_CMD();break;		
+    		case 0xb2: 	ARM_BackCMD_CMD();break;		
+    		//case 0xb3: 	ARM_BackCMD_B0();break;		
+    		case 0xb4: 	ARM_BackCMD_B0();break;		
+    		case 0xb5: 	ARM_BackCMD_B5();break;		
+    		case 0xb6: 	ARM_BackCMD_B6();break;		
+    		default:		ARM_BackCMD_B0();break;
+    	}
+	//set a dsp event to tell arm we had reply
+	shm_cycBufWrite(CYCBUF_DSPEVENT, &event, 1);
+	}
+		//return ;
+    //if in std mode receive STD gcode  
+    if( OverallSign.NCSign == NCSIGN_STD )
+    {
+        if(!shm_cycBufIsEmpty(CYCBUF_GCODE))
+        {
+            i=0;
+            while(i<10)
+            {
+                ARM_MainCMD_B3();
+                shm_cycBufRead(CYCBUF_GCODE, NULL, 0);
+                i++;
+                if(shm_cycBufIsEmpty(CYCBUF_GCODE))
+                    break;
+            }
+        }
+    }
+}
+
+//处理SCIB 串口程序
+//VT变频器总线控制
+void SCIB_ComVT(void)		
+{
+	if(sSCIPara.SCIB_ReceiveSign)
+	{	
+		//发送30ms无正确数据返回, 重发数据到VT总线	
+	/*	if(++sSCIPara.SCIB_RecCount>33)
+		{
+			sSCIPara.SCIB_RecCount=0;
+			sSCIPara.SCIB_SendSign = 1;
+			sSCIPara.SCIB_ReceiveSign = 0;
+			sSCIPara.SCIB_ResendCount++;
+			sSCIPara.SCIB_TotalResendCount++;			
+			if(sSCIPara.SCIB_ResendCount> System.SCIB_NoCom_Count)
+			{	
+				// 主轴板与DSP 通讯报警	
+				Error.SCIBComError = 1;
+				high_error();				
+				S_Spindle.RealDisplaySpeed=0;
+			}
+		}*/
+		
+		//发送8ms无正确数据返回, 重发数据到VT总线
+		if(get_delta_time(Timer0.SciBComCounter) > 10.0)
+		{	
+			sSCIPara.SCIB_SendSign = 1;
+			sSCIPara.SCIB_ReceiveSign = 0;
+			sSCIPara.SCIB_ResendCount++;
+			sSCIPara.SCIB_TotalResendCount++;			
+			if(sSCIPara.SCIB_ResendCount> System.SCIB_NoCom_Count)
+			{	
+				// 主轴板与DSP 通讯报警	
+				Error.SCIBComError = 1;
+				high_error();				
+				S_Spindle.RealDisplaySpeed=0;
+			}
+			Timer0.SciBComCounter = Timer0.GenericCounter;
+			return ;
+		}
+		
+		SCIB_RxTotal=0;
+		/*
+		while(rUARTB_STATUS & 0x0200)      
+		{	
+			if(SCIB_RxIndex >= UARTB_TXRXBUFSIZE)
+				SCIB_RxIndex = 0;			
+			SCIB_RxBuf[++SCIB_RxIndex] = rUARTB_BUF;
+			if(++SCIB_RxTotal > UARTB_TXRXBUFSIZE)
+				break;
+		}*/
+		spindleRX(SCIB_RxBuf,&SCIB_RxIndex,(INT16U)UARTB_TXRXBUFSIZE);
+		if(SCIB_RxIndex>=13)
+		{
+			SCIB_RxIndex=0;
+			if(psSPINPackeIn->Port!=0x01)
+				return ;
+			if(Packet_CRC16Get(&SCIB_RxBuf[1], 11)!=psSPINPackeIn->Check)
+				return ;		
+			//主轴驱动反馈速度( 传输单位: 0.01Hz)
+			S_Spindle.VT_FeedbackSpeedHz=psSPINPackeIn->Speed1+((INT32U)psSPINPackeIn->Speed23<<8);			
+			//反馈角度( 传输单位: 0.1度)
+			S_Spindle.VT_FeedbackAngle = psSPINPackeIn->Angle*100;
+			//转矩绝对值(0.1%)
+			S_Spindle.TorqueAbs = psSPINPackeIn->Torque/10;				
+						
+			// 兼容无编码器VT软件未升级版本,主轴转速做假时通用
+			if(S_Spindle.PulsePerCycle==0)
+				S_Spindle.VT_FeedbackSpeedHz = S_Spindle.SpeedHz;		
+			if(S_Spindle.VT_FeedbackAngle >= System.SpindleOneRing_EncoderRealDegree)
+				S_Spindle.VT_FeedbackAngle = S_Spindle.VT_FeedbackAngle % System.SpindleOneRing_EncoderRealDegree;
+			if(psSPINPackeIn->Command & 0x08)
+			{
+				FLOAT64 DeltaAngle;		// 当前主轴偏离角度 单位: 度	
+				DeltaAngle =fabs(divdp(fabs((FLOAT64)S_Spindle.VT_FeedbackAngle-(FLOAT64)S_Spindle.ORTM252Angle), 1000.0));						
+				if(((DeltaAngle<(S_Spindle.S_StopDistance+3.0))||(DeltaAngle>(360.0-S_Spindle.S_StopDistance-3.0))))
+				{	
+					// STD_run_M252()中初始化;或B4通用定位初始化.
+					if(++S_Spindle.VT_ORT_OK_Counter > 4)
+						S_Spindle.ORTCompleteSign = 1;					
+				}			
+			}
+			//考虑负载波动，定位完称标志有效后不根据VT变频器标志取消
+			if(psSPINPackeIn->Command & 0x80) 
+			{
+				//VT报警
+				if(++sSCIPara.SCIB_ErrorCount>System.SpindleErrorCount)
+				{
+					Error.ServoAlarm.U = 1;	
+					Error.MainErrorSign = 1;
+				}
+			}
+			else
+			{
+				Error.ServoAlarm.U = 0;
+				sSCIPara.SCIB_ErrorCount = 0;
+			}
+			
+			sSCIPara.SCIB_SendSign = 1;
+			sSCIPara.SCIB_ReceiveSign = 0;
+			sSCIPara.SCIB_RecCount=0;
+			sSCIPara.SCIB_ResendCount = 0;
+			sSCIPara.SCIB_TotalRightCount++;
+		}
+		return ;
+	}
+
+	if(sSCIPara.SCIB_SendSign==1)
+	{
+		if(Error.ORTError)		
+		{
+			SpindleOutSignal.bit.CW  = 0;
+			SpindleOutSignal.bit.CCW = 0;
+		}
+		//切换主轴电机方向
+		if(U_Servo.S003)
+		{
+			if(SpindleOutSignal.bit.CW == 1)
+			{
+				SpindleOutSignal.bit.CW = 0;
+				SpindleOutSignal.bit.CCW = 1;
+			}
+			else if(SpindleOutSignal.bit.CCW == 1)
+			{
+				SpindleOutSignal.bit.CCW = 0;
+				SpindleOutSignal.bit.CW = 1;
+			}
+		}		
+		//当主轴为通常运行模式时，减少通讯频率
+		if(S_Spindle.RunModeSign == S_RunModeGeneric)
+		{	
+			if(++sSCIPara.SCIB_SendCycle<2)
+				return ;
+			sSCIPara.SCIB_SendCycle = 0;			
+		}
+		else
+		{
+			// 还未启动刚性攻牙
+			if((S_Spindle.RunModeSign==S_RunModeRIGID)&&(S_Spindle.RigidTapStartSign==0))				
+				S_Spindle.SpeedHz = 0;
+			SpindleOutSignal.bit.ZEROSERVO = (S_Spindle.SpeedHz)?0:1;			
+		}	  	 
+
+   	 	//信息码8Byte
+   	 	psSPINPackeOut->Command = 0;	//变频器控制命令字节
+		if(SpindleOutSignal.bit.CW == 1)
+   	 		psSPINPackeOut->Command |= 0x01;   	 	
+   	 	else if(SpindleOutSignal.bit.CCW == 1)
+			psSPINPackeOut->Command |= 0x03;  	 
+
+		if(SpindleOutSignal.bit.RESETALM == 1)
+   	 	{	
+   	 		//BIT2=1   复位主轴
+			psSPINPackeOut->Command |= 0x04;
+			SpindleOutSignal.bit.RESETALM = 0;
+   	 	}
+
+		if(S_Spindle.RunModeSign == S_RunModeORTM252)
+		{	
+			//BIT3=1   主轴定位,加入定位时S_Spindle.SpeedHz!
+			psSPINPackeOut->Command |= 0x08;		
+			S_Spindle.SpeedHz = divdp( S_Spindle.ORTSpeed*1000.0,S_Spindle.SpeedPerVolt );	//S_Spindle.SpeedHz unit :0.01HZ
+   	 	}
+
+		if(System.FunctionSelectionSwitch_10 & 0x01)
+			psSPINPackeOut->Command |= 0x10;
+		//转速( 传输单位: 0.01Hz  占3字节)
+		psSPINPackeOut->Speed1 = S_Spindle.SpeedHz;
+		psSPINPackeOut->Speed23 = S_Spindle.SpeedHz>>8;
+		//定位角度( 传输单位: 0.1度)
+		psSPINPackeOut->Angle = divdp( S_Spindle.ORTM252Angle, 100 );
+		psSPINPackeOut->Check = Packet_CRC16Get(&SCIB_TxBuf[1], 11);
+		
+		sSCIPara.SCIB_SendSign= 0; 
+	    //sCPLD_IO_Out2Register .bit.BUS485RW= 1;	//send TX enable
+	    //rCPLD_IO_OUT2= sCPLD_IO_Out2Register.all;
+
+		SCIB_RxIndex = 0;		  
+		SCIB_TxIndex =0;
+		SCIB_TxTotal = 13;
+		/*
+		while(SCIB_TxIndex<SCIB_TxTotal)	
+		{
+			if(!(rUARTB_STATUS & USTAT_TXRDY))
+				break;
+			rUARTB_BUF  = SCIB_TxBuf[++SCIB_TxIndex];			
+		}*/
+		spindleTX(SCIB_TxBuf, SCIB_TxTotal);
+		sSCIPara.SCIB_SendCount=0;
+		Timer0.SciBComCounter = Timer0.GenericCounter;	
+		return ;
+	}
+	
+	//数据发送后等待3ms 后转为接受状态
+/*	if(++sSCIPara.SCIB_SendCount>3)
+	{			
+		sCPLD_IO_Out2Register .bit.BUS485RW= 0;	// RX enable	
+		rCPLD_IO_OUT2= sCPLD_IO_Out2Register.all;
+		SCIB_RxIndex = 0;
+		sSCIPara.SCIB_ReceiveSign = 1;
+	}*/
+
+	//数据发送后等待1.0秒后转为接受状态
+	if(get_delta_time( Timer0.SciBComCounter) > 1.0)
+	{			
+		//sCPLD_IO_Out2Register .bit.BUS485RW= 0;	// RX enable
+		//rCPLD_IO_OUT2= sCPLD_IO_Out2Register.all;
+		SCIB_RxIndex = 0;
+		sSCIPara.SCIB_ReceiveSign = 1;
+		Timer0.SciBComCounter = Timer0.GenericCounter;
+	}
+}   
+
+//**********************************************
+//		DSP串口通讯处理程序 ARM-DSP
+//          2M通讯速率
+//          512字节缓冲区
+//**********************************************
+void SCIA_Init(void)
+{   /*
+	rUART_CONF=0xff01;
+	rUART_RESET=0;             	 	//复位
+	rUART_RESET=0XFFFF;     		 //启动
+	sSCIPara.SCIA_ErrorCount = 0;
+	sSCIPara.SCIA_SendSign = 0;
+	sSCIPara.SCIA_ReceiveSign = 1;
+	sSCIPara.SCIA_ComCount = 0;
+	SCIA_TxIndex=0;
+	SCIA_TxTotal=0;
+	SCIA_RxIndex=1;
+    */
+    psDSPPacketTemp=(tsDSP_PACKET_TEMP *)parm2dspPKG;	
+    
+	psDSPPacketInSPC=(tsDSP_PACKETIN_SPC *)parm2dspPKG;	
+	//STD gcode is send by cycbuffer now
+	//psDSPPacketInSTD=(tsDSP_PACKETIN_STD *)parm2dspPKG;
+	psDSPPacketInALM=(tsDSP_PACKETIN_ALM *)parm2dspPKG;
+	psDSPPacketInCOM=(tsDSP_PACKETIN_COM *)parm2dspPKG;
+	//psDSPPacketInSYS=(tsDSP_PACKETIN_SYS *)parm2dspPKG;
+	psDSPPacketInServo=(tsDSP_PACKETIN_SERVO *)parm2dspPKG;
+	psDSPPacketInLinear=(tsDSP_PACKETIN_LINEAR *)pPARALINEAR;
+
+	psDSPPacketOutALM=(tsDSP_PACKETOUT_ALM *)pdsp2armPKG;	
+	psDSPPacketOutCMD=(tsDSP_PACKETOUT_CMD *)pdsp2armPKG;
+	psDSPPacketOutB0=(tsDSP_PACKETOUT_B0 *)pdsp2armPKG;
+	psDSPPacketOutB5=(tsDSP_PACKETOUT_B5 *)pdsp2armPKG;
+	psDSPPacketOutB6=(tsDSP_PACKETOUT_B6 *)pdsp2armPKG;	
+	psDSPPacketOutServo=(tsDSP_PACKETOUT_SERVO *)pdsp2armPKG;	
+}
+
+//**********************************************
+//		DSP串口通讯处理程序 DSP-Spindle
+//          250K通讯速率
+//          512字节缓冲区
+//**********************************************
+void SCIB_Init(void)
+{	/*
+	rUART_CONFB=0xff07;
+	rUART_RESET=0;              			//复位
+	rUART_RESET=0XFFFF;     	  		//启动
+	*/
+	initSpindleCOM();
+	sSCIPara.SCIB_SendCount = 0;		//复位后清零!added by enjoy 20090903
+	sSCIPara.SCIB_ResendCount = 0;
+	sSCIPara.SCIB_TotalResendCount = 0;
+	sSCIPara.SCIB_SendSign = 1;
+	sSCIPara.SCIB_ReceiveSign = 0;
+	sSCIPara.SCIB_SendCycle = 0;
+	sSCIPara.SCIB_ErrorCount = 0;
+	psSPINPackeIn=(tsSPIN_PACKETIN *)SCIB_RxBuf;
+	psSPINPackeOut=(tsSPIN_PACKETOUT *)SCIB_TxBuf;
+	
+	psSPINPackeOut->Port = 0x01;		//站点地址
+   	psSPINPackeOut->Protocal = 0x01;	//协议类型- 主站发送包	 	
+   	psSPINPackeOut->Function = 0x10;	//功能码
+   	psSPINPackeOut->Rsd9 = 0;
+	psSPINPackeOut->Rsd10 = 0;	
+}

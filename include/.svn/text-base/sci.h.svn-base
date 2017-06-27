@@ -1,0 +1,48 @@
+#ifndef _DSP6713_SCI_H
+#define _DSP6713_SCI_H
+
+#include "datatype.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+//串行通讯用参数
+typedef struct
+{
+	INT16U	SCIA_MainCMD;			// 协议命令码
+	INT16U	SCIA_RxLength;			// 协议包长度
+	INT16U	SCIA_ComID;			// 协议包条号
+	INT16U	SCIA_BackCmdNo;		//数据返回命令NO
+	INT16U	SCIA_GradeCount;
+	INT16U	SCIA_SendSign;			
+	INT16U	SCIA_ReceiveSign;
+	INT32U	SCIA_ErrorCount;		//串口A出错次数	
+	INT32U	SCIA_ComCount;			//串口A出错次数	
+
+	INT16U	SCIB_SendRight;
+	INT16U	SCIB_SendCycle;			//当主轴为通常运行模式时，减少通讯频率
+	INT16U	SCIB_SendSign;			//DSP发送数据
+	INT16U	SCIB_ReceiveSign;		//DSP接收VT反馈数据
+	INT32U	SCIB_RecCount;
+	INT32U	SCIB_SendCount;
+	INT32U	SCIB_ResendCount;
+	INT32U	SCIB_TotalResendCount;
+	INT32U	SCIB_TotalRightCount;
+	INT32U	SCIB_ErrorCount;		//串口B出错次数	
+}tsSCIPARA;
+
+extern void SCIA_Init(void);
+extern void SCIB_Init(void);
+
+
+
+extern void SCIA_ComARM(void);
+extern void SCIB_ComVT(void);
+extern INT16U Packet_CRC16Get(INT8U *pData, INT16U Length);
+#ifdef __cplusplus
+}
+#endif 	
+
+#endif

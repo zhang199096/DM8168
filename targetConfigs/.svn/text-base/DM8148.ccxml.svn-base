@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<configurations XML_version="1.2" id="configurations_0">
+    
+<configuration XML_version="1.2" id="Texas Instruments XDS2xx USB Emulator_0">
+        <instance XML_version="1.2" desc="Texas Instruments XDS2xx USB Emulator_0" href="connections/TIXDS2XXUSB_Connection.xml" id="Texas Instruments XDS2xx USB Emulator_0" xml="TIXDS2XXUSB_Connection.xml" xmlpath="connections"/>
+        <connection XML_version="1.2" id="Texas Instruments XDS2xx USB Emulator_0">
+            <instance XML_version="1.2" href="drivers/tixds560icepick_d.xml" id="drivers" xml="tixds560icepick_d.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560c674x.xml" id="drivers" xml="tixds560c674x.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560arm9.xml" id="drivers" xml="tixds560arm9.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560cs_dap.xml" id="drivers" xml="tixds560cs_dap.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560cortexM.xml" id="drivers" xml="tixds560cortexM.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560cs_child.xml" id="drivers" xml="tixds560cs_child.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560cortexA.xml" id="drivers" xml="tixds560cortexA.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560csstm.xml" id="drivers" xml="tixds560csstm.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds560etbcs.xml" id="drivers" xml="tixds560etbcs.xml" xmlpath="drivers"/>
+            <platform XML_version="1.2" id="platform_0">
+                <instance XML_version="1.2" desc="TI814x_0" href="devices/ti814x.xml" id="TI814x_0" xml="ti814x.xml" xmlpath="devices"/>
+                <device HW_revision="1" XML_version="1.2" description="TI814x" id="TI814x_0" partnum="TI814x" simulation="no">
+                    <router HW_revision="1.0" XML_version="1.2" description="ICEPick_D Router" id="IcePick_D_0" isa="ICEPICK_D">
+                        <subpath id="subpath_10">
+                            <router HW_revision="1.0" XML_version="1.2" description="CS_DAP Router" id="CS_DAP_1" isa="CS_DAP">
+                                <subpath id="subpath_2">
+                                    <property Type="numericfield" Value="0x1a" desc="Port Number_0" id="Port Number"/>
+                                    <cpu HW_revision="1.0" XML_version="1.2" desc="ICECrusherCS_1" description="Cross Triggering" deviceSim="false" id="ICECrusherCS_0" isa="cs_child"/>
+                                </subpath>
+                            </router>
+                        </subpath>
+                        <subpath id="subpath_11">
+                            <router HW_revision="1.0" XML_version="1.2" description="CS_DAP Router" id="CS_DAP_2" isa="CS_DAP">
+                                <subpath id="subpath_3">
+                                    <property Type="numericfield" Value="0x1b" desc="Port Number_1" id="Port Number"/>
+                                </subpath>
+                            </router>
+                        </subpath>
+                    </router>
+                </device>
+            </platform>
+        </connection>
+    </configuration>
+</configurations>

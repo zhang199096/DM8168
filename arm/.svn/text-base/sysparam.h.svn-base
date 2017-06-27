@@ -1,0 +1,85 @@
+/*----------------------------------------------------------------------
+file: SYSPARAM.h 
+version: 0.01.0
+author : vinge  
+date   :20080920
+description : define the system parmeters used in L system
+------------------------------------------------------------------------   
+*/
+#ifndef __SYSPARAM_H__
+#define __SYSPARAM_H__
+#include "taskglobal.h"
+#define SYS_PARAM_MAX   (240) //INCLUDE THE DSP 240 PARAM
+#define SYS_PARAM_GROUP_MAX  (8)
+#define SYS_PGROUP_INDEX_MAX  (100)
+#define DSP_PARAM_BYTE_COUNT  (120)
+#define DSP_PARAM_DWORD_COUNT (120)
+#define DSP_PARAM_MAX       (DSP_PARAM_BYTE_COUNT+DSP_PARAM_DWORD_COUNT)
+//****************************************************************
+#define PARAM_TYPE_RESV     (0)  //not used yet ,can set any valuel
+#define PARAM_TYPE_BOOL     (1) // 0 1 SELECT
+#define PARAM_TYPE_HEX      (2)  //the parmater data type
+#define PARAM_TYPE_INTS     (3)
+#define PARAM_TYPE_INTU     (4)
+
+//****************************************************************
+#define PARAM_SET_ERR_OK        (0)
+#define PARAM_SET_ERR_WRP       (1) //write protect
+#define PARAM_SET_ERR_NOPARAM   (2) //ERR INDEX IS GIVEN
+#define PARAM_SET_ERR_NOTBOOL   (3) // ONT 0 OR 1 GIVE TO BOOL
+#define PARAM_SET_ERR_OUTRANGE  (4)
+
+#define PARAM_SET_ACT_NONE      (0)
+#define PARAM_SET_RESET         (1) //ASK FOR REST BEFORE USE
+//****************************************************************
+//#define PARAM_TYPE_FLOAT     (3)  //will show as 9 int and 5tail
+typedef  struct __parameter
+{
+    S32 val; 
+    S32 limitL; //lowtes value
+    S32 limitH; //hightes value
+    U8  group;  //分组
+    S16  grpIndex; //功能索引号，分组的基础上把功能相同的参数排一起
+    U8  type;
+    //U8  action; // what should do after val change; 
+}__attribute__((packed)) Tparameter;
+/*
+typedef  struct __tDSPparam
+{
+    S8  sysbyte[DSP_PARAM_BYTE_COUNT];
+    S32 sysdword[DSP_PARAM_DWORD_COUNT];
+} TDSPparam,*PDSPparam;
+*/
+extern Tparameter SYSparam[SYS_PARAM_MAX];
+extern TDSPparam DSPparamDefault;
+extern TDSPparam DSPparam;
+
+extern U16 PGroup[SYS_PARAM_GROUP_MAX][SYS_PGROUP_INDEX_MAX];
+extern U8  PGcount[SYS_PARAM_GROUP_MAX];
+//****************************************************************
+void paramInit(void);
+U8 paramSetVal(U16 index,S32 newval);
+U8 paramAutoSetVal(U16 index,S32 newval);
+U8 paramChkBool(U16 index,S32 newval);
+U8 paramChkLimit(U16 index,S32 newval);
+U8 paramSave(const U16 index, S32 newval);
+void paramLoadDefault(void);
+void paramSave2File(void);
+U8 paramLoadFromFile(void);
+U8 paramLoadFromBuffer(U8* buf, U16 bufLen);
+
+void CheckParma(void);
+BOOL examDog(void);
+U8 setOPlock(U8*keystr);
+U8 checkOPlock(U8 * keystr);
+U32 setPasswords(void);
+U32 unlockPassWord(U8 index, U8* str);
+U8 checkPassword(void);
+U8 setPassWordTime(BOOL timeOut);
+U8 toolCompSave2File(void);
+U8  toolCompLoadFromFile(void);
+U8  toolclearall(void);
+U8 toolCompSave2File2(void);
+U8  toolCompLoadFromFile2(void);
+#endif
+

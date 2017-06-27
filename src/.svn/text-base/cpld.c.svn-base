@@ -1,0 +1,1317 @@
+/****************************************************************/
+/* Name :                                                                   				*/
+/*       CPLD interface		                      							*/
+/* Function:                                                               				*/
+/*       DSP&CPLD                                            						*/
+/*  Copyright 2008 by LOKSHUN CNC  Equipment LTD.                           	*/
+/*  All rights reserved  LOKSHUN CNC  Equipment LTD.                   		*/ 
+/*	Designed by: DAVID SHEN										*/
+/*   Modified by : ENJOY LU		                                                            */
+/****************************************************************/
+
+#include "..\\include\\dec6713_main.h"
+/*
+union tsIO_OUT1_REG 		sCPLD_IO_Out1Register;
+union tsIO_OUT2_REG 		sCPLD_IO_Out2Register;
+union tsIO_IN1_REG		sCPLD_IO_In1Register;
+union tsIO_IN2_REG		sCPLD_IO_In2Register;
+union tsIO_IN3_REG		sCPLD_IO_In3Register;
+union tsIO_IN4_REG		sCPLD_IO_In4Register;
+*/
+INT16U  CPLD_IO_Out1Register;
+INT16U  CPLD_IO_In1Register;
+INT16U  CPLD_IO_In2Register;
+INT16U  CPLD_GPIO_INRegister[2];
+INT16U  CPLD_GPIO_OUTRegister[2];
+union tsIO_DOG_REG tsDOGRegister;
+union tsIO_WHEEL_REG tsWHEELRegister;
+union tsIO_OUT2_REG 	sCPLD_IO_Out2Register;
+union tsIO_IN4_REG		sCPLD_IO_In4Register;
+tsENCODER X_Encoder;
+tsENCODER Y_Encoder;
+tsENCODER Z_Encoder;
+tsENCODER IV_Encoder;
+tsENCODER V_Encoder;
+tsENCODER VI_Encoder;
+tsENCODER U_Encoder;		// 主轴编码器 
+tsENCODER W_Encoder;
+
+tsSERVO X_Servo;
+tsSERVO Y_Servo;
+tsSERVO Z_Servo;
+tsSERVO IV_Servo;
+tsSERVO V_Servo;
+tsSERVO VI_Servo;
+tsSERVO U_Servo;
+
+INT16U HardLimitCounter = 0;
+
+
+//CH0609
+void CPLD_ReadIOIn1(void)		//CPLD IO 输入口1
+{
+	CPLD_IO_In1Register = rCPLD_IO_IN1;
+	WRITE_AALM(1);	// test bug	A4轴报警作假
+	
+	if(System.RunState == SimulateRun)
+	{
+		//仿真运行报警信号作假		
+        SET_ALL_ALM;
+		//仿真运行coin信号作假
+		SET_ALL_COIN;
+	}
+	
+	OverallSign.EveryAxisCoinValid = (GET_XCOIN & GET_YCOIN &GET_ZCOIN);
+
+	
+	Error.ServoAlarm.X = 1-GET_XALM;
+	Error.ServoAlarm.Y = 1-GET_YALM;
+	Error.ServoAlarm.Z = 1-GET_ZALM;
+	
+	if( Error.ServoAlarm.X || Error.ServoAlarm.Y || Error.ServoAlarm.Z)
+	{	//伺服全报警(使用急停开关)，截取数据	
+		Error.MainErrorSign 	= 1;
+		S_Spindle.RunModeSign 	= S_RunModeGeneric;
+		S_Spindle.RunSign 		= S_STOP;
+		S_Spindle.SpinSpeedSet 	= 0;	
+		S_Spindle.SpinSpeedOutputVolt=0.0;
+		Reference.FindRefSign.X = 0;
+		Reference.FindRefSign.Y = 0;
+		Reference.FindRefSign.Z = 0;
+		Reference.FindRefSign.U = 0;
+	}	
+}
+
+//CH0701
+void CPLD_ReadIOIn2(void)		//CPLD IO 输入口2
+{
+	/*
+	if(Error.MainErrorSign)
+	{
+		return;
+	}
+	*/
+	CPLD_IO_In2Register = rCPLD_IO_IN2;
+	//for test		A4轴限位作假
+	WRITE_ANEG(1);		
+	WRITE_APOS(1);
+	
+	if((System.FunctionSelectionSwitch_05 & 0x01) == 0x01)
+	{
+        SET_ALL_LIMIT;
+	}
+		
+	if(System.RunState == SimulateRun)
+	{	//仿真运行限位信号作假
+        SET_ALL_LIMIT;
+	}
+
+	if(System.HardLimitFilterTime<1)
+	{
+		return;
+	}
+	if(OverallSign.NCSign ==NCSIGN_STD)
+	{
+		if(HardLimitCounter ==1 )
+		{
+			if(get_delta_time(Timer0.HardLimitStartCounter)> System.HardLimitFilterTime)
+			{				
+				if(	GET_XNEG == 0||
+				    GET_XPOS == 0)
+				{
+					Reference.SearchRefSign = 1;
+					Reference.FindRefSign.X = 0;
+					S_Spindle.RunModeSign 	= S_RunModeGeneric;
+					S_Spindle.RunSign 		= S_STOP;
+					S_Spindle.SpinSpeedSet 	= 0;
+					S_Spindle.SpinSpeedOutputVolt=0.0;
+					STDNCSign.GetPositionSign = 1;
+					//Error.EncoderError.X = 1;
+					Error.MainErrorSign = 1;
+				}
+				if( GET_YNEG == 0|| 	
+					GET_YPOS == 0)
+				{
+					Reference.SearchRefSign = 1;
+					Reference.FindRefSign.Y = 0;
+					S_Spindle.RunModeSign 	= S_RunModeGeneric;
+					S_Spindle.RunSign 		= S_STOP;
+					S_Spindle.SpinSpeedSet 	= 0;
+					S_Spindle.SpinSpeedOutputVolt=0;
+					STDNCSign.GetPositionSign = 1;
+					//Error.EncoderError.Y = 1;
+					Error.MainErrorSign = 1;
+				}
+				if(	GET_ZNEG == 0||		
+					GET_ZPOS == 0)
+				{
+					Reference.SearchRefSign = 1;
+					Reference.FindRefSign.Z = 0;
+					S_Spindle.RunModeSign 	= S_RunModeGeneric;
+					S_Spindle.RunSign 		= S_STOP;
+					S_Spindle.SpinSpeedSet 	= 0;
+					STDNCSign.GetPositionSign = 1;
+					//Error.EncoderError.Z = 1;
+					Error.MainErrorSign = 1;
+				}
+
+			}
+			else
+			{
+				if(	GET_XNEG == 0||		
+					GET_XPOS == 0||	
+					GET_YNEG == 0||		
+					GET_YPOS == 0||	
+					GET_ZNEG == 0||		
+					GET_ZPOS == 0||	
+					GET_ANEG == 0||
+					GET_APOS == 0)
+				{
+					HardLimitCounter = 1;
+					SET_ALL_LIMIT;
+				}
+				else
+				{
+					HardLimitCounter = 0;
+				}
+			}
+		}
+		else 
+		{
+			if(	GET_XNEG == 0||		
+				GET_XPOS == 0||	
+				GET_YNEG == 0||		
+				GET_YPOS == 0||	
+				GET_ZNEG == 0||		
+				GET_ZPOS == 0||	
+				GET_ANEG == 0||
+				GET_APOS == 0)
+			{
+				Timer0.HardLimitStartCounter = Timer0.GenericCounter;
+				HardLimitCounter = 1;
+				
+				SET_ALL_LIMIT;
+			}
+			else
+			{
+				HardLimitCounter = 0;
+			}
+		}
+	}
+	else
+	{
+		HardLimitCounter = 0;
+	}
+
+	//OVER IS MOVE FORM IO IN3 TO IO IN2
+	if(System.RunState == SimulateRun)
+	{	//仿真运行轴插补运行结束信号作假
+		OverallSign.EveryAxisOverValid =1;
+	}
+	else
+	{		
+		OverallSign.EveryAxisOverValid=  
+		    GET_XOVER & GET_YOVER & GET_ZOVER;
+	}
+}
+/*
+void CPLD_ReadIOIn3(void)		//CPLD IO 输入口3
+{
+	sCPLD_IO_In3Register.all  = rCPLD_IO_IN3;	
+
+	
+}*/
+void CPLD_ReadIOIn4(void)		//CPLD IO 输入口4		
+{   
+	//sCPLD_IO_In4Register.all  = rCPLD_IO_IN4;
+	//for test	opened 20091213 test hitachi
+	//if((System.FunctionSelectionSwitch_05 & 0x02) == 0x02)
+	{
+	        sCPLD_IO_In4Register.bit.ATCLock = 0;		//for test	自动对刀开关（常开） 1-ON 对刀有效
+	        sCPLD_IO_In4Register.bit.ATCTrack = 1;		
+	}
+
+	if(System.RunState == SimulateRun)
+	{	//仿真运行自动对刀信号作假
+		sCPLD_IO_In4Register.bit.ATCLock = 0;		//for test	自动对刀开关（常开） 1-ON 对刀有效
+		sCPLD_IO_In4Register.bit.ATCTrack = 1;		//for test	自动对刀超行程开关（常闭） 1-ON 未过行程0-OFF 过行程 
+	}
+}
+/***************CPLD IO AERA END***************/	
+
+void CPLD_EncoderJudge(void)		//判断编码器有无报警
+{
+	if(Error.MainErrorSign)
+		return ;
+
+	if(System.RunState == SimulateRun)
+	{	//系统仿真运行编码器报警作假。
+		Error.EncoderError.X = 0;
+		Error.EncoderError.Y = 0;
+		Error.EncoderError.Z = 0;
+		Error.MainErrorSign = 0;
+		return ;
+	}
+		
+	if(System.EncoderCheckChoose.X)
+	{
+		Error.EncoderError.X = GET_X_ENCODER_ERR;		
+		//解决安川驱动开始运行初期编码器报警问题
+		if(Error.EncoderError.X)
+		{
+			if(Reference.FindRefSign.X == 0)
+			{
+				CPLD_EncoderResetX();
+				Error.EncoderError.X = 0;
+			}
+		}
+	}
+	
+	if(System.EncoderCheckChoose.Y)
+	{	
+		Error.EncoderError.Y = GET_Y_ENCODER_ERR;
+		//解决安川驱动开始运行初期编码器报警问题
+		if(Error.EncoderError.Y)
+		{
+			if(Reference.FindRefSign.Y == 0)
+			{
+				CPLD_EncoderResetY();
+				Error.EncoderError.Y = 0;
+			}
+		}
+	}
+
+	if(System.EncoderCheckChoose.Z)
+	{
+		Error.EncoderError.Z = GET_Z_ENCODER_ERR;
+		//解决安川驱动开始运行初期编码器报警问题
+		if(Error.EncoderError.Z)
+		{
+			if(Reference.FindRefSign.Z == 0)
+			{
+				CPLD_EncoderResetZ();
+				Error.EncoderError.Z = 0;
+			}
+		}
+	}
+	
+	if(System.EncoderCheckChoose.U)
+	{
+		if(Error.EncoderError.U == 0)
+		{
+			Error.EncoderError.U = GET_U_ENCODER_ERR;
+		}
+	}		
+
+	if(Error.EncoderError.X||Error.EncoderError.Y||Error.EncoderError.Z||Error.EncoderError.U)
+	{
+		Error.MainErrorSign = 1;
+	}
+}
+
+/**************** initialize encoder begin ********************/
+void CPLD_EncoderResetX(void)	//初始化X 编码器
+{
+	//复位编码器计数器和四细分器
+	CLR_X_ENCODER_RST ;
+
+	X_Encoder.OldPOSValue = 0;
+	X_Encoder.NowPOSValue = 0;
+	X_Encoder.HighPOSValue = 0;
+	X_Encoder.LPM_PositiveCounterPort = (INT16U *) ADDRESS_X_ENCODER_COUNTER;
+	X_Encoder.MACH_PositionValue = 0;		
+
+	//取消复位编码器计数器和四细分器
+    SET_X_ENCODER_RST;
+}
+void CPLD_EncoderResetY(void)	//初始化Y 编码器
+{
+	//复位编码器计数器和四细分器
+	CLR_Y_ENCODER_RST;
+
+	Y_Encoder.OldPOSValue = 0;
+	Y_Encoder.NowPOSValue = 0;
+	Y_Encoder.HighPOSValue = 0;
+	Y_Encoder.LPM_PositiveCounterPort = (INT16U *) ADDRESS_Y_ENCODER_COUNTER;
+	Y_Encoder.MACH_PositionValue = 0;		
+
+	//取消复位编码器计数器和四细分器
+	SET_Y_ENCODER_RST;
+}
+
+void CPLD_EncoderResetZ(void)	//初始化Z 编码器
+{
+	//复位编码器计数器和四细分器
+	CLR_Z_ENCODER_RST;
+
+	Z_Encoder.OldPOSValue = 0;
+	Z_Encoder.NowPOSValue = 0;
+	Z_Encoder.HighPOSValue = 0;
+	Z_Encoder.LPM_PositiveCounterPort = (INT16U *) ADDRESS_Z_ENCODER_COUNTER;
+	Z_Encoder.MACH_PositionValue = 0;		
+
+	//取消复位编码器计数器和四细分器
+	SET_Z_ENCODER_RST;
+}
+
+void CPLD_EncoderResetU(void)	//初始化U 编码器
+{
+	S_Spindle.CalSpeedOKSign = -1;		
+
+	//复位编码器计数器和四细分器
+	CLR_U_ENCODER_RST;
+
+	U_Encoder.OldPOSValue = 0;
+	U_Encoder.NowPOSValue = 0;
+	U_Encoder.HighPOSValue = 0;
+	U_Encoder.LPM_PositiveCounterPort = (INT16U *) ADDRESS_U_ENCODER_COUNTER;
+	U_Encoder.OverSign = 0;			//added by enjoy 200908
+	U_Encoder.MACH_PositionValue = 0;		
+	U_Encoder.ResetSign = 1;
+	//取消复位编码器计数器和四细分器
+	SET_U_ENCODER_RST;
+}
+void CPLD_EncoderResetW(void)	//初始化w 手轮 编码器
+{
+	//复位编码器计数器和四细分器
+	CLR_W_ENCODER_RST;
+
+	W_Encoder.OldPOSValue = 0;
+	W_Encoder.NowPOSValue = 0;
+	W_Encoder.HighPOSValue = 0;
+	W_Encoder.LPM_PositiveCounterPort = (INT16U *) ADDRESS_WHEEL_ENCODER_COUNTER;
+	W_Encoder.MACH_PositionValue = 0;		
+
+	//取消复位编码器计数器和四细分器
+	SET_W_ENCODER_RST;
+}	
+INT16U CPLD_EncoderValue(tsENCODER *psEncoder)
+{
+	INT16U NowPOSValue1,NowPOSValue2;
+	NowPOSValue1 = *psEncoder->LPM_PositiveCounterPort;
+	NowPOSValue2 = *psEncoder->LPM_PositiveCounterPort;	
+	if(abs(NowPOSValue1-NowPOSValue2) > 10000)
+	{
+		NowPOSValue1 = *psEncoder->LPM_PositiveCounterPort;
+		NowPOSValue2 = *psEncoder->LPM_PositiveCounterPort;
+		if(abs(NowPOSValue1-NowPOSValue2) > 10000)
+		{
+			OverallSign.GetMachCoordinateRight = 0;
+			return FALSE;
+		}
+	}	
+	psEncoder->NowPOSValue = NowPOSValue2;
+	if((psEncoder->OldPOSValue>60000) && (psEncoder->NowPOSValue<10000))
+		psEncoder->HighPOSValue ++;
+	else if((psEncoder->OldPOSValue<10000) && (psEncoder->NowPOSValue>60000))
+		psEncoder->HighPOSValue --;
+	if(abs(psEncoder->HighPOSValue) > 360)//  2^31  / 65536 /Resolution(360000/4096)  =     372.827
+	{
+		psEncoder->HighPOSValue = 0;
+		psEncoder->OverSign = 1;
+	}
+	return TRUE;
+}
+
+void CPLD_IOInit(void)
+{
+	
+}
+void CPLD_ServoInit(void)
+{
+	X_Servo.PWM_Port = (INT16U *) ADDRESS_X_PWM;;
+	X_Servo.LPM_CounterPort = (INT16U *) ADDRESS_X_PULSE_COUNTER;	
+	X_Servo.PWM_PeriodRegister = 1000;
+	 *(X_Servo.PWM_Port) = X_Servo.PWM_PeriodRegister;
+	 *(X_Servo.LPM_CounterPort) = 0;
+
+	Y_Servo.PWM_Port = (INT16U *) ADDRESS_Y_PWM;
+	Y_Servo.LPM_CounterPort = (INT16U *) ADDRESS_Y_PULSE_COUNTER;	
+	Y_Servo.PWM_PeriodRegister = 1000;
+	*(Y_Servo.PWM_Port) = Y_Servo.PWM_PeriodRegister;
+	*(Y_Servo.LPM_CounterPort) = 0;	
+
+	Z_Servo.PWM_Port = (INT16U *) ADDRESS_Z_PWM;
+	Z_Servo.LPM_CounterPort = (INT16U *) ADDRESS_Z_PULSE_COUNTER;	
+	Z_Servo.PWM_PeriodRegister = 1000;
+	 *(Z_Servo.PWM_Port) = Z_Servo.PWM_PeriodRegister;
+	 *(Z_Servo.LPM_CounterPort) = 0;
+}
+
+void CPLD_ServoOff(void)
+{
+    SET_ALLAXIS_OFF; 
+}
+
+void CPLD_ServoOn(void )
+{
+    SET_ALLAXIS_ON;
+}
+//------------------------------------------------------------------------
+INT32U IOINS;
+INT32U IOOUTS;
+void read_CPLD_GPIOIN()
+{
+    CPLD_GPIO_INRegister[0] =rCPLD_GPIO_IN1;
+    CPLD_GPIO_INRegister[1] =rCPLD_GPIO_IN2;
+}
+void write_CPLD_GPIOOUT()
+{
+    rCPLD_GPIO_OUT1=CPLD_GPIO_OUTRegister[0];
+    rCPLD_GPIO_OUT2=CPLD_GPIO_OUTRegister[1];
+}
+INT32U GPIOinput_all()
+{
+    read_CPLD_GPIOIN();
+    IOINS=((CPLD_GPIO_INRegister[1]&0Xff)<<16)|CPLD_GPIO_INRegister[0];
+    sCPLD_IO_In4Register.all=CPLD_GPIO_INRegister[1];
+    return IOINS;
+}
+BOOL GPIOinput_bit(INT8U bit)
+{
+    BOOL result;
+    //if(bit>24) return FALSE
+    //read_CPLD_GPIOIN();
+    result=GETBIT(IOINS,bit);
+    return result;
+}
+void GPIOinput_writebit(INT8U bit, BOOL value)
+{
+    WRITEBIT(IOINS,bit,value);
+}
+void GPIOoutput_bit(INT8U bit, BOOL value)
+{
+    //if(bit>31) return;
+    WRITEBIT(IOOUTS,bit,value);
+    CPLD_GPIO_OUTRegister[0]=IOOUTS&0XFFFF;
+    CPLD_GPIO_OUTRegister[1]=(IOOUTS>>16)&0XFFFF;
+    write_CPLD_GPIOOUT ();
+}
+void GPIOoutput_all(INT32U value)
+{
+    IOOUTS=(value&0X00FFFFFF)|((INT32U)sCPLD_IO_Out2Register.all)<<24;
+    CPLD_GPIO_OUTRegister[0]=IOOUTS&0XFFFF;
+    CPLD_GPIO_OUTRegister[1]=(IOOUTS>>16)&0XFFFF;
+    write_CPLD_GPIOOUT();
+}
+void GPIOoutput_flush()
+{
+    IOOUTS=(IOOUTS&0X00FFFFFF)|((INT32U)sCPLD_IO_Out2Register.all)<<24;
+    CPLD_GPIO_OUTRegister[0]=IOOUTS&0XFFFF;
+    CPLD_GPIO_OUTRegister[1]=(IOOUTS>>16)&0XFFFF;
+    write_CPLD_GPIOOUT();
+}
+BOOL GPIOoutput_getbit(INT8U bit)
+{
+    return GETBIT(IOOUTS,bit);
+}
+void GPIOinit()
+{
+    GPIOinput_all();
+    GPIOoutput_all (0);
+}
+//------------------------------------------
+__inline void write_CPLD_DOG ()
+{
+    rCPLD_DOG= tsDOGRegister.all;
+}
+void LEDset(short led,BOOL onoff)
+{   //onely two led :0 and 1
+    led=led%2;
+    if(led)
+    {
+        tsDOGRegister.bit.LED1=onoff;
+    }else{
+        tsDOGRegister.bit.LED0=onoff;
+    }
+    write_CPLD_DOG ();
+}
+void LEDflash(short led)
+{
+    if(led)
+    {
+        tsDOGRegister.bit.LED1^=1;
+    }else{
+        tsDOGRegister.bit.LED0^=1;
+    }
+    write_CPLD_DOG ();
+}
+void SetLCDBackLight(INT8U onoff,INT8U grade)
+{
+	static INT8U timer=0;
+	if(onoff){
+		tsDOGRegister.bit.LCDBLON=1;
+	}else{
+		tsDOGRegister.bit.LCDBLON=0;
+		//tsDOGRegister.bit.LCDPWMEN=0;
+	}
+	timer++;
+	if(timer>5)	timer=0;
+
+	if(timer<grade){
+		tsDOGRegister.bit.LCDPWMEN=1;
+	}else{
+		tsDOGRegister.bit.LCDPWMEN=0;
+	}
+	write_CPLD_DOG ();
+}
+INT16U getFkey(void)
+{
+	INT16U temp;
+	temp=rCPLD_FKEY;
+	return temp;
+}
+void read_CPLD_wheel()
+{
+	tsWHEELRegister.all =rCPLD_WHEEL_IO;
+}
+//-----------------------------------------------------------------------------
+//UART functions handle spindle and keyboard
+
+//uarts is in 8148 cpu,but place here for the org function set is in fpga
+
+#define UART1 0X48022000   //for spindle
+#define UART2 0X48024000   //for key
+#define UART3 0X481A6000   // for io
+#define UART485EN 0x4804c13c //this is a gpio special for 485
+
+#define UART_RX_REG    0x00
+#define UART_TX_REG    0x00
+#define UART_DLL_REG   0x00
+#define UART_DLH_REG   0x04
+#define UART_EFR_REG   0X08
+#define UART_FCR_REG   0X08
+#define UART_IIR_REG   0X08
+#define UART_LCR_REG   0x0c
+#define UART_MCR_REG   0X10
+#define UART_LSR_REG   0X14
+#define UART_SYSC_REG  0X54
+#define UART_SYSS_REG  0X58
+
+#define READ_UART_REG(uartbase,reg)          (*(unsigned char*)(uartbase+reg))
+#define WRITE_UART_REG(uartbase,reg,value)   (*(unsigned char*)(uartbase+reg)=(unsigned char)value)
+#define UART_RX_EMPTY(uartbase)              ((READ_UART_REG(uartbase,UART_LSR_REG)&0x3)==0)
+#define UART_TX_EMPTY(uartbase)              ((READ_UART_REG(uartbase,UART_LSR_REG)&0x20)!=0)
+#define UART_RX_ERR(uartbase)              ((READ_UART_REG(uartbase,UART_LSR_REG)&0x80)!=0)
+#define UART_RX_FIFO_CLEAN(uartbase)         (WRITE_UART_REG(uartbase,UART_FCR_REG,(READ_UART_REG(uartbase,UART_FCR_REG)&0x2)))
+
+/*-----------485 functions----------------------------*/
+
+
+#define UART485TXDELAY(time) { int i; for (i = 0; i < (time); i++);}
+#define UART485TXSTART {*(INT32U*) (UART485EN) |= 0x4000;}
+#define UART485TXOVER  {*(INT32U*) (UART485EN) &=~ 0x4000;}
+
+void initSpindleCOM()
+{
+	//init uart1 to 500k  for spindle
+	WRITE_UART_REG(UART1, UART_LCR_REG, 0XBF);
+	WRITE_UART_REG(UART1, UART_EFR_REG, 0X10);
+	WRITE_UART_REG(UART1, UART_DLL_REG, 6);
+	// 6:500k baud rate
+	WRITE_UART_REG(UART1, UART_DLH_REG, 0);
+	//WRITE_UART_REG(UART1, UART_IER_REG, );
+	WRITE_UART_REG(UART1, UART_LCR_REG, 0<<3|0<<2|3);
+    //n; 1 stop; 8 bit
+	WRITE_UART_REG(UART1, UART_FCR_REG, 1<<6|1<<4|1<<2|1<<1|1);
+	//clear fifo here
+	WRITE_UART_REG(UART1, UART_MCR_REG, 0);
+}
+void spindleTX(INT8U* buf,INT8U len)
+{
+	int i;
+    UART485TXSTART;
+	for (i = 0; i < len; i++) {
+        WRITE_UART_REG(UART1, UART_TX_REG, buf[i]);
+	}
+    UART485TXDELAY(1300*len);
+    UART485TXOVER;
+}
+
+void spindleRX(INT8U* buf,INT16U* count,INT16U bufsize)
+{
+	while(!UART_RX_EMPTY(UART1))
+	{
+	    if(*count>=bufsize)
+	        *count=0;
+        buf[*count] = READ_UART_REG(UART1,UART_RX_REG);
+		*count=(*count)+1;
+	}
+}
+/*---490 keyboard functions----*/
+void initKeyboardCOM()
+{
+    //init uart1 to 1m   for keyboard
+    WRITE_UART_REG(UART3, UART_LCR_REG, 0XBF);
+    WRITE_UART_REG(UART3, UART_EFR_REG, 0X10);
+    WRITE_UART_REG(UART3, UART_DLL_REG, 3);
+    // 3:1mhz baud rate
+    WRITE_UART_REG(UART3, UART_DLH_REG, 0);
+    WRITE_UART_REG(UART3, UART_LCR_REG, 0<<3|0<<2|3);
+    //n; 1 stop; 8 bit 
+    WRITE_UART_REG(UART3, UART_FCR_REG, 1<<6|1<<4|1<<2|1<<1|1);
+    //clear fifo here  
+    WRITE_UART_REG(UART3, UART_MCR_REG, 0);
+}
+
+void keyboardTX(INT8U* buf,INT8U len)
+{
+    int i;
+    for (i = 0; i < len; i++) {
+        WRITE_UART_REG(UART3, UART_TX_REG, buf[i]);
+    }
+}
+
+void keyboardRX(INT8U* buf,INT16U* count,INT16U bufsize)
+{
+    while(!UART_RX_EMPTY(UART3))
+    {
+        if(*count>=bufsize)
+        {
+            *count=0;
+        }
+        buf[*count] = READ_UART_REG(UART3,UART_RX_REG);
+        *count=(*count)+1;
+    }
+}
+
+//-----------------------------------------------------------------------------
+//以下为非线补区域
+//功能:计算X 轴机床坐标的非线性误差补偿值
+//入口: 未补偿的机床坐标值
+//出口: 补偿后的机床坐标值，对应激光测量值
+//单位:  um or ud(A4/A5) or pulse(Spindle)
+void NCCoord_LinearValueX(INT32S *pValueX)
+{
+	INT16U X_ECPT;
+	X_ECPT = OverallSign.EncoderCompPt.X;	
+
+	if(X_ECPT <= 0)
+	{
+		X_ECPT = 1;
+	}
+	else if(X_ECPT > System.AxisCompMaxL.X)
+	{
+		X_ECPT = System.AxisCompMaxL.X;
+	}
+
+	if(System.CompensationDirection.X)
+	{	//正向补偿
+		do
+		{
+			if(*pValueX > AxisCompBuffer[X_ECPT].XL)
+			{	
+				X_ECPT++;
+			}
+			else if(*pValueX < AxisCompBuffer[X_ECPT-1].XL)
+			{
+				X_ECPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((X_ECPT>0) && (X_ECPT<=System.AxisCompMaxL.X));	
+	}
+	else
+	{	//负向补偿
+		do
+		{
+			if(*pValueX < AxisCompBuffer[X_ECPT].XL)
+			{	
+				X_ECPT++;
+			}
+			else if(*pValueX > AxisCompBuffer[X_ECPT-1].XL)
+			{
+				X_ECPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((X_ECPT>0) && (X_ECPT<=System.AxisCompMaxL.X));	
+	}
+
+	if(X_ECPT == 0)
+	{
+		*pValueX = AxisCompBuffer[0].XR+(*pValueX-AxisCompBuffer[0].XL);
+	}
+	else if(X_ECPT > System.AxisCompMaxL.X)
+	{
+		*pValueX = AxisCompBuffer[System.AxisCompMaxL.X].XR+(*pValueX-AxisCompBuffer[System.AxisCompMaxL.X].XL);
+	}
+	else
+	{
+		*pValueX = AxisCompBuffer[X_ECPT-1].XR+(*pValueX-AxisCompBuffer[X_ECPT-1].XL)*
+			divdp( (AxisCompBuffer[X_ECPT].XR-AxisCompBuffer[X_ECPT-1].XR), (AxisCompBuffer[X_ECPT].XL-AxisCompBuffer[X_ECPT-1].XL) );
+	}		
+
+	OverallSign.EncoderCompPt.X = X_ECPT;	
+}
+
+//计算Y 轴机床坐标的非线性误差补偿值
+void	NCCoord_LinearValueY(INT32S *pValueY)
+{
+	INT16U Y_ECPT;
+	Y_ECPT = OverallSign.EncoderCompPt.Y;
+
+	if(Y_ECPT <= 0)
+	{
+		Y_ECPT = 1;
+	}
+	else if(Y_ECPT > System.AxisCompMaxL.Y)
+	{
+		Y_ECPT = System.AxisCompMaxL.Y;
+	}
+
+	if(System.CompensationDirection.Y)
+	{	//正向补偿
+		do
+		{
+			if(*pValueY > AxisCompBuffer[Y_ECPT].YL)
+			{	
+				Y_ECPT++;
+			}
+			else if(*pValueY < AxisCompBuffer[Y_ECPT-1].YL)
+			{
+				Y_ECPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Y_ECPT>0) && (Y_ECPT<=System.AxisCompMaxL.Y));	
+	}
+	else
+	{	//负向补偿
+		do
+		{
+			if(*pValueY < AxisCompBuffer[Y_ECPT].YL)
+			{	
+				Y_ECPT++;
+			}
+			else if(*pValueY > AxisCompBuffer[Y_ECPT-1].YL)
+			{
+				Y_ECPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Y_ECPT>0) && (Y_ECPT<=System.AxisCompMaxL.Y));	
+	}
+
+	if(Y_ECPT == 0)
+	{
+		*pValueY = AxisCompBuffer[0].YR+	(*pValueY-AxisCompBuffer[0].YL);
+	}
+	else if(Y_ECPT >System.AxisCompMaxL.Y)
+	{
+		*pValueY = AxisCompBuffer[System.AxisCompMaxL.Y].YR+(*pValueY-AxisCompBuffer[System.AxisCompMaxL.Y].YL);
+	}
+	else
+	{
+		*pValueY = AxisCompBuffer[Y_ECPT-1].YR+(*pValueY-AxisCompBuffer[Y_ECPT-1].YL)*
+			divdp( (AxisCompBuffer[Y_ECPT].YR-AxisCompBuffer[Y_ECPT-1].YR), (AxisCompBuffer[Y_ECPT].YL-AxisCompBuffer[Y_ECPT-1].YL));
+	}		
+
+	OverallSign.EncoderCompPt.Y = Y_ECPT;
+	
+}
+
+//计算Z 轴机床坐标的非线性误差补偿值
+void	NCCoord_LinearValueZ(INT32S *pValueZ)
+{
+	INT16U Z_ECPT;
+	Z_ECPT = OverallSign.EncoderCompPt.Z;
+		
+	if(Z_ECPT <= 0)
+	{
+		Z_ECPT = 1;
+	}
+	else if(Z_ECPT > System.AxisCompMaxL.Z)
+	{
+		Z_ECPT = System.AxisCompMaxL.Z;
+	}
+
+	if(System.CompensationDirection.Z)
+	{	//正向补偿
+		do
+		{
+			if(*pValueZ > AxisCompBuffer[Z_ECPT].ZL)
+			{	
+				Z_ECPT++;
+			}
+			else if(*pValueZ < AxisCompBuffer[Z_ECPT-1].ZL)
+			{
+				Z_ECPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Z_ECPT>0) && (Z_ECPT<=System.AxisCompMaxL.Z));	
+	}
+	else
+	{	//负向补偿
+		do
+		{
+			if(*pValueZ < AxisCompBuffer[Z_ECPT].ZL)
+			{	
+				Z_ECPT++;
+			}
+			else if(*pValueZ > AxisCompBuffer[Z_ECPT-1].ZL)
+			{
+				Z_ECPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Z_ECPT>0) && (Z_ECPT<=System.AxisCompMaxL.Z));	
+	}
+
+	if(Z_ECPT == 0)
+	{
+		*pValueZ = AxisCompBuffer[0].ZR+(*pValueZ-AxisCompBuffer[0].ZL);
+	}
+	else if(Z_ECPT > System.AxisCompMaxL.Z)
+	{
+		*pValueZ = AxisCompBuffer[System.AxisCompMaxL.Z].ZR+(*pValueZ-AxisCompBuffer[System.AxisCompMaxL.Z].ZL);
+	}
+	else
+	{
+		*pValueZ = AxisCompBuffer[Z_ECPT-1].ZR+	(*pValueZ-AxisCompBuffer[Z_ECPT-1].ZL)*
+			divdp( (AxisCompBuffer[Z_ECPT].ZR-AxisCompBuffer[Z_ECPT-1].ZR), (AxisCompBuffer[Z_ECPT].ZL-AxisCompBuffer[Z_ECPT-1].ZL));
+	}		
+
+	OverallSign.EncoderCompPt.Z = Z_ECPT;
+}
+
+
+//入口: 当前插补机床坐标未逆向补偿理论位置值－最小输入单位
+//出口: 计算X 轴输出脉冲的非线性误差逆向补偿值
+//计算获得值为机床坐标脉冲输出位置值
+void NCCoord_LinearPulseX(INT32S *pPulseX)
+{
+	INT16U X_POCPT;
+	X_POCPT = OverallSign.PulseOutCompPt.X;	
+
+	if(X_POCPT <= 0)
+	{
+		X_POCPT = 1;
+	}
+	else if(X_POCPT > System.AxisCompMaxL.X)
+	{
+		X_POCPT = System.AxisCompMaxL.X;
+	}
+
+	if(System.CompensationDirection.X)
+	{	//正向补偿
+		do
+		{
+			if(*pPulseX > AxisCompBuffer[X_POCPT].XR)
+			{	
+				X_POCPT++;
+			}
+			else if(*pPulseX < AxisCompBuffer[X_POCPT-1].XR)
+			{
+				X_POCPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((X_POCPT>0) && (X_POCPT<=System.AxisCompMaxL.X));	
+	}
+	else
+	{	//负向补偿
+		do
+		{
+			if(*pPulseX < AxisCompBuffer[X_POCPT].XR)
+			{	
+				X_POCPT++;
+			}
+			else if(*pPulseX > AxisCompBuffer[X_POCPT-1].XR)
+			{
+				X_POCPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((X_POCPT>0) && (X_POCPT<=System.AxisCompMaxL.X));	
+	}
+
+	if(X_POCPT == 0)
+	{
+		*pPulseX = AxisCompBuffer[0].XL+(*pPulseX-AxisCompBuffer[0].XR);
+	}
+	else if(X_POCPT > System.AxisCompMaxL.X)
+	{
+		*pPulseX = AxisCompBuffer[System.AxisCompMaxL.X].XL+(*pPulseX-AxisCompBuffer[System.AxisCompMaxL.X].XR);
+	}
+	else
+	{
+		*pPulseX = AxisCompBuffer[X_POCPT-1].XL+(*pPulseX-AxisCompBuffer[X_POCPT-1].XR)*
+			divdp( (AxisCompBuffer[X_POCPT].XL-AxisCompBuffer[X_POCPT-1].XL), (AxisCompBuffer[X_POCPT].XR-AxisCompBuffer[X_POCPT-1].XR) );
+	}		
+
+	OverallSign.PulseOutCompPt.X = X_POCPT;
+	// 变换输入单位为脉冲输出单位
+	*pPulseX *= (divdp(System.LinearAxisMinUnit,System.LinearAxisOutUnitEQU)*X_Servo.AxisOutUnitEQU);
+}
+
+//入口: 当前插补机床坐标未逆向补偿理论位置值－um or ud 
+//出口: 计算Y 轴输出脉冲的非线性误差逆向补偿值
+//计算获得值为机床坐标脉冲输出位置值
+void NCCoord_LinearPulseY(INT32S *pPulseY)
+{
+	INT16U Y_POCPT;
+	Y_POCPT = OverallSign.PulseOutCompPt.Y;
+
+	if(Y_POCPT <= 0)
+	{
+		Y_POCPT = 1;
+	}
+	else if(Y_POCPT > System.AxisCompMaxL.Y)
+	{
+		Y_POCPT = System.AxisCompMaxL.Y;
+	}
+
+	if(System.CompensationDirection.Y)
+	{	//正向补偿
+		do
+		{
+			if(*pPulseY > AxisCompBuffer[Y_POCPT].YR)
+			{	
+				Y_POCPT++;
+			}
+			else if(*pPulseY < AxisCompBuffer[Y_POCPT-1].YR)
+			{
+				Y_POCPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Y_POCPT>0) && (Y_POCPT<=System.AxisCompMaxL.Y));	
+	}
+	else
+	{	//负向补偿
+		do
+		{
+			if(*pPulseY < AxisCompBuffer[Y_POCPT].YR)
+			{	
+				Y_POCPT++;
+			}
+			else if(*pPulseY > AxisCompBuffer[Y_POCPT-1].YR)
+			{
+				Y_POCPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Y_POCPT>0) && (Y_POCPT<=System.AxisCompMaxL.Y));	
+	}
+
+	if(Y_POCPT == 0)
+	{
+		*pPulseY = AxisCompBuffer[0].YL+(*pPulseY-AxisCompBuffer[0].YR);
+	}
+	else if(Y_POCPT >System.AxisCompMaxL.Y)
+	{
+		*pPulseY = AxisCompBuffer[System.AxisCompMaxL.Y].YL+(*pPulseY-AxisCompBuffer[System.AxisCompMaxL.Y].YR);
+	}
+	else
+	{
+		*pPulseY = AxisCompBuffer[Y_POCPT-1].YL+(*pPulseY-AxisCompBuffer[Y_POCPT-1].YR)*
+			divdp( (AxisCompBuffer[Y_POCPT].YL-AxisCompBuffer[Y_POCPT-1].YL), (AxisCompBuffer[Y_POCPT].YR-AxisCompBuffer[Y_POCPT-1].YR));
+	}		
+
+	OverallSign.PulseOutCompPt.Y = Y_POCPT;	
+	// 变换输入单位为脉冲输出单位
+	*pPulseY *= (divdp(System.LinearAxisMinUnit,System.LinearAxisOutUnitEQU)*Y_Servo.AxisOutUnitEQU);
+}
+
+//入口: 当前插补机床坐标未逆向补偿理论位置值－um or ud
+//出口: 计算Z 轴输出脉冲的非线性误差逆向补偿值
+//计算获得值为机床坐标脉冲输出位置值
+void NCCoord_LinearPulseZ(INT32S *pPulseZ)
+{
+	INT16U Z_POCPT;
+	Z_POCPT = OverallSign.PulseOutCompPt.Z;
+		
+	if(Z_POCPT <= 0)
+	{
+		Z_POCPT = 1;
+	}
+	else if(Z_POCPT > System.AxisCompMaxL.Z)
+	{
+		Z_POCPT = System.AxisCompMaxL.Z;
+	}
+
+	if(System.CompensationDirection.Z)
+	{	//正向补偿
+		do
+		{
+			if(*pPulseZ > AxisCompBuffer[Z_POCPT].ZR)
+			{	
+				Z_POCPT++;
+			}
+			else if(*pPulseZ < AxisCompBuffer[Z_POCPT-1].ZR)
+			{
+				Z_POCPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Z_POCPT>0) && (Z_POCPT<=System.AxisCompMaxL.Z));	
+	}
+	else
+	{	//负向补偿
+		do
+		{
+			if(*pPulseZ < AxisCompBuffer[Z_POCPT].ZR)
+			{	
+				Z_POCPT++;
+			}
+			else if(*pPulseZ > AxisCompBuffer[Z_POCPT-1].ZR)
+			{
+				Z_POCPT--;
+			}
+			else
+			{	//处于当前区域内
+				break;
+			}
+		}while((Z_POCPT>0) && (Z_POCPT<=System.AxisCompMaxL.Z));	
+	}
+
+	if(Z_POCPT == 0)
+	{
+		*pPulseZ = AxisCompBuffer[0].ZL+(*pPulseZ-AxisCompBuffer[0].ZR);
+	}
+	else if(Z_POCPT > System.AxisCompMaxL.Z)
+	{
+		*pPulseZ = AxisCompBuffer[System.AxisCompMaxL.Z].ZL+(*pPulseZ-AxisCompBuffer[System.AxisCompMaxL.Z].ZR);
+	}
+	else
+	{
+		*pPulseZ = AxisCompBuffer[Z_POCPT-1].ZL+	(*pPulseZ-AxisCompBuffer[Z_POCPT-1].ZR)*
+			divdp( (AxisCompBuffer[Z_POCPT].ZL-AxisCompBuffer[Z_POCPT-1].ZL), (AxisCompBuffer[Z_POCPT].ZR-AxisCompBuffer[Z_POCPT-1].ZR));
+	}		
+
+	OverallSign.PulseOutCompPt.Z = Z_POCPT;
+
+	// 变换输入单位为脉冲输出单位
+	*pPulseZ *= (divdp(System.LinearAxisMinUnit,System.LinearAxisOutUnitEQU)*Z_Servo.AxisOutUnitEQU);
+}
+
+void NCCoord_MACValue(tsENCODER *psEncoder , tsSERVO *psServo)
+{
+	psEncoder->MACH_PositionValueout=((psEncoder->NowPOSValue+65536*psEncoder->HighPOSValue)*psEncoder->Resolution*psServo->Resolution);
+	psEncoder->OldPOSValue = psEncoder->NowPOSValue;
+	//psEncoder->MACH_PositionValueout =psEncoder->MACH_PositionValueout*psEncoder->Resolution;
+	psEncoder->MACH_PositionValue =(psEncoder->EncoderDIR)?((-1)*psEncoder->MACH_PositionValueout):(psEncoder->MACH_PositionValueout);	
+}
+// 手论坐标，只需要读出计数
+void NCCoord_MACValueWheel()
+{
+    W_Encoder.MACH_PositionValueout=W_Encoder.NowPOSValue+65536*W_Encoder.HighPOSValue;
+    W_Encoder.OldPOSValue = W_Encoder.NowPOSValue;
+    //psEncoder->MACH_PositionValueout =psEncoder->MACH_PositionValueout*psEncoder->Resolution;
+    W_Encoder.MACH_PositionValue =(W_Encoder.EncoderDIR)?((-1)*W_Encoder.MACH_PositionValueout):(W_Encoder.MACH_PositionValueout);
+
+}
+void NCCoord_ABSValue(void)	
+{	
+	if(OverallSign.GetMachCoordinateRight == 0)
+		return ;
+		
+	NCCoord_LinearValueX(&X_Encoder.MACH_PositionValue);
+	NCCoord_LinearValueY(&Y_Encoder.MACH_PositionValue);
+	NCCoord_LinearValueZ(&Z_Encoder.MACH_PositionValue);
+
+	// 由于搜索参考点为正向定位，所以负方向运动时需+ 间隙值
+	OverallSign.ABS_Coordinate.X = X_Encoder.MACH_PositionValue+((OverallSign.MoveSign.X)?(0):(System.Gap.X));
+	// 由于搜索参考点为负向定位，所以正方向运动时需- 间隙值
+	OverallSign.ABS_Coordinate.Y = Y_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Y)?(0):(System.Gap.Y));
+	// 由于搜索参考点为负向定位，所以正方向运动时需- 间隙值
+	OverallSign.ABS_Coordinate.Z = Z_Encoder.MACH_PositionValue-((!OverallSign.MoveSign.Z)?(0):(System.Gap.Z));
+
+	OverallSign.ABS_Coordinate.X -=(OverallSign.ABS_MY_OffsetCoordinate.X+OverallSign.MYORG_M_Coordinate.X);
+	OverallSign.ABS_Coordinate.Y -=(OverallSign.ABS_MY_OffsetCoordinate.Y+OverallSign.MYORG_M_Coordinate.Y);
+	OverallSign.ABS_Coordinate.Z -=(OverallSign.ABS_MY_OffsetCoordinate.Z+OverallSign.MYORG_M_Coordinate.Z);	
+}
+
+
+//机床原始坐标值变换到名义坐标 
+//入口: 补偿后的机床坐标值	: 10nm or 10nd
+//出口:  名义坐标值 				: 10nm or 10nd
+//名义坐标变换到工件坐标 
+//入口:  名义坐标值 		 单位: 10nm or 10nd
+//出口:  工件绝对坐标值 单位	: 10nm or 10nd
+void NCCoord_MACToWork(INT40AXIS *psCoordinateWork,INT40AXIS *psCoordinateMAC)
+{//没有加非线补
+	psCoordinateWork->X = psCoordinateMAC->X-OverallSign.ABS_MY_OffsetCoordinate.X-OverallSign.MYORG_M_Coordinate.X;
+	psCoordinateWork->Y = psCoordinateMAC->Y-OverallSign.ABS_MY_OffsetCoordinate.Y-OverallSign.MYORG_M_Coordinate.Y;
+	psCoordinateWork->Z = psCoordinateMAC->Z-OverallSign.ABS_MY_OffsetCoordinate.Z-OverallSign.MYORG_M_Coordinate.Z;	
+}
+
+//工件坐标经偏置旋转变换到名义坐标  CH0701
+//入口:  工件绝对坐标值 单位	: um or ud
+//出口:  名义坐标值 		 单位: um or ud
+//名义坐标变换到机床原始坐标  CH0701
+//入口:  名义坐标值  单位: um or ud
+//出口:  插补点MACH 坐标值: um or ud
+//含Z 轴刀具长度补偿
+void NCCoord_WorkToMAC(INT40AXIS *psCoordinateWork,INT40AXIS *psCoordinateMAC)
+{//没有加非线补
+	psCoordinateMAC->X = psCoordinateWork->X+OverallSign.ABS_MY_OffsetCoordinate.X+OverallSign.MYORG_M_Coordinate.X;
+	psCoordinateMAC->Y = psCoordinateWork->Y+OverallSign.ABS_MY_OffsetCoordinate.Y+OverallSign.MYORG_M_Coordinate.Y;
+	psCoordinateMAC->Z = psCoordinateWork->Z+OverallSign.ABS_MY_OffsetCoordinate.Z+OverallSign.MYORG_M_Coordinate.Z;	
+}
+
+void NCCoord_WorkToMACToLinear(INT40AXIS *psCoordinateWork,INT40AXIS *psCoordinateMAC)
+{//通常使用，加了非线补
+	psCoordinateMAC->X = psCoordinateWork->X+OverallSign.ABS_MY_OffsetCoordinate.X+OverallSign.MYORG_M_Coordinate.X;
+	psCoordinateMAC->Y = psCoordinateWork->Y+OverallSign.ABS_MY_OffsetCoordinate.Y+OverallSign.MYORG_M_Coordinate.Y;
+	psCoordinateMAC->Z = psCoordinateWork->Z+OverallSign.ABS_MY_OffsetCoordinate.Z+OverallSign.MYORG_M_Coordinate.Z;	
+
+    /*  for test //20140925
+    NCCoord_LinearPulseX(&psCoordinateMAC->X);
+	NCCoord_LinearPulseY(&psCoordinateMAC->Y);
+	NCCoord_LinearPulseZ(&psCoordinateMAC->Z);
+    */
+}
+
+void NCCoord_WorkToMACToLinearOne(INT40AXIS *psCoordinateWork,INT40AXIS *psCoordinateMAC, INT8U GG17ID)
+{//用在攻牙里面
+	if(GG17ID==17)
+	{
+		psCoordinateMAC->Z = psCoordinateWork->Z+OverallSign.ABS_MY_OffsetCoordinate.Z+OverallSign.MYORG_M_Coordinate.Z;	
+		NCCoord_LinearPulseZ(&psCoordinateMAC->Z);
+	}
+	else	 if(GG17ID==18)
+	{
+		psCoordinateMAC->Y = psCoordinateWork->Y+OverallSign.ABS_MY_OffsetCoordinate.Y+OverallSign.MYORG_M_Coordinate.Y;	
+		NCCoord_LinearPulseY(&psCoordinateMAC->Y);
+	}
+	else
+	{
+		psCoordinateMAC->X = psCoordinateWork->X+OverallSign.ABS_MY_OffsetCoordinate.X+OverallSign.MYORG_M_Coordinate.X;
+		NCCoord_LinearPulseX(&psCoordinateMAC->X);
+	}	
+}
+
+
+INT16U NCCoord_GetAndCheck(void)
+{//获取稳定坐标校核
+	if(System.RunState == SimulateRun)
+	{
+		if(System.SystemSimulationRunSign == 1)
+		{
+			//OverallSign.ABS_Coordinate.X = NC_AREAControl.NowValue.X;
+			//OverallSign.ABS_Coordinate.Y = NC_AREAControl.NowValue.Y;
+			//OverallSign.ABS_Coordinate.Z = NC_AREAControl.NowValue.Z;
+			OverallSign.ABS_Coordinate=NC_AREAControl.NowValue;			
+		}
+		else
+		{
+			OverallSign.ABS_Coordinate.X = 0;
+			OverallSign.ABS_Coordinate.Y = 0;
+			OverallSign.ABS_Coordinate.Z = 0;
+			NC_AREAControl.NowValue = OverallSign.ABS_Coordinate;			
+		}
+		NC_AREAControl.OldValue=NC_AREAControl.NowValue;	
+		
+		NCCoord_WorkToMACToLinear(&OverallSign.ABS_Coordinate, &NC_AREAControl.OldPointMACHPulseOut);
+		return TRUE;
+	}
+	
+	if( System.FeedAxisBusStyle == 0 )
+	{
+		INT40AXIS	NowValue1,NowValue2,NowValue3;  //当前绝对坐标位置值 um or u
+		
+		NowValue1.X  = OverallSign.ABS_Coordinate.X;
+		NowValue1.Y  = OverallSign.ABS_Coordinate.Y;
+		NowValue1.Z  = OverallSign.ABS_Coordinate.Z;
+
+		//有可能存在死循环
+		do
+		{
+			OverallSign.GetMachCoordinateRight = 1;
+			if(CPLD_EncoderValue(&X_Encoder))
+				NCCoord_MACValue(&X_Encoder , &X_Servo);			
+			if(CPLD_EncoderValue(&Y_Encoder))
+				NCCoord_MACValue(&Y_Encoder , &Y_Servo);
+			if(CPLD_EncoderValue(&Z_Encoder))
+				NCCoord_MACValue(&Z_Encoder , &Z_Servo);
+		}while(OverallSign.GetMachCoordinateRight==0);
+
+		NCCoord_ABSValue();
+		NowValue2.X  = OverallSign.ABS_Coordinate.X;
+		NowValue2.Y  = OverallSign.ABS_Coordinate.Y;
+		NowValue2.Z  = OverallSign.ABS_Coordinate.Z;
+
+		do
+		{
+			OverallSign.GetMachCoordinateRight = 1;
+			if(CPLD_EncoderValue(&X_Encoder))
+				NCCoord_MACValue(&X_Encoder , &X_Servo);			
+			if(CPLD_EncoderValue(&Y_Encoder))
+				NCCoord_MACValue(&Y_Encoder , &Y_Servo);
+			if(CPLD_EncoderValue(&Z_Encoder))
+				NCCoord_MACValue(&Z_Encoder , &Z_Servo);
+		}while(OverallSign.GetMachCoordinateRight==0);
+		
+		NCCoord_ABSValue();
+		NowValue3.X  = OverallSign.ABS_Coordinate.X;
+		NowValue3.Y  = OverallSign.ABS_Coordinate.Y;
+		NowValue3.Z  = OverallSign.ABS_Coordinate.Z;
+
+		if((labs(NowValue1.X-NowValue2.X)>5) || (labs(NowValue1.X-NowValue3.X)>5))
+		{
+			//程序冗余，可优化
+			STDNCSign.GetPositionSign = 1;
+			SPCNCSign.GetPositionSign = 1;
+			NCRunSign.GetPositionSign = 1;
+			return FALSE;
+		}
+
+		if((labs(NowValue1.Y-NowValue2.Y)>5) || (labs(NowValue1.Y-NowValue3.Y)>5))
+		{
+			//程序冗余，可优化
+			STDNCSign.GetPositionSign = 1;
+			SPCNCSign.GetPositionSign = 1;
+			NCRunSign.GetPositionSign = 1;
+			return FALSE;
+		}
+
+		if((labs(NowValue1.Z-NowValue2.Z)>5) || (labs(NowValue1.Z-NowValue3.Z)>5))
+		{
+			//程序冗余，可优化
+			STDNCSign.GetPositionSign = 1;
+			SPCNCSign.GetPositionSign = 1;
+			NCRunSign.GetPositionSign = 1;
+			return FALSE;
+		}
+
+		//获得输出位置机床位置坐标  10nm or 10nd
+		NC_AREAControl.NowValue.X = NowValue3.X;
+		NC_AREAControl.NowValue.Y = NowValue3.Y;
+		NC_AREAControl.NowValue.Z = NowValue3.Z;
+
+		NC_AREAControl.OldValue.X = NC_AREAControl.NowValue.X;
+		NC_AREAControl.OldValue.Y = NC_AREAControl.NowValue.Y;
+		NC_AREAControl.OldValue.Z = NC_AREAControl.NowValue.Z;
+
+		NCCoord_WorkToMACToLinear(&NC_AREAControl.NowValue, &NC_AREAControl.OldPointMACHPulseOut);
+	}
+
+	return TRUE;
+}
+
+

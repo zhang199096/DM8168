@@ -1,0 +1,135 @@
+// FILE:   DSP6713_MAIN.h
+// start date:   2007-12
+
+#ifndef DSP6713_MAIN_H
+#define DSP6713_MAIN_H
+
+#include "datatype.h"
+
+
+
+#define		FPGA_MAX_F		64000000/2		//FPGA时钟频率
+//define NCSIGNS 
+#define     NCSIGN_NONE     0
+#define     NCSIGN_STD      1
+#define     NCSIGN_SPC      2
+
+//SPI ROM ADDRESS DEFINATION
+#define PROM_PARADSPB0_1    1024
+#define PROM_PARADSPB0_2    (PROM_PARADSPB0_1+120)
+
+#define PROM_PARADSPSERVO   (4096)
+#define PROM_PARALINEAR    (1024*8) //8K 
+//---------------------------------------------------------------------------
+// Include All Peripheral Header Files:
+//
+
+/* xdctools header files */
+#include <xdc/std.h>
+#include <xdc/runtime/Assert.h>
+#include <xdc/runtime/Diags.h>
+#include <xdc/runtime/Error.h>
+#include <xdc/runtime/Log.h>
+#include <xdc/runtime/System.h>
+#include <xdc/runtime/Registry.h>
+/* package header files */
+#include <ti/ipc/Ipc.h>
+#include <ti/ipc/MultiProc.h>
+#include <ti/ipc/Notify.h>
+#include <ti/ipc/SharedRegion.h>
+
+#include <ti/sysbios/BIOS.h>
+#include <ti/sysbios/hal/Timer.h>
+#include <ti/sysbios/family/c64p/Hwi.h>
+#include <ti/sysbios/knl/Swi.h>
+#include <ti/sysbios/knl/Clock.h>
+#include <ti/sysbios/knl/Task.h>
+#include <ti/sysbios/knl/Semaphore.h>
+
+#include <ti/mathlib/mathlib.h>
+#define DSP  1
+
+//define a interrupt enable and disable macro
+
+#define IRQ_DISABLE(num)  Hwi_disableInterrupt(num)
+#define IRQ_ENABLE(num)   Hwi_enableInterrupt(num)
+#define IRQNUM_PLUSE   10   // pluse 
+#define IRQNUM_MBUS    11   //M2 M3 BUS
+
+#include "structcode.h"
+#include "structpacket.h"
+#include "structpara.h"
+#include "structpoint.h"
+
+#include "common.h"
+#include "usr_prm.h"				//bus transplanting
+#include "area_code_rec.h"
+#include "area_control.h"         	//区域运动控制
+#include "area_control_extend1.h"         	//区域运动控制(扩展)
+#include "area_control_extend3.h"         	//区域运动控制(扩展)
+#include "cputimers.h"          	// 32-bit CPU Timers
+#include "sci.h"               		 	// SCI Registers
+#include "run_nc.h"					//运动控制
+#include "cpld.h"						//CPLD 控制
+#include "spi.h"
+#include "int_code.h"
+#include "sharemem.h"
+#include "key.h"
+extern INT32S MonitorBuffer1[1024];					//截取数据缓冲区
+extern INT32S MonitorBuffer2[1024];					//截取数据缓冲区
+extern INT32S MonitorBuffer3[1024];					//截取数据缓冲区
+extern INT32S MonitorBuffer4[1024];
+extern INT32S GetDataBuffer[1000];					//截取数据缓冲区
+extern tsINTERPOLATION_BUFFER InterpolationBuffer[INTERPOLATIONBUFLENGTH+1];
+
+typedef struct
+{
+	INT16U CheckCycle;
+	INT16U SampleCycle;
+	INT16U ErrorCountX;
+	INT16U ErrorCountY;
+	INT16U ErrorCountZ;
+	INT16U ErrorSetup;
+	INT32S POSValueX;
+	INT32S POSValueY;
+	INT32S POSValueZ;
+	FLOAT64 POSDeltaX;
+	FLOAT64 POSDeltaY;
+	FLOAT64 POSDeltaZ;
+	FLOAT64 POSStotal;
+	FLOAT64 POSError;
+}tsDSPTRACKOVER;
+
+typedef	struct
+{
+	INT32U GetNextSendCount;					//收到下一条SendCount
+	INT32U SingleCodeEndCount;						//单段终点代码条
+	INT32U AreaGCodeLastRealSendCount;					//上次发送的RealSendCount
+}tsNCAREASINGLE;
+
+#define TestBufferMax 10000
+#define CALCULATEMax 100
+#define CAL_e1 0.000001
+#define CAL_e2 0.001
+extern tsDSP_PACKET_STATE *psDSPPacketState;
+extern tsPART_VARIANT funtion_v;
+extern tsGCODE RealRunGCode;	
+extern INT32U TestsBufferCnt;
+extern INT32S	TestsBuffer[TestBufferMax][10];	
+
+extern tsNCAREASINGLE NCAreaSingle;
+extern void system_initial(void);
+extern void power_on_initial(void);
+extern void parameter_initial(void);
+
+
+extern void STD_run_NC_initial(void);	//运行STDNC 前的初始化
+extern void SPC_run_NC_initial(void);	//运行SPCNC 前的初始化
+extern void high_error(void);
+
+
+#endif  // end of DSP6713_MAIN_H definition
+
+//===========================================================================
+// No more.
+//===========================================================================

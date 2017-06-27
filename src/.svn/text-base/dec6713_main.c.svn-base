@@ -1,0 +1,2037 @@
+/****************************************************************/
+/* Name :                                                                   				*/
+/*       main		                      									*/
+/* Function:                                                               				*/
+/*       main    ... initial                                       						*/
+/*  Copyright 2008 by LOKSHUN CNC  Equipment LTD.                           	*/
+/*  All rights reserved  LOKSHUN CNC  Equipment LTD.                   		*/ 
+/*	Designed by: DAVID SHEN										*/
+/*   Modified by : ENJOY LU		                                                            */
+/****************************************************************/
+
+#include "..\\include\\DEC6713_main.h"
+const double PI = 3.1415926535897932384626433832795;
+tsNCAREASINGLE NCAreaSingle;
+tsPART_VARIANT funtion_v;
+
+
+
+
+tsDSP_PACKET_STATE *psDSPPacketState;
+tsPARADSPB0_1_BUF sParaDspB0_1Buf={
+    //参数值      序号       设置说明    
+    1        , //0000        驱动参数修改权限[0~3]
+    1        , //0001        进给轴控制类型(0-脉冲;1-M2;2-M3)
+    0        , //0002        主轴控制类型(0-VT;1-M2;2-M3)
+    3        , //0003        伺服总线从站数量
+    0        , //0004        自动上下料控制电机数量
+    0        , //0005        IV轴类型选择(0-关闭;1-A;2-B;3-C)
+    0        , //0006        V轴类型选择(0-关闭;1-A;2-B;3-C)
+    0        , //0007        IV轴硬限位功能设置
+    0        , //0008        V轴硬限位功能设置
+    0        , //0009        四轴加工类型(0-M200~201切换;1-3+1强制)
+    0        , //0010        五轴加工类型(0-M200~203切换;1-4+1强制)
+    0        , //0011        双驱同步轴模型选择(0-无效;1-X轴;2-Y轴;3-Z轴)
+    0        , //0012        双驱同步轴调试功能(0-无效;1-主动轴 ;2-从动轴)
+    0        , //0013        伺服刀库控制类型(0-VT;1-M2;2-M3)
+    0        , //0014        伺服刀库调试功能
+    0        , //0015        卡盘调试功能
+    0        , //0016        主轴配置类型
+    10       , //0017        主轴连续不通讯次数[2~10]
+    10       , //0018        主轴连续欠电压误报警次数[10~40]
+    20       , //0019        运动轴硬限位检测时间(单位:ms)
+    10       , //0020        插补周期[1~100](单位:0.1ms)
+    80       , //0021        轨迹超程设置(单位:mm)
+    6        , //0022        曲线平滑允许误差[0~20] (单位:um)
+    10       , //0023        转角不减速最大角度(单位:度)
+    25       , //0024        最小速度设定值(单位:0.1mm/s)
+    1        , //0025        精准最小速度设定值(单位:0.1mm/s)
+    35       , //0026        转向过程时间常数(单位:ms)
+    1        , //0027        精准转向过程时间常数(单位:ms)
+    0        , //0028        圆弧减速比(G61有效)(单位:0.1)
+    5        , //0029        圆弧定速计算比例系数[3~12]
+    40       , //0030        拟合曲线弓高误差[5,50](单位:um)
+    40       , //0031        拟合曲线公差长度比例因子[10,100]
+    20       , //0032        软启动最大速度[15~30]
+    4        , //0033        软启动比率系数[0~9]
+    10       , //0034        手动模态速度柔和比例系数[6~10]
+    10       , //0035        自动模态速度柔和比例系数[6~10]
+    0        , //0036        电子手轮响应系数[0~10]
+    0        , //0037        手动功能响应系数[0~10]
+    1        , //0038        手动功能补偿系数[0~10]
+    1        , //0039        区域速度计算模式
+    1        , //0040        功能选择开关1
+    0        , //0041        功能选择开关2
+    0        , //0042        功能选择开关3
+    0        , //0043        功能选择开关4
+    0        , //0044        功能选择开关5
+    0        , //0045        功能选择开关6
+    0        , //0046        功能选择开关7
+    0        , //0047        功能选择开关8
+    0        , //0048        功能选择开关9
+    0        , //0049        功能选择开关10
+    0        , //0050        功能选择开关11
+    0        , //0051        功能选择开关12
+    0        , //0052        功能选择开关13
+    0        , //0053        功能选择开关14
+    0        , //0054        功能选择开关15
+    0        , //0055        功能选择开关16
+    0        , //0056        功能选择开关17
+    0        , //0057        功能选择开关18
+    0        , //0058        功能选择开关19
+    0        , //0059        功能选择开关20
+    1        , //0060        X轴编码器检测标志
+    1        , //0061        Y轴编码器检测标志
+    1        , //0062        Z轴编码器检测标志
+    1        , //0063        IV轴编码器检测标志
+    1        , //0064        V轴编码器检测标志
+    1        , //0065        S轴编码器检测标志
+    1        , //0066        X轴编码器读数方向
+    0        , //0067        Y轴编码器读数方向
+    1        , //0068        Z轴编码器读数方向
+    0        , //0069        IV轴编码器读数方向
+    0        , //0070        V轴编码器读数方向
+    0        , //0071        S轴编码器读数方向
+    0        , //0072        电子手轮读数方向
+    0        , //0073        对刀锁定信号电平设置
+    0        , //0074        对刀超行程信号电平设置*
+    0        , //0075        未定义
+    0        , //0076        未定义
+    0        , //0077        运动轴负载比例设置
+    0        , //0078        旋转轴负载比例设置
+    0        , //0079        主轴负载比例设置
+    0        , //0080        未定义
+    0        , //0081        未定义
+    0        , //0082        未定义
+    0        , //0083        未定义
+    0        , //0084        未定义
+    0        , //0085        未定义
+    0        , //0086        未定义
+    0        , //0087        未定义
+    0        , //0088        未定义
+    0        , //0089        未定义
+    0        , //0090        未定义
+    0        , //0091        未定义
+    0        , //0092        未定义
+    0        , //0093        未定义
+    0        , //0094        未定义
+    0        , //0095        未定义
+    0        , //0096        未定义
+    0        , //0097        未定义
+    0        , //0098        未定义
+    0        , //0099        未定义
+    10       , //0100        DSP轨迹超程报警序号
+    2        , //0101        DSP插补量过大报警序号
+    1        , //0102        未定义
+    0        , //0103        未定义
+    0        , //0104        未定义
+    0        , //0105        未定义
+    0        , //0106        未定义
+    0        , //0107        未定义
+    0        , //0108        未定义
+    0        , //0109        未定义
+    0        , //0110        未定义
+    0        , //0111        未定义
+    0        , //0112        未定义
+    0        , //0113        未定义
+    0        , //0114        未定义
+    0        , //0115        未定义
+    0        , //0116        未定义
+    0        , //0117        未定义
+    0        , //0118        未定义
+    0        , //0119        未定义
+};
+tsPARADSPB0_2_BUF sParaDspB0_2Buf={
+    1000     , //0120        线性轴输入单位(单位:nm)
+    1000     , //0121        旋转轴输入单位(单位:nd)
+    1000     , //0122        主轴输入单位(单位:nd)
+    1000     , //0123        线性轴输出单位(单位:nm/指令单位)
+    1000     , //0124        旋转轴输出单位(单位:nd/指令单位)
+    100000   , //0125        主轴输出单位(单位:nd/指令单位)
+    0        , //0126        线性轴换向抵消脉冲[0~1000](单位:线性轴输出指令单位)
+    0        , //0127        旋转轴换向抵消脉冲[0~1000](单位:旋转轴输出指令单位)
+    1000     , //0128        X轴反馈编码器分辨率设置(单位:nm/pulse)
+    1000     , //0129        Y轴反馈编码器分辨率设置(单位:nm/pulse)
+    1000     , //0130        Z轴反馈编码器分辨率设置(单位:nm/pulse)
+    0        , //0131        IV轴反馈编码器每转脉冲数(单位:pulse/r)
+    0        , //0132        V轴反馈编码器每转脉冲数(单位:pulse/r)
+    1        , //0133        S轴反馈编码器每转脉冲数(单位:pulse/r)
+    0        , //0134        X轴间隙补偿(单位:nm)
+    0        , //0135        Y轴间隙补偿(单位:nm)
+    0        , //0136        Z轴间隙补偿(单位:nm)
+    0        , //0137        IV轴间隙补偿(单位:nd)
+    0        , //0138        V轴间隙补偿(单位:nd)
+    0        , //0139        S轴间隙补偿(单位:nd)
+    1000     , //0140        线性轴手动一档进给速度设定[100~1000](单位:mm/min)
+    2000     , //0141        线性轴手动二档进给速度设定[1000~5000](单位:mm/min)
+    5000     , //0142        线性轴手动三档进给速度设定[5000~150000](单位:mm/min)
+    0        , //0143        IV轴手动一档进给速度设置(单位:degree/s)
+    0        , //0144        IV轴手动二档进给速度设置(单位:degree/s)
+    0        , //0145        IV轴手动三档进给速度设置(单位:degree/s)
+    0        , //0146        V轴手动一档进给速度设置(单位:degree/s)
+    0        , //0147        V轴手动二档进给速度设置(单位:degree/s)
+    0        , //0148        V轴手动三档进给速度设置(单位:degree/s)
+    1800     , //0149        线性轴正向搜索参考点速度设定[10~10000](单位:mm/min)
+    200      , //0150        线性轴负向搜索参考点速度设定[10~2000](单位:mm/min)
+    20       , //0151        线性轴负向搜索参考点距离设定[10~200](单位:mm)
+    0        , //0152        IV轴参考点快进速度设置(单位:degree/s)
+    0        , //0153        IV轴参考点搜索速度设置(单位:degree/s)
+    0        , //0154        IV轴参考点搜索距离设置(单位:degree)
+    0        , //0155        V轴参考点快进速度设置(单位:degree/s)
+    0        , //0156        V轴参考点搜索速度设置(单位:degree/s)
+    0        , //0157        V轴参考点搜索距离设置(单位:degree)
+    0        , //0158        系统最大进给速度设置(单位:mm/min
+    0        , //0159        系统限速标志
+    12000    , //0160        X轴最大移动速度设置(单位:mm/min)
+    12000    , //0161        Y轴最大移动速度设置(单位:mm/min)
+    12000    , //0162        Z轴最大移动速度设置(单位:mm/min)
+    0        , //0163        IV轴最大移动速度设置(单位:degree/s)
+    0        , //0164        V轴最大移动速度设置(单位:degree/s)
+    10000    , //0165        线性轴快进速度设置[0~200000](单位:mm/min)
+    0        , //0166        IV轴快进速度设置(单位:degree/s)
+    0        , //0167        V轴快进速度设置(单位:degree/s)
+    3000     , //0168        线性轴运动平台加速度[0~200000](单位:mm/s2)
+    0        , //0169        IV轴运动平台加速度设置(单位:degree/s2)
+    0        , //0170        V轴运动平台加速度设置(单位:degree/s2)
+    500      , //0171        精准运动平台加速度[0~200000](单位:mm/s2)
+    5000     , //0172        快进运动平台加速度[0~20000] (单位:mm/ s2)
+    5000     , //0173        精准模态机电时间常数(单位0.1ms)
+    400      , //0174        指数型加速机电时间常数(单位0.1ms)
+    300      , //0175        指数型减速机电时间常数(单位0.1ms)
+    12000    , //0176        切削加工最大钳制速度(单位:mm/min)
+    8000     , //0177        通用型加速时间常数(单位:0.1ms)
+    8000     , //0178        通用型减速时间常数(单位:0.1ms)
+    30       , //0179        第二转角不减速最大角度[0~180](单位:度)
+    100      , //0180        二次转角向后搜索距离[0~1000000](单位:um)
+    1000     , //0181        转角指定加速度[1~50000](单位:mm/s2)
+    120      , //0182        区域速度差值[0~24000](单位:mm/min)
+    100      , //0183        短区域长度[1~100000](单位:um)
+    300      , //0184        短区域加减速度[1~50000](单位:mm/s2)
+    100000   , //0185        长代码长度[1~1000000](单位:um)
+    90       , //0186        长代码指定角度[0~180](单位:d)
+    120      , //0187        长代码指定终点速度[0~24000](单位:mm/min)
+    150      , //0188        长代码指定加速度[1~50000](单位:mm/s2)
+    6        , //0189        小线段忽略长度值[1~10000](单位:um)
+    6        , //0190        矢量插补最小线段长度[1~8000](单位:um)
+    400      , //0191        矢量插补最大线段长度[1~8000](单位:um)
+    0        , //0192        伺服主轴钳制转速1(单位:r/min)
+    0        , //0193        伺服主轴钳制转速2(单位:r/min)
+    0        , //0194        伺服主轴钳制转速3(单位:r/min)
+    0        , //0195        伺服主轴钳制转速4(单位:r/min)
+    0        , //0196        伺服主轴第1段加减速时间常数(单位:0.1ms)
+    0        , //0197        伺服主轴第2段加减速时间常数(单位:0.1ms)
+    0        , //0198        伺服主轴第3段加减速时间常数(单位:0.1ms)
+    0        , //0199        伺服主轴第4段加减速时间常数(单位:0.1ms)
+    300      , //0200        主轴减速加速度(单位:r/s2)
+    10000    , //0201        主轴转速设置[0~1000000](单位:r/min)
+    15       , //0202        主轴定位最低转速[0~100](单位:r/min)
+    300      , //0203        主轴定位转速(单位:r/min)
+    300      , //0204        主轴10Hz对应转速当量(r/min)
+    1500     , //0205        刚性攻丝最高主轴转速(单位:r/min)
+    0        , //0206        刚性攻丝主轴速度采集模式(0-VT总线;1-编码器)
+    5        , //0207        刚性攻丝主轴停止提前量[0~100](单位:度)
+    18       , //0208        刚性攻丝前馈增益Kp[0~225]
+    17       , //0209        刚性攻丝前馈增益Kv[0~225]
+    200      , //0210        啄式钻孔返回距离(单位:um)
+    100      , //0211        深孔钻孔安全距离(单位:um)
+    300      , //0212        镗孔设定角度[0~359999](单位:0.001度)
+    200      , //0213        钻孔底部暂停时间(单位:ms)
+    200      , //0214        双速齿轮箱换挡转速(单位:r/min)
+    100      , //0215        双速齿轮箱低档最高转速(单位:r/min)
+    300      , //0216        双速齿轮箱高档最高转速(单位:r/min)
+    250      , //0217        双速齿轮箱高低档切换转速(单位:r/min)
+    0        , //0218        伺服刀库第一工位角度值(单位:0.001度)
+    0        , //0219        伺服刀库调试完成标志位
+    2        , //0220        X轴非线性补偿组数设置[0~280]
+    2        , //0221        Y轴非线性补偿组数设置[0~280]
+    2        , //0222        Z轴非线性补偿组数设置[0~280]
+    2        , //0223        IV轴非线性补偿组数设置[0~280]
+    2        , //0224        V轴非线性补偿组数设置[0~280]
+    0        , //0225        名义坐标系X轴原点机床坐标(单位:线性轴输入单位)
+    0        , //0226        名义坐标系Y轴原点机床坐标(单位:线性轴输入单位)
+    0        , //0227        名义坐标系Z轴原点机床坐标(单位:线性轴输入单位)
+    0        , //0228        名义坐标系IV轴原点机床坐标(单位:旋转轴输入单位)
+    0        , //0229        名义坐标系V轴原点机床坐标(单位:旋转轴输入单位)
+    0        , //0230        名义坐标系S轴原点机床坐标(单位:旋转轴输入单位)
+    0        , //0231        双驱同步允许误差设置(单位:最小输入单位)
+    180      , //0232        X轴转向速度差限制值[1~24000](单位:mm/min)
+    180      , //0233        Y轴转向速度差限制值[1~24000](单位:mm/min)
+    180      , //0234        Z轴转向速度差限制值[1~24000](单位:mm/min)
+    0        , //0235        IV轴转向速度差限制值[1~24000](单位:d/min)
+    0        , //0236        未定义
+    0        , //0237        未定义
+    0        , //0238        未定义
+    4000     , //0239        直线群圆弧近似速度[1~24000](单位:mm/min)
+};
+
+
+void clean_error_sign(void)	//清除错误标志
+{		
+	Error.NCCodeBreak = 0;
+	Error.RAMCodeCheckError = 0;
+	Error.InterpolationOver = 0;
+	Error.TrackRunOutError = 0;
+	Error.HaveGetErrorDataSign= 0;
+	Error.ORTError = 0;
+	Error.AAT_OverTravel = 0;			
+	Error.AAT_OverSpeedSign = 0;		
+	Error.SCIBComError = 0;				
+	Error.CompDataCheckError = 0;							
+	Error.MainErrorSign = 0;
+}
+
+void high_error(void)
+{
+	Error.MainErrorSign = 1;	
+	Error.HaveGetErrorDataSign = 1;
+	S_Spindle.RunModeSign 	= S_RunModeGeneric;
+	S_Spindle.RunSign 		= S_STOP;
+	S_Spindle.SpinSpeedSet 	= 0;
+	
+	if(Error.NCCodeBreak == 1)
+	{
+		Error.RealRunCount = STDNCSign.RealSendCount;
+	}
+	else
+	{
+		Error.RealRunCount = STDNCSign.RealRunCount;
+	}
+	
+	STDNCSign_Error = STDNCSign;
+	NC_AREAControl_Error = NC_AREAControl;
+	NC_AreaRunNCSign_Error = NCRunSign;
+	CPLD_ServoOff();
+}	
+
+
+void InitTest(void)	
+{	
+	NCRunSign.RealRunCount			= 0;
+	NCRunSign.RealSendCount			= 0;
+	NCRunSign.PrecalCode 			= 0;
+	NC_AREAControl.Pointer_EndCode	= 0;
+	NC_AREAControl.VNow				= 0;
+	NC_AREAControl.Vm               = 0;
+	NC_AREAControl.Ve               = 0;
+	NC_AREAControl.Vs               = 0;
+	NC_AREAControl.VmReal           = 0;
+	
+	//for Add Line
+	AddLineNCSign.RealSendCount	= 0;
+	AddLineNCSign.RealRunCount	= 0;
+
+	//for Single
+	NCAreaSingle.GetNextSendCount	= 0;
+	NCAreaSingle.AreaGCodeLastRealSendCount	= 0;
+
+	X_Encoder.MACH_PositionValue	= 0;
+	Y_Encoder.MACH_PositionValue	= 0;
+	Z_Encoder.MACH_PositionValue	= 0;
+	U_Encoder.MACH_PositionValue	= 0;
+	OverallSign.InterpolationSendCnt = 0;
+	OverallSign.InterpolationRunCnt = 0;
+	
+	//自动对刀功能	
+	AutoAdjustTool.LevelChangeSign = 0;
+
+	System.Tsample1					= 0;
+
+	//clear error sign
+	Error.EncoderError.X			= 0;
+	Error.EncoderError.Y			= 0;
+	Error.EncoderError.Z			= 0;
+	Error.EncoderError.U			= 0;
+	OverallSign.ToleranceBigCanRunSign = 0;
+    OverallSign.CurrentGapSign = 0;	
+}
+
+//初始化DSP 模块系统参数
+void ini_dsp_module_sys_para(void)
+{
+	//P000-P005
+	System.EncoderCheckChoose.X = 1;
+	System.EncoderCheckChoose.Y = 1;
+	System.EncoderCheckChoose.Z = 1;
+	System.EncoderCheckChoose.U = 1;
+	//P006-P011
+	X_Encoder.EncoderDIR = 0;
+	Y_Encoder.EncoderDIR = 0;
+	Z_Encoder.EncoderDIR = 0;
+	U_Encoder.EncoderDIR = 0;
+	//p012-p018
+	System.FeedAxisBusStyle = -1;
+	System.SlaveMAX = 0;	
+	//P019
+	AutoAdjustTool.Style = 0;
+	//P020
+	System.Tsample = 0.001;						// 1ms
+	System.Tsample1 = 0.001;					// 1ms
+	//P021-P023
+	System.MAXSpeed.X = 200;
+	System.MAXSpeed.Y = 200;
+	System.MAXSpeed.Z = 200;
+
+	//P030-P039
+	System.ExponentMaxSpeed = 80;
+	System.ExponentMinRatio = 0.2;
+	System.VeerDeltaV = 3;
+	System.NicetyVeerDeltaV = 2;
+	System.TrackRunOutRangeSQR = 900;
+	System.FunctionSelectionSwitch_01	= 1;			//DSPb0-35参数. ARM->DSP发送G代码条数(SendCount)不连续警告检测标志0:不检测,其他:检测
+	System.FlexuousAxisLength = 0.008;
+	System.ArcFeedDownRatio = 1;
+	System.VeerDeltaT = 0.0015;
+	System.NicetyVeerDeltaT = 0.0001;
+	System.ArcDownRatio = 3;
+	System.PWM_PeriodRegister_MIN = divdp(FPGA_MAX_F,500000.0);  //安二f_MAX = 500KHz；安五f_MAX = 4MHz；
+	System.PWM_PeriodRegister_MAX = 65500; //ch by bill
+	System.PWM_PeriodRegister_ZeroPeriod = 2;
+	//P040-P044
+	
+	S_Spindle.SpindleControlStyle = 0;
+	S_Spindle.S_n_MIN = 60;
+	S_Spindle.S_StopDistance = 2;			// 刚性攻牙S 轴停止提前量 unit:d   [1,5]
+	S_Spindle.RigidKp = 1.7;				// Z 轴位置增益假设为1.7
+	S_Spindle.RigidKv = 1.9/70.0;			// Z 轴速度增益假设为1.9/70
+	S_Spindle.RigidKa = 1.9/70.0;			
+
+	//P050-P056
+	System.FunctionSelectionSwitch_02  = 0;	//050	
+	System.AreaControlModle = 0;			//P051
+	System.FunctionSelectionSwitch_03 = 0;	//P052	
+	System.SpindleSpeedbackmodle = 0;
+ 	System.HardLimitFilterTime   = 0;		//P054硬限位时间常数.uint:ms
+	System.SCIB_NoCom_Count		= 200;	//P055主轴连续不通讯次数。单位：S。
+	System.FunctionSelectionSwitch_04 = 2;	
+	System.FunctionSelectionSwitch_05 = 0;	
+	System.SpindleErrorCount = 5;			//P059s轴连续报警次数
+	System.Vnow_TsampleLinearRatio = 1;
+	System.Vnow_TsampleLinearMaxSpeed = 30;
+
+	System.SPCShakeSign = 0.9;
+	System.STDShakeSign = 0.9;
+	System.FunctionSelectionSwitch_06 = 0;
+	System.FunctionSelectionSwitch_07 = 0;
+	System.FunctionSelectionSwitch_08 = 0;
+	System.FunctionSelectionSwitch_09 = 0;		
+	System.FunctionSelectionSwitch_10 = 0;				//073	变频器零伺服使能标志测试.0：零伺服使能无效1：零伺服使能有效
+	System.FunctionSelectionSwitch_11 = 0;
+	
+	System.ParameterWriteOpenSign = 0;			//083			
+	System.BowstringError_Max = 0.002;			//084	弓高误差最大值(Uint:um)
+	System.ToleranceStotalquotiety = 0.4;		//085	拟合曲线公差长度比例因子[10,100](uint:%)	
+	System.FunctionSelectionSwitch_12 = 0;
+	System.VeerMinAngle = 15;
+	
+	//P121-P126
+	System.LinearAxisMinUnit = 1000;
+	System.RotaryAxisMinUnit = 1000;
+	System.SpindleAxisMinUnit = 1000;
+	System.LinearAxisOutUnitEQU =1000;
+	System.RotaryAxisOutUnitEQU = 1000;
+	System.SpindleAxisOutUnitEQU =100000;		//ch by enjoy 20090810
+	System.UnitTo_mm = divdp( System.LinearAxisMinUnit, 1000000.0 );
+	System.UnitTo_d = divdp( System.RotaryAxisMinUnit, 1000000.0 );
+	
+	//P127-P131
+	System.AxisCompMaxL.X = 2;
+	System.AxisCompMaxL.Y = 2;
+	System.AxisCompMaxL.Z = 2;
+	//P132-P137
+	X_Encoder.Resolution = 1000;
+	Y_Encoder.Resolution = 1000;
+	Z_Encoder.Resolution = 1000;
+	U_Encoder.Resolution = 87.890625;
+	
+	//P138-P143
+	System.Gap.X = 0;
+	System.Gap.Y = 0;
+	System.Gap.Z = 0;
+	System.Gap.U = 0;
+	//P144-P148
+	OverallSign.MYORG_M_Coordinate.X = 0;		
+	OverallSign.MYORG_M_Coordinate.Y = 0;		
+	OverallSign.MYORG_M_Coordinate.Z = 0;				
+	OverallSign.MYORG_M_Coordinate.U = 0;		
+	//P149
+	STDNCSign.FG0 = 200;
+	//P150
+	System.a_SET_ARM = 2000;
+	
+	System.Vclamp_SPC = 200;
+	//P161-P165
+	S_Spindle.ORTM253Angle = 0;
+	S_Spindle.ORTSpeed = 4;		//10r/s  = 600r/min
+	S_Spindle.SpeedPerVolt = 300;
+	S_Spindle.a_ac_SET = 3600;
+	S_Spindle.a_de_SET = 3600;
+	S_Spindle.RigidHighestSpeed = 12000;
+
+	System.ReferenceFrameMode = REF_XYZ;
+	System.SpindleOneRing_EncoderRealDegree = 360000;	
+
+	//P195
+	System.a_SET_ARM_Nicety = 600;
+	//P195
+	System.a_SET_ARM_G0 = 6000;	
+	
+	//P198
+	System.ExponentTimeConstant_Nicety= 0.050;	//10ms
+	//P199
+	System.ExponentTimeConstant_ac = 0.010;	//10ms
+	//P200
+	System.ExponentTimeConstant_de = 0.010;	//10ms
+
+	//P203-205
+	System.Vclamp = 100;
+	System.TimeConstant_ac = 0.300;
+	System.TimeConstant_de = 0.300;
+
+	X_Servo.S106 = 0;
+	Y_Servo.S106 = 0;
+	Z_Servo.S106 = 0;
+	U_Servo.S106 = 0;
+	
+	X_Servo.S107 = 0;
+	Y_Servo.S107 = 0;
+	Z_Servo.S107 = 0;
+	U_Servo.S107 = 0;
+	
+	X_Servo.S108 = 1;
+	Y_Servo.S108 = 1;
+	Z_Servo.S108 = 1;
+	U_Servo.S108 = 1;
+	
+	X_Servo.S109 = 0;
+	Y_Servo.S109 = 0;
+	Z_Servo.S109 = 0;
+	U_Servo.S109 = 0;
+	
+	X_Servo.Resolution = 1;
+	Y_Servo.Resolution = 1;
+	Z_Servo.Resolution = 1;
+	U_Servo.Resolution = 1;
+
+	X_Servo.AxisOutUnitEQU = 1.0;
+	Y_Servo.AxisOutUnitEQU = 1.0;
+	Z_Servo.AxisOutUnitEQU = 1.0;
+	U_Servo.AxisOutUnitEQU = 1.0;	
+	X_Servo.AxisOutUnitEQUSp = 5000.0;
+	Y_Servo.AxisOutUnitEQUSp = 5000.0;
+	Z_Servo.AxisOutUnitEQUSp = 5000.0;
+	U_Servo.AxisOutUnitEQUSp = 5000.0;	
+	///for test
+	System.S_ce = 3;
+	if( System.S_ce%2 == 0 )
+	{
+		System.S_ce=System.S_ce-1;
+	}
+	System.S_T1_Acc = 0.1;
+	System.S_T1_Dec = 0.1;
+	System.Average_Time = 0;
+	System.VeerMinAngle = 5;
+	System.VeerMinAngle_2 = 9;	
+	System.Min_CodeStotal = 0.006;//特小线段忽略长度值mm
+	System.VecterInerpolate_MinLen = 0.006;//VectorInterpolate允许最小线段长度值mm
+	System.VecterInerpolate_MaxLen = 1.5;//VectorInterpolate允许最大线段长度值mm
+	System.NCInterpolateAddCnPerCercle = 1;
+	System.Veer2_SearchLen = 0.20;//二次转角向后搜索距离 mm;
+	System.VecterInerpolate_MinAngle = 1.2;
+	System.VecterInerpolate_LinerMaxLen = 0.8;
+	System.VecterInerpolate_AngleerMaxLen = 0.4;
+	System.VecterInerpolate_K = 2.5;
+	System.VecterInerpolate_CompanLen = 0.5;//	
+	System.VecterInerpolate_CompanValue = 0.006;//	
+
+	System.NCAreaSpeedRange = 5;	//区域起始速度终止速度差值mm/s
+	System.NCAreashortLen = 0.5;	//短区域长度值mm
+	System.NCAreashortA = 150;		//短区域加减速度值	mm/s*s
+	System.LongCodeLen = 5; 	//长代码长度值mm
+	System.LongCodeAngle = 90;	//长代码指定加速度角度值
+	System.LongCodeVm = 3;//mm/s
+	System.LongCodeA = 100;  //长代码指定加速度
+	System.VeerDecA = 1000;//转角指定加速度mm/s*s
+	System.ForwardSpeed_kx = 0; 	//X轴速度前馈补偿百分比
+	System.ForwardSpeed_ky = 0; 	//Y轴速度前馈补偿百分比
+	System.ForwardSpeed_kz = 0; 	//Z轴速度前馈补偿百分比
+	System.Positiongain_x = 90; 	//X轴位置环增益
+	System.Positiongain_y = 90; 	//Y轴位置环增益
+	System.Positiongain_z = 90; 	//Z轴位置环增益 
+	/////////////G0 加速度线性系数//////////////////////////	
+	System.G0_A_min = 2000; //mm/s*s
+	System.G0_A_max = 8000; //mm/s*s  pn197
+	System.G0_V_min = divdp( 2000, 60 );//mm/s
+	System.G0_V_max = divdp( 48000, 60 );//mm/s 
+	System.G0_ka = divdp( System.G0_A_max - System.G0_A_min , System.G0_V_max - System.G0_V_min );
+	System.G0_kb = System.G0_A_max - System.G0_ka * System.G0_V_max;
+	System.t_k1 = 0.25;
+	System.t_k2 = 0.25; 
+	System.NCSTD_SearchCount = 50;
+	System.NCSPC_SearchCount = 1;
+
+	System.AxisAngleLimitSpeed.X = 17;
+	System.AxisAngleLimitSpeed.Y = 17;
+	System.AxisAngleLimitSpeed.Z = 17;
+	System.AxisAngleLimitSpeed.U = 17;
+	/////////////////////////////////////////////////		
+}
+
+INT16U AxisCompensation_check_ini(void)
+{
+	INT16U i;
+	
+	for(i=0;i<COMPBUFFERLENGTH;i++)
+	{
+		AxisCompBuffer[i].XL = 12345+i;
+		AxisCompBuffer[i].YL = 12345+2*i;
+		AxisCompBuffer[i].ZL = 12345+3*i;
+		AxisCompBuffer[i].XR = 12345+6*i;
+		AxisCompBuffer[i].YR = 12345+7*i;
+		AxisCompBuffer[i].ZR = 12345+8*i;
+	}
+
+	for(i=0;i<COMPBUFFERLENGTH;i++)
+	{
+		if(AxisCompBuffer[i].XL != (12345+i))
+		{
+			return FALSE;
+		}
+		if(AxisCompBuffer[i].YL != (12345+2*i))
+		{
+			return FALSE;
+		}
+		if(AxisCompBuffer[i].ZL != (12345+3*i))
+		{
+			return FALSE;
+		}
+		if(AxisCompBuffer[i].XR != (12345+6*i))
+		{
+			return FALSE;
+		}
+		if(AxisCompBuffer[i].YR != (12345+7*i))
+		{
+			return FALSE;
+		}
+		if(AxisCompBuffer[i].ZR != (12345+8*i))
+		{
+			return FALSE;
+		}
+	}
+
+	// 非线性补偿参数初始化
+	System.CompensationDirection.X = 1;	//POS COMPENSATION
+	System.CompensationDirection.Y = 0;	//NEG COMPENSATION
+	System.CompensationDirection.Z = 0;	//NEG COMPENSATION
+
+	for(i=0;i<COMPBUFFERLENGTH;i++)
+	{
+		AxisCompBuffer[i].XL = 0;
+		AxisCompBuffer[i].YL = 0;
+		AxisCompBuffer[i].ZL = 0;
+		AxisCompBuffer[i].XR = 0;
+		AxisCompBuffer[i].YR = 0;
+		AxisCompBuffer[i].ZR = 0;
+	}
+
+	AxisCompBuffer[1].XL = 100000;	
+	AxisCompBuffer[1].XR = 100000;	
+	AxisCompBuffer[1].YL = -100000;	
+	AxisCompBuffer[1].YR = -100000;	
+	AxisCompBuffer[1].ZL = -100000;	
+	AxisCompBuffer[1].ZR = -100000;		
+
+	AxisCompBuffer[2].XL = 200000;	
+	AxisCompBuffer[2].XR = 200000;	
+	AxisCompBuffer[2].YL = -200000;	
+	AxisCompBuffer[2].YR = -200000;	
+	AxisCompBuffer[2].ZL = -200000;	
+	AxisCompBuffer[2].ZR = -200000;	
+
+	OverallSign.EncoderCompPt.X = 1;
+	OverallSign.EncoderCompPt.Y = 1;
+	OverallSign.EncoderCompPt.Z = 1;
+
+	OverallSign.PulseOutCompPt.X = 1;
+	OverallSign.PulseOutCompPt.Y = 1;
+	OverallSign.PulseOutCompPt.Z = 1;
+	
+	return TRUE;
+}
+
+INT16U GCODE_check(void)
+{
+	INT16U i;
+	tsGCODE GCodeCheck;
+
+	GCodeCheck.SendCount = 12345;
+	GCodeCheck.CMD1 = 12345;
+	GCodeCheck.CMD2 = 12345;
+	GCodeCheck.StartPoint.X = 123456;
+	GCodeCheck.StartPoint.Y = 123456;
+	GCodeCheck.StartPoint.Z = 123456;
+	GCodeCheck.EndPoint.X = 123456;
+	GCodeCheck.EndPoint.Y = 123456;
+	GCodeCheck.EndPoint.Z = 123456;
+	
+	for(i=0;i<STDGCODE_MOD;i++)
+	{
+		GCodeBuffer[i] = 	GCodeCheck;	
+	}
+	Error.OutsideRAMCheckError = 0;
+	for(i=0;i<STDGCODE_MOD;i++)
+	{
+		if(GCodeBuffer[i].SendCount != 12345)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].CMD1 != 12345)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].CMD2 != 12345)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].StartPoint.X != 123456)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].StartPoint.Y != 123456)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].StartPoint.Z != 123456)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].EndPoint.X != 123456)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].EndPoint.Y != 123456)
+		{
+			return FALSE;
+		}
+		if(GCodeBuffer[i].EndPoint.Z != 123456)
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+void SDRAM_check(void)
+{
+	INT16U CheckReturn;
+	Error.InsideRAMCheckError = 0;
+	
+	CheckReturn = AxisCompensation_check_ini();
+	if(CheckReturn == 0)
+	{
+		Error.InsideRAMCheckError = 1;
+	}
+	
+	CheckReturn = GCODE_check();
+	if(CheckReturn == 0)
+	{
+		Error.InsideRAMCheckError = 1;
+	}
+
+}
+
+void power_on_initial(void)		//系统CNC 上电初始化
+{
+	System.RunState = RealTimeRun;		// 实时运行
+//	System.RunState = SimulateRun;		// 仿真运行
+	System.SystemSimulationRunSign = 0;
+	
+	//初始化时钟
+	Timer0.GenericCounter = 0;
+	//timer0主循环采样周期应为300us
+	Timer0.SamplePeriod = 300;
+	
+	//SDRAM_check();
+	ini_dsp_module_sys_para();
+
+	//CPLD_IOInit();
+	GPIOinit();
+	//初始化伺服系统控制软硬件
+	CPLD_ServoInit();
+	
+	
+	CPLD_ServoOn();			//伺服使能
+
+    CPLD_EncoderResetX();
+    CPLD_EncoderResetY();
+    CPLD_EncoderResetZ();
+    CPLD_EncoderResetU();
+
+	//*(X_Servo.LPM_CounterPort) = 0;
+	//*(Y_Servo.LPM_CounterPort) = 0;
+	//*(Z_Servo.LPM_CounterPort) = 0;
+	SET_LPMEN ;
+
+	//以下为加入硬件缓冲区时初始化
+	//INTP_RESET;
+	//INTP_SETDEALY(64);
+	//INTP_ENABLE; 
+
+	InitTest();		//for test
+
+	//for Refference		
+	Reference.SearchRefSign 		= 0;
+	Reference.NeedFindAxisSign.X 	= 0;
+	Reference.NeedFindAxisSign.Y 	= 0;
+	Reference.NeedFindAxisSign.Z 	= 0;
+	Reference.NeedFindAxisSign.U 	= 0;	
+	Reference.FindRefSign.X = 0;
+	Reference.FindRefSign.Y = 0;
+	Reference.FindRefSign.Z = 0;
+	Reference.FindRefSign.U = 0;
+	Reference.RefStep		= 0;
+
+	Timer0.SpindleRealSpeedCounter = Timer0.GenericCounter;		
+	
+	AutoAdjustTool.FunctionSign = 0;		// 自动对刀功能 
+	AutoAdjustTool.HaveDealAATOverTravelSign = 0;    
+
+	OverallSign.Z_CompesationLength = 0;
+	OverallSign.Z_CompesationLengthBak = 0;
+	OverallSign.Z_CompesationLengthDelta = 0;
+	OverallSign.Int4IdleSign = 0;
+	System.GearDownRate = 1;				//BF/ZF减速箱减速比
+	OverallSign.GapCompensateCnt.X = 0;
+	OverallSign.GapCompensateCnt.Y = 0;
+	OverallSign.GapCompensateCnt.Z = 0;
+	OverallSign.HardLimitNeedGetPositionSign = 0;
+	OverallSign.SPC_HandwheelSim = 0;
+}
+
+void STD_run_NC_initial(void)	//运行STDNC 前的初始化
+{
+	//ini G代码各组群状态
+	STDNCSign.F = divdp( 2000, 60.0 );
+	STDNCSign.GGroup00 = 0;
+	STDNCSign.GGroup02 = 17;
+	STDNCSign.GGroup15 = 64;	
+	
+	//initial communication
+	STDNCSign.RealRunCount = 0;
+	STDNCSign.RealSendCount = 0;
+	STDNCSign.Waitsign = 0;
+	STDNCSign.LastRealSendCount = 0;
+	STDNCSign.ArmAgainSendGcodeSign = 0;		//Arm重发代码标志.1:重发.
+
+	OverallSign.NCSign = NCSIGN_STD;
+	get_ABS_coordinate();
+	OverallSign.STDLastMoveGCode.EndPoint = OverallSign.ABS_Coordinate;		
+	OverallSign.LastMoveCodeEndVector.X = 0.57735;
+	OverallSign.LastMoveCodeEndVector.Y = 0.57735;
+	OverallSign.LastMoveCodeEndVector.Z = 0.57735;
+	//波动处理
+	OverallSign.FlexuousAxisSign.X = 0;
+	OverallSign.FlexuousAxisSign.Y = 0;
+	OverallSign.FlexuousAxisSign.Z = 0;
+	OverallSign.FlexuousRealSendCount = 0;
+	OverallSign.FlexuousNCAREARealSendCount = 0;
+	OverallSign.ToleranceBigCanRunSign = 0;
+
+	//主轴初始化
+	S_Spindle.RunModeSign = S_RunModeGeneric;
+	S_Spindle.RigidTapStartSign = 0;
+	S_Spindle.ORTCompleteSign = 0;				//CH0507
+	S_Spindle.RigidBackToolSign = 0;			//CH0507
+	S_Spindle.RigidBackToolCompleteSign = 0;	//CH0507
+	S_Spindle.ReachSetSpeedJudgeSign = 0;		//CH20120217
+	
+	//initial NC_AREAControl
+	NCRunSign.NewAreaSign	= 0;
+	NCRunSign.RealSendCount = 0;
+	NCRunSign.RealRunCount	= 0;
+	NCRunSign.Waitsign = 0;
+	NC_AREAControl.Pointer_EndCode = 0;
+	NC_AREAControl.VNow 	= 0;
+	NC_AREAControl.VMin 	= 1;
+	NCRunSign.VeVmCalCount = 1;
+	NCRunSign.EndCodeCount = 1;
+	NCRunSign.EndCodeCount = 1;
+	NCRunSign.SingleModifyOffsetOrCompesationSign = 0;
+	NC_AREAControl.Snow = 0;
+	NC_AREAControl.VNow = 0;
+	NC_AREAControl.VNowOut = 0;		//CH0512
+	NC_AREAControl.Pointer_StartCode = 0;
+	NC_AREAControl.Pointer_EndCode = 0;
+	NC_AREAControl.DeltaStep.X =0;
+	NC_AREAControl.DeltaStep.Y =0;
+	NC_AREAControl.DeltaStep.Z =0;        
+	NC_AREAControl.OldValue.X = 0;                         
+	NC_AREAControl.OldValue.Y = 0;                         
+	NC_AREAControl.OldValue.Z = 0;  	
+	NC_AREAControl.a_ac = 2000;
+	NC_AREAControl.a_de = 2000;
+	NC_AREAControl.OldPointMACHPulseOut.X = 0;
+	NC_AREAControl.OldPointMACHPulseOut.Y = 0;
+	NC_AREAControl.OldPointMACHPulseOut.Z = 0;
+
+	//清前馈补偿相关寄存值
+	NC_AREAControl.TrackDeltaValue.X = 0;
+	NC_AREAControl.TrackDeltaValue.Y = 0;
+	NC_AREAControl.TrackDeltaValue.Z = 0;
+	NC_AREAControl.TrackDeltaValue_Last.X = 0;
+	NC_AREAControl.TrackDeltaValue_Last.Y = 0;
+	NC_AREAControl.TrackDeltaValue_Last.Z = 0;
+	NC_AREAControl.VNowLast = 0;
+	OverallSign.NC_SearchCount = System.NCSTD_SearchCount;
+	NC_AREAControl.SearchCount = OverallSign.NC_SearchCount;
+	NC_AREAControl.NewGodeRunSign = 0;	
+	NC_AREAControl.AreaPreCalStep = 1;	
+	NC_AREAControl.AreaPreCalStep2add = 0;	
+	NC_AREAControl.Vm               = 0;
+	NC_AREAControl.Ve               = 0;
+	NC_AREAControl.Vs               = 0;
+	NC_AREAControl.VmReal           = 0;
+	
+	//清插补缓冲区
+	InterpolationBuffer[0] = InterpolationBuffer[OverallSign.InterpolationRunCnt%INTERPOLATIONBUFLENGTH];
+	OverallSign.InterpolationSendCnt = 0;
+	OverallSign.InterpolationRunCnt = 0;
+	//initial STDNCSign
+	STDNCSign.XYZ_Over = 1;               
+	STDNCSign.ProgramPreRunSign = 0;
+
+	//单段功能初始化
+	STDNCSign.SingleModeSign = 0;
+	STDNCSign.NeedRunSingleSign = 0;
+	STDNCSign.SingleRunOver = 0;
+	STDNCSign.AddLineSign = 0;
+	STDNCSign.AddLineStep = 1;
+	STDNCSign.GetPositionSign = 1;
+	Timer0.GetPositionCounter = Timer0.GenericCounter;
+	
+	// 自动对刀功能 
+	AutoAdjustTool.FunctionSign = 0;
+	TestsBufferCnt = 0;
+	OverallSign.CurrentGapSign = 0;
+	OverallSign.SPC_HandwheelSim = 0;
+}
+
+
+void SPC_run_NC_initial(void)	//运行SPCNC 前的初始化
+{
+	//ini G代码各组群状态
+	SPCNCSign.F = divdp( 2000, 60.0 );
+	SPCNCSign.GGroup00 = 0;
+	SPCNCSign.GGroup02 = 17;
+	SPCNCSign.GGroup15 = 64;
+	SPCNCSign.RealRunCount = 0;		//initial communication
+	SPCNCSign.RealSendCount = 0;
+	SPCNCSign.LastRealSendCount = 0;
+	SPCNCSign.Waitsign = 0;
+	
+	get_ABS_coordinate();
+
+	OverallSign.SPCLastMoveGCode.EndPoint = OverallSign.ABS_Coordinate;		
+	OverallSign.HardLimitNeedGetPositionSign = 0;
+	OverallSign.LastMoveCodeEndVector.X = 0.57735;
+	OverallSign.LastMoveCodeEndVector.Y = 0.57735;
+	OverallSign.LastMoveCodeEndVector.Z = 0.57735;
+
+	//主轴初始化
+	S_Spindle.RunModeSign = S_RunModeGeneric;
+	S_Spindle.RigidTapStartSign = 0;
+	S_Spindle.ORTCompleteSign = 0;	//CH0507	
+	S_Spindle.ReachSetSpeedJudgeSign = 0;		//CH20120217
+	//S_Spindle.VT_ORT_OK_Counter=0;		// 主轴通用定位初始化
+
+	AutoAdjustTool.FunctionSign = 0;		// 自动对刀功能 CH0507
+	
+	//initial NC_AREAControl
+	NCRunSign.NewAreaSign	= 0;
+	NCRunSign.RealSendCount = 0;
+	NCRunSign.RealRunCount	= 0;
+	NCRunSign.VeVmCalCount = 1;	
+	NCRunSign.EndCodeCount = 1;
+	NC_AREAControl.Pointer_EndCode = 0;
+	NC_AREAControl.VNow 	= 0;
+	NC_AREAControl.VMin 	= 1;
+	NCRunSign.SingleModifyOffsetOrCompesationSign	= 0;
+	//initial NC_AREAControl
+	NC_AREAControl.Snow = 0;
+	NC_AREAControl.VNow = 0;
+	NC_AREAControl.VNowOut = 0;		
+	NC_AREAControl.Pointer_StartCode = 0;
+	NC_AREAControl.Pointer_EndCode = 0;
+	NC_AREAControl.DeltaStep.X =0;
+	NC_AREAControl.DeltaStep.Y =0;
+	NC_AREAControl.DeltaStep.Z =0;        
+	NC_AREAControl.OldValue.X = 0;                         
+	NC_AREAControl.OldValue.Y = 0;                         
+	NC_AREAControl.OldValue.Z = 0;  
+	NC_AREAControl.a_ac = 2000;
+	NC_AREAControl.a_de = 2000;
+	OverallSign.NC_SearchCount = System.NCSPC_SearchCount;
+	NC_AREAControl.SearchCount = OverallSign.NC_SearchCount;
+	NC_AREAControl.NewGodeRunSign = 0;	
+	NC_AREAControl.AreaPreCalStep = 1;
+	NC_AREAControl.AreaPreCalStep2add = 0;	
+	NC_AREAControl.Vm               = 0;
+	NC_AREAControl.Ve               = 0;
+	NC_AREAControl.Vs               = 0;
+	NC_AREAControl.VmReal           = 0;
+
+	//清前馈补偿相关寄存值
+	NC_AREAControl.TrackDeltaValue.X = 0;
+	NC_AREAControl.TrackDeltaValue.Y = 0;
+	NC_AREAControl.TrackDeltaValue.Z = 0;
+	NC_AREAControl.TrackDeltaValue_Last.X = 0;
+	NC_AREAControl.TrackDeltaValue_Last.Y = 0;
+	NC_AREAControl.TrackDeltaValue_Last.Z = 0;
+	NC_AREAControl.VNowLast = 0;
+	
+	//清插补缓冲区
+	InterpolationBuffer[0] = InterpolationBuffer[OverallSign.InterpolationRunCnt%INTERPOLATIONBUFLENGTH];
+	OverallSign.InterpolationSendCnt = 0;
+	OverallSign.InterpolationRunCnt = 0;
+	OverallSign.ToleranceBigCanRunSign = 0;
+	
+	//initial SPCNCSign
+	SPCNCSign.XYZ_Over = 1;                 
+	SPCNCSign.GetPositionSign = 1;			//for get x.y.z feedback coordinates
+	Timer0.GetPositionCounter = Timer0.GenericCounter;
+	TestsBufferCnt = 0;
+	System.SPCRunCount=0;
+	System.SPCLocateOver=FAIL;
+	System.HandPulseBk=System.HandPulse;
+	System.HandGradeBk=System.HandGrade;
+	Timer0.JogStartCounter = Timer0.GenericCounter;
+	OverallSign.CurrentGapSign = 0;
+	OverallSign.SPC_HandwheelSim = 0;
+}
+
+void S_run_spindle_initial(void)		//运行S_spindle 前的初始化
+{
+	S_Spindle.RunModeSign = S_RunModeGeneric;
+	OverallSign.MoveSign.U = 0;
+	S_Spindle.RunSign = S_STOP;
+	S_Spindle.SpinSpeedSet = 0;
+	S_Spindle.RealDisplaySpeed=0.0;// add by le
+	S_Spindle.SpinSpeedOutputVolt=0.0;
+	S_Spindle.SpindleGrade = 0;
+	S_Spindle.LastSpindleGrade = 0;
+	SpindleOutSignal.all = 0;
+	S_Spindle.UnReachSetSpeedSign = 0;
+	S_Spindle.ORTCompleteSign = 0;		
+	S_Spindle.ReachSetSpeedJudgeSign = 0;		//CH20120217
+	S_Spindle.SpinSpeedDecSign = 0;
+	S_Spindle.RigidSpindleDecCounter = 0;	//CH0603
+}
+
+
+void system_initial(void)		//系统CNC  控制初始化，RET 键有效
+{		
+	//复位参考点信号输入
+	SET_CLRREF ;
+	
+		
+	CPLD_ServoOn();			//伺服使能
+	
+	//取消复位参考点信号输入
+	CLR_CLRREF ;
+
+	clean_error_sign();
+	STD_run_NC_initial();
+	SPC_run_NC_initial();
+	S_run_spindle_initial();
+
+	OverallSign.NCSign = NCSIGN_NONE;
+	//sCPLD_IO_Out2Register.bit.OUT4 = 1;
+	//rCPLD_IO_OUT2= sCPLD_IO_Out2Register.all;
+	
+	SCIA_Init();
+	SCIB_Init();				//初始化VT总线
+
+}
+
+
+// ARM->DSP伺服模块数据通讯包协议
+void ARM_MainCMD_Servo(tsSERVO *psServo,tsPARADSPSERVO_BUF *psParaServo) 
+{
+	//tsPARADSPSERVO_BUF *psParaServo;
+	//psParaServo=(tsPARADSPSERVO_BUF *)psDSPPacketInServo->Info32;
+	psServo->S001=psParaServo->S001;	//伺服驱动器型号
+	psServo->S003=psParaServo->S003;	//切换电机方向	
+	
+	//psServo->S037=psParaServo->S037;	//PG分频比(脉冲单位) [Pn212]	
+	//psServo->S038=psParaServo->S038;	//电子齿轮比(分子) [Pn20E]	
+	//psServo->S039=psParaServo->S039;	//电子齿轮比(分母) [Pn210]		
+	
+	psServo->S106=psParaServo->S106;	//编码器线数		
+	psServo->S107=psParaServo->S107;	//电机一转对应直线距离或旋转角度unit:nm or nd	
+	psServo->S108=psParaServo->S108;	//减速比分子	
+	psServo->S109=psParaServo->S109;	//减速比分母
+
+	psServo->Resolution = 1.0;
+	psServo->AxisOutUnitEQU = 1.0;
+
+	//避免除法出现程序异常20130924 change by rex chen
+	if((System.LinearAxisOutUnitEQU) && (System.LinearAxisMinUnit))
+	if(((System.ParameterWriteOpenSign&0X0F))&&(psServo->S037)&&(psServo->S038)&&(psServo->S039)
+		&&(psServo->S106)&&(psServo->S107)&&(psServo->S108)&&(psServo->S109))	
+	{
+		//分开计算，防止浮点运算出错		
+		psServo->Resolution = divdp(psServo->S107 , System.LinearAxisMinUnit);
+		psServo->Resolution = divdp(psServo->Resolution , (4*psServo->S037));
+		psServo->Resolution = psServo->Resolution * divdp(psServo->S109 , psServo->S108);
+		if(fabs(psServo->Resolution) < 1e-6)
+		{	//兼容老版本(设置电子齿轮比)
+			psServo->Resolution = 1.0;
+		}
+		//分开计算，防止浮点运算出错	
+		psServo->AxisOutUnitEQU = divdp(psServo->S107 , System.LinearAxisOutUnitEQU);
+		psServo->AxisOutUnitEQU = divdp((powdp(2 , psServo->S106)) , psServo->AxisOutUnitEQU);
+		psServo->AxisOutUnitEQU = psServo->AxisOutUnitEQU * divdp(psServo->S108 , psServo->S109);
+		psServo->AxisOutUnitEQU = psServo->AxisOutUnitEQU *  psServo->S039;
+		psServo->AxisOutUnitEQU = divdp(psServo->AxisOutUnitEQU ,  psServo->S038);			
+		if(fabs(psServo->AxisOutUnitEQU) < 1e-6)
+		{	
+			//兼容老版本(设置电子齿轮比)
+			psServo->AxisOutUnitEQU = 1.0;
+		}
+	}
+	
+	//提高执行效率，避免插补点信息判断的浮点数运算
+	if(System.LinearAxisOutUnitEQU)
+	{
+		psServo->AxisOutUnitEQUSp=divdp(5000000.0,System.LinearAxisOutUnitEQU)*psServo->AxisOutUnitEQU;
+	}	
+	else
+	{
+		psServo->AxisOutUnitEQUSp=5000.0;
+	}
+	//新增软限位信息处理
+	//if(psDSPPacketTemp->Command==0x50)
+    if(psServo==&X_Servo)
+	{
+		System.XLimitPos=psParaServo->S118;
+		System.XLimitNeg=psParaServo->S119;
+	}
+	else if(psServo==&Y_Servo)//if(psDSPPacketTemp->Command==0x51)
+	{
+		System.YLimitPos=psParaServo->S118;
+		System.YLimitNeg=psParaServo->S119;
+	}
+	else if(psServo==&Z_Servo)//if(psDSPPacketTemp->Command==0x52)
+	{
+		System.ZLimitPos=psParaServo->S118;
+		System.ZLimitNeg=psParaServo->S119;
+	}	
+}
+
+// ARM->DSP SPINDLE_70系统数据通讯包协议
+void ARM_MainCMD_70(void) 
+{
+	//ARM_MainCMD_Servo(&U_Servo);
+	System.GapPulse.X = divdp(System.LinearAxisMinUnit,System.LinearAxisOutUnitEQU)*System.Gap.X*X_Servo.AxisOutUnitEQU;
+	System.GapPulse.Y = divdp(System.LinearAxisMinUnit,System.LinearAxisOutUnitEQU)*System.Gap.Y*Y_Servo.AxisOutUnitEQU;
+	System.GapPulse.Z = divdp(System.LinearAxisMinUnit,System.LinearAxisOutUnitEQU)*System.Gap.Z*Z_Servo.AxisOutUnitEQU;
+	System.GapPulse.U = divdp(System.SpindleAxisMinUnit,System.SpindleAxisOutUnitEQU)*System.Gap.U*U_Servo.AxisOutUnitEQU;
+}
+
+void ARM_MainCMD_B1(void) 
+{
+	tsPARADSPB0_1_BUF *psParaB0_1;
+	tsPARADSPB0_2_BUF *psParaB0_2;
+	psParaB0_1=(tsPARADSPB0_1_BUF *)pPARADSPB0_1;//psDSPPacketInSYS->Info8;
+	psParaB0_2=(tsPARADSPB0_2_BUF *)pPARADSPB0_2;//psDSPPacketInSYS->Info32;
+	//we use default for now
+	//*psParaB0_1 =sParaDspB0_1Buf;//sParaDspB0_1Buf=*psParaB0_1;
+	//*psParaB0_2 =sParaDspB0_2Buf;//sParaDspB0_2Buf=*psParaB0_2;
+
+	//B0_1 MODLE
+	/*******************************************************************/
+	/******** DSPB0-1组第1页，P000~P019 系统设置参数********/	
+	System.ParameterWriteOpenSign = psParaB0_1->ServoParaModify;	
+	System.FeedAxisBusStyle = 0;//psParaB0_1->ServoFeedType; 
+	S_Spindle.SpindleControlStyle =0;// psParaB0_1->ServoSpinType;		
+	if(System.SlaveMAX != psParaB0_1->ServoStationsSub)
+	{
+		//IRQ_disable(IRQ_EVT_EXTINT6);
+		IRQ_DISABLE(IRQNUM_MBUS);
+		System.SlaveMAX = psParaB0_1->ServoStationsSub;
+	}	
+	System.A4_Model=psParaB0_1->AxisTypeIV;
+	System.A5_Model=psParaB0_1->AxisTypeV;
+	
+	System.SpindleSetupType=psParaB0_1->SpindleType;			//主轴配置类型	
+	System.SCIB_NoCom_Count = psParaB0_1->SpindleComs*100;	//主轴连续不通讯次数。单位：S。
+	if(System.SCIB_NoCom_Count < 200)	
+		System.SCIB_NoCom_Count = 200;	
+	else if(System.SCIB_NoCom_Count > 6000)	
+		System.SCIB_NoCom_Count = 6000;	
+	System.SpindleErrorCount = psParaB0_1->SpindleVoltages*10;	//主轴驱动器误报警过滤时间
+	if(System.SpindleErrorCount <= 5)	
+		System.SpindleErrorCount = 5;	
+	System.HardLimitFilterTime	= psParaB0_1->AxisHlimitTimes++;		//硬限位过虑时间常数uint:ms
+	
+	/*******************************************************************/
+	/******** DSPB0-1组第2页，P020~P039 加工实用参数********/	
+	System.Tsample = divdp(psParaB0_1->InterpolationCycle, 10000.0 );	//插补周期(单位：0.1ms)
+	System.Tsample1 = System.Tsample;
+	System.PWM_PeriodRegister_ZeroPeriod = FPGA_MAX_F*2*System.Tsample;	
+	if((X_Servo.S001 ==5)||(Y_Servo.S001 ==5)||(Z_Servo.S001 ==5))	//安二f_MAX = 500KHz；安五f_MAX = 4MHz；
+		System.PWM_PeriodRegister_MIN = divdp(FPGA_MAX_F,4000000.0); 	
+	System.TrackRunOutRangeSQR = powdp(psParaB0_1->TrackOverflow, 2);	
+	System.FlexuousAxisLength = divdp(psParaB0_1->CurveSmoothOffset,1000);
+	System.VeerMinAngle = psParaB0_1->TurnNoDecAngle;
+	if(System.VeerMinAngle == 0)	
+		System.VeerMinAngle = 15;	
+	System.VeerDeltaV = divdp(psParaB0_1->FeedMin, 10.0); 
+	System.NicetyVeerDeltaV = divdp(psParaB0_1->FeedMinNice, 10.0);
+	System.VeerDeltaT = divdp(psParaB0_1->TimeConstTurn, 20000.0);			
+	System.NicetyVeerDeltaT = divdp(psParaB0_1->TimeConstTurnNice, 20000.0);	
+	System.ArcFeedDownRatio = divdp(psParaB0_1->ArcDecRatio, 10.0);
+	System.ArcDownRatio = psParaB0_1->ArcCalculateScale;
+	System.BowstringError_Max =  divdp(psParaB0_1->FittingLineOffset , 1000);		//弓高误差最大值	
+	if(System.BowstringError_Max < 0.004)
+	{
+		System.BowstringError_Max = 0.0;
+	}
+	else if(System.BowstringError_Max > 0.012)
+	{
+		System.BowstringError_Max = 0.012;
+	}	
+	System.ToleranceStotalquotiety = divdp(psParaB0_1->FittingLineScale,100.0);		//拟合曲线公差长度比例因子[10,100](uint:%)	
+	if(System.ToleranceStotalquotiety < 0.010)	
+	{
+		System.ToleranceStotalquotiety = 0.0;
+	}
+	else if(System.ToleranceStotalquotiety > 1.0)	
+	{
+		System.ToleranceStotalquotiety = 1.0;
+	}
+	System.ExponentMaxSpeed = psParaB0_1->SoftBootFeed;
+	if(System.ExponentMaxSpeed > 300.0)	
+		System.ExponentMaxSpeed = 300.0;	
+	System.Vnow_TsampleLinearMaxSpeed = System.ExponentMaxSpeed;	
+	System.Vnow_TsampleLinearRatio = psParaB0_1->SoftBootScale;
+	System.ExponentMinRatio = divdp(psParaB0_1->SoftBootScale,10.0);		
+	System.SPCShakeSign = divdp(psParaB0_1->SoftFeedScaleJog,10.0);
+	if(System.SPCShakeSign<=0)
+	{
+		System.SPCShakeSign = 1.0;
+	}
+	else if(System.SPCShakeSign<0.5)
+	{
+		System.SPCShakeSign = 0.5;
+	}
+	else if(System.SPCShakeSign>1.2)
+	{
+		System.SPCShakeSign = 1.2;
+	}	
+	System.STDShakeSign = divdp(psParaB0_1->SoftFeedScaleAuto,10.0);
+	if(System.STDShakeSign<=0)
+	{
+		System.STDShakeSign = 1.0;
+	}
+	if(System.STDShakeSign<0.5)
+	{
+		System.STDShakeSign = 0.5;
+	}
+	else if(System.STDShakeSign>1.2)
+	{
+		System.STDShakeSign = 1.2;
+	}
+	System.AreaControlModle = psParaB0_1->AreaFeedDealType;				//0:S曲线;	1:三次曲线
+	OverallSign.UsualAccelerateStyle = (System.AreaControlModle & 0x40)?(TimeConstant):(RatioConstant);
+	OverallSign.RapidAccelerateStyle = (System.AreaControlModle & 0x80)?(TimeConstant):(RatioConstant);
+
+	/*******************************************************************/
+	/******** DSPB0-1组第3页，P040~P059 功能选择开关********/	
+	System.FunctionSelectionSwitch_01 = psParaB0_1->FunctionSelect01;	
+	System.FunctionSelectionSwitch_02 = psParaB0_1->FunctionSelect02;
+	System.FunctionSelectionSwitch_03 = psParaB0_1->FunctionSelect03;
+	System.FunctionSelectionSwitch_04 = psParaB0_1->FunctionSelect04;
+	System.FunctionSelectionSwitch_05 = psParaB0_1->FunctionSelect05;
+	System.FunctionSelectionSwitch_06 = psParaB0_1->FunctionSelect06;
+	System.FunctionSelectionSwitch_07 = psParaB0_1->FunctionSelect07;
+	System.FunctionSelectionSwitch_08 = psParaB0_1->FunctionSelect08;
+	System.FunctionSelectionSwitch_09 = psParaB0_1->FunctionSelect09;
+	System.FunctionSelectionSwitch_10 = psParaB0_1->FunctionSelect10;
+	System.FunctionSelectionSwitch_11 = psParaB0_1->FunctionSelect11;
+	System.FunctionSelectionSwitch_12 = psParaB0_1->FunctionSelect12;	
+
+	/*******************************************************************/
+	/********* DSPB0-1组第4页，P060~P079 编码器设置**********/	
+	System.EncoderCheckChoose.X = psParaB0_1->EncoderCheckX;
+	System.EncoderCheckChoose.Y = psParaB0_1->EncoderCheckY;
+	System.EncoderCheckChoose.Z = psParaB0_1->EncoderCheckZ;
+	//System.EncoderCheckChoose.IV = psParaB0_1->EncoderCheckIV;
+	//System.EncoderCheckChoose.V = psParaB0_1->EncoderCheckV;
+	System.EncoderCheckChoose.U = psParaB0_1->EncoderCheckS;
+	X_Encoder.EncoderDIR = psParaB0_1->EncoderRDDirX;
+	Y_Encoder.EncoderDIR = psParaB0_1->EncoderRDDirY;
+	Z_Encoder.EncoderDIR = psParaB0_1->EncoderRDDirZ;
+	//IV_Encoder.EncoderDIR = psParaB0_1->EncoderRDDirIV;
+	//V_Encoder.EncoderDIR = psParaB0_1->EncoderRDDirV;
+	U_Encoder.EncoderDIR = psParaB0_1->EncoderRDDirS;	
+	AutoAdjustTool.LevelChangeSign = psParaB0_1->SignLevelATCLock;	
+	
+	/*******************************************************************/
+	/********* DSPB0-1组第5页，P080~P099 编码器设置**********/
+	
+
+	/*******************************************************************/
+	/************* DSPB0-1组第6页，P100~P119 未定义*************/		
+	System.RunState =1;// psParaB0_1->Rsd119;  
+	if((System.RunState == SimulateRun)&&(System.SystemSimulationRunSign == 0))
+	{
+		NC_AREAControl.NowValue.X = 0;	
+		NC_AREAControl.NowValue.Y = 0;	
+		NC_AREAControl.NowValue.Z = 0;		
+	}	
+
+	//B0_2 MODLE
+	/*******************************************************************/
+	/***** DSPB0-2组第1页，P120~P139 最小单位、分辨率*****/	
+	System.LinearAxisMinUnit = psParaB0_2->AxisUnitInLinear;		
+	System.UnitTo_mm = divdp( System.LinearAxisMinUnit, 1000000.0);	
+	System.RotaryAxisMinUnit = psParaB0_2->AxisUnitInRotate;		
+	System.UnitTo_d = divdp( System.RotaryAxisMinUnit, 1000000.0);	
+	System.SpindleAxisMinUnit = psParaB0_2->AxisUnitInSpindle;	
+	System.LinearAxisOutUnitEQU = psParaB0_2->AxisUnitOutLinear;	
+	System.RotaryAxisOutUnitEQU = psParaB0_2->AxisUnitOutRotate;	
+	System.SpindleAxisOutUnitEQU = psParaB0_2->AxisUnitOutSpindle;	
+	X_Encoder.Resolution = divdp(psParaB0_2->AxisResolutionX, System.LinearAxisMinUnit);	
+	Y_Encoder.Resolution = divdp(psParaB0_2->AxisResolutionY, System.LinearAxisMinUnit);	
+	Z_Encoder.Resolution = divdp(psParaB0_2->AxisResolutionZ, System.LinearAxisMinUnit);	
+	U_Encoder.Resolution = divdp( 360000000.0, (psParaB0_2->AxisResolutionS*System.SpindleAxisMinUnit));	//U轴反馈编码器分辨率(ud/pulse)
+	S_Spindle.PulsePerCycle = psParaB0_2->AxisResolutionS;		//反馈编码器每转脉冲数(单位：pulse /r)
+	System.Gap.X = divdp(psParaB0_2->AxisGapOffsetX, System.LinearAxisMinUnit);		
+	System.Gap.Y = divdp(psParaB0_2->AxisGapOffsetY, System.LinearAxisMinUnit);		
+	System.Gap.Z = divdp(psParaB0_2->AxisGapOffsetZ, System.LinearAxisMinUnit);	
+	System.Gap.U = divdp(psParaB0_2->AxisGapOffsetS, System.RotaryAxisMinUnit);
+
+	/**************************************************************************/
+	/** DSPB0-2组第2页，P140~P159  档位速度、搜索参考点速度**/
+    System.JogGrade1=psParaB0_2->FeedLJogGrade1;
+    System.JogGrade2=psParaB0_2->FeedLJogGrade2;
+    System.JogGrade3=psParaB0_2->FeedLJogGrade3; //by vinge
+	System.SRefBack = divdp(psParaB0_2->DistLRefNeg, System.UnitTo_mm);
+
+	/********************************************************************/
+	/******** DSPB0-2组第3页，P160~P179  速度、加速度*********/
+	System.MAXSpeed.X = divdp(psParaB0_2->FeedMaxX, 60.0);			
+	System.MAXSpeed.Y = divdp(psParaB0_2->FeedMaxY, 60.0);
+	System.MAXSpeed.Z = divdp(psParaB0_2->FeedMaxZ, 60.0);
+	STDNCSign.FG0 = divdp(psParaB0_2->FeedG0L, 60.0) * System.STDShakeSign;
+	System.a_SET_ARM = psParaB0_2->AccFeedL;
+	System.a_SET_ARM_Nicety = psParaB0_2->AccFeedNice;
+	if(System.a_SET_ARM_Nicety == 0)
+		System.a_SET_ARM_Nicety = 50;	
+	System.a_SET_ARM_G0 = psParaB0_2->AccFeedG0;
+	if(System.a_SET_ARM_G0 == 0)	
+		System.a_SET_ARM_G0 = 2000;	
+	System.ExponentTimeConstant_Nicety = divdp(psParaB0_2->TimeConstExponentNice, 10000);		//精准电机机械时间常数单位0.1ms
+	if(System.ExponentTimeConstant_Nicety  <= 0.010)	
+		System.ExponentTimeConstant_Nicety = 0.050;		
+	System.ExponentTimeConstant_ac = divdp(psParaB0_2->TimeConstExponentAcc, 10000);		//加速时间常数单位0.1ms
+	if(System.ExponentTimeConstant_ac  <= 0.005)	
+		System.ExponentTimeConstant_ac = 0.020;	
+	System.ExponentTimeConstant_de = divdp(psParaB0_2->TimeConstExponentDec, 10000);		//减速时间常数单位0.1ms
+	if(System.ExponentTimeConstant_de  <= 0.005)	
+		System.ExponentTimeConstant_de = 0.020;	
+	if((System.FunctionSelectionSwitch_06 & 0x04) != 0x04)	
+		System.ExponentTimeConstant_ac = System.ExponentTimeConstant_de;
+	System.Vclamp = divdp(psParaB0_2->STDFeedClamp,60);		//G01切削加工最大钳制速度(初始为6000mm/min)
+	if(System.Vclamp  <= 0)	
+		System.Vclamp = 200;	
+	System.TimeConstant_ac = divdp(psParaB0_2->TimeConstCombineAcc, 10000);		//(斜线型算法)加速时间常数1.单位*0.1ms
+	if(System.TimeConstant_ac  <= 0.020)	
+		System.TimeConstant_ac = 0.020;	
+	System.TimeConstant_de = divdp(psParaB0_2->TimeConstCombineDec, 10000);		//(斜线型算法)减速时间常数1.单位*0.1ms
+	if(System.TimeConstant_de  <= 0.020)	
+		System.TimeConstant_de = 0.020;
+	System.VeerMinAngle_2   = psParaB0_2->TurnNoDecAngle2;
+	if(System.VeerMinAngle_2 <= 0)
+	{
+		System.VeerMinAngle_2 = 0;
+	}	
+
+	/****************************************************************************/
+	/**** DSPB0-2组第4页，P180~P199 切削钳制速度、伺服主轴*****/	
+	System.Veer2_SearchLen = divdp(psParaB0_2->Veer2_SearchLen,1000);		
+	if(System.Veer2_SearchLen  < 0)
+	{
+		System.Veer2_SearchLen = 0;
+	}
+	else if(System.Veer2_SearchLen  > 100)
+	{
+		System.Veer2_SearchLen = 100;
+	}	
+	System.VeerDecA = psParaB0_2->VeerDecA;		
+	if(System.VeerDecA <= 0)
+	{
+		System.VeerDecA = 1000;
+	}
+	else if(System.VeerDecA  >= 5000)
+	{
+		System.VeerDecA = 5000;
+	}	
+	System.NCAreaSpeedRange = divdp(psParaB0_2->NCAreaSpeedRange , 60);		
+	if(System.NCAreaSpeedRange  <= 0)
+	{
+		System.NCAreaSpeedRange = 0;
+	}
+	else if(System.NCAreaSpeedRange  >= 400)
+	{
+		System.NCAreaSpeedRange = 400;
+	}	
+	System.NCAreashortLen = divdp(psParaB0_2->NCAreashortLen, 1000);		
+	if(System.NCAreashortLen  <= 0)
+	{
+		System.NCAreashortLen = 0.001;
+	}
+	else if(System.NCAreashortLen  >= 10.0)
+	{
+		System.NCAreashortLen = 10.0;
+	}	
+	System.NCAreashortA = divdp(psParaB0_2->NCAreashortA , 10000);		
+	if(System.NCAreashortA  <= 0)
+	{
+		System.NCAreashortA = 50;
+	}
+	else if(System.NCAreashortA  >= 5000)
+	{
+		System.NCAreashortA = 5000;
+	}	
+	System.LongCodeLen = divdp(psParaB0_2->LongCodeLen, 1000);		
+	if(System.LongCodeLen <= 0)
+	{
+		System.LongCodeLen = 1;
+	}
+	else if(System.LongCodeLen  > 1000)
+	{
+		System.LongCodeLen = 1000;
+	}	
+	System.LongCodeAngle = psParaB0_2->LongCodeAngle;		
+	if(System.LongCodeAngle  <= 0)
+	{
+		System.LongCodeAngle = 0;
+	}
+	else if(System.LongCodeAngle  >= 180)
+	{
+		System.LongCodeAngle = 180;
+	}	
+	System.LongCodeVm = divdp(psParaB0_2->LongCodeVm, 60);		
+	if(System.LongCodeVm  <= 0)
+	{
+		System.LongCodeVm = 0;
+	}
+	else if(System.LongCodeVm  >= 400)
+	{
+		System.LongCodeVm = 400;
+	}	
+	System.LongCodeA = psParaB0_2->LongCodeA;		
+	if(System.LongCodeA  <= 0)
+	{
+		System.LongCodeA = 50;
+	}
+	else if(System.LongCodeA  >= 5000)
+	{
+		System.LongCodeA = 5000;
+	}
+	
+	System.Min_CodeStotal = divdp(psParaB0_2->Min_CodeStotal, 1000 );
+	if(System.Min_CodeStotal <=0)
+	{
+		System.Min_CodeStotal = 0.005;
+	}
+	if(System.Min_CodeStotal >= 1.0)
+	{
+		System.Min_CodeStotal = 1.0; //um
+	}
+	System.VecterInerpolate_MinLen = divdp(psParaB0_2->VecterInerpolate_MinLen, 1000 );
+	if(System.VecterInerpolate_MinLen <=0)
+	{
+		System.VecterInerpolate_MinLen = 0.005;
+	}
+	if(System.VecterInerpolate_MinLen >= 8.0)
+	{
+		System.VecterInerpolate_MinLen = 8.0; //um
+	}
+	System.VecterInerpolate_MaxLen = divdp(psParaB0_2->VecterInerpolate_MaxLen, 1000 );
+	if(System.VecterInerpolate_MaxLen <=0)
+	{
+		System.VecterInerpolate_MaxLen = 0.005;
+	}
+	if(System.VecterInerpolate_MaxLen >= 8.0)
+	{
+		System.VecterInerpolate_MaxLen = 8.0; //um
+	}
+	if( System.VecterInerpolate_MaxLen < System.VecterInerpolate_MinLen )
+		System.VecterInerpolate_MaxLen = System.VecterInerpolate_MinLen;
+	
+	/****************************************************************************/
+	/******* DSPB0-2组第5页，P200~P219 VT主轴参数、攻丝参数*******/
+	S_Spindle.a_ac_SET = psParaB0_2->SpeedSpindleDec*360.0;		
+	S_Spindle.a_de_SET = S_Spindle.a_ac_SET;	
+	S_Spindle.S_n_MIN = psParaB0_2->SpeedSpindleLocMin*6;			//r/min to d/s
+	S_Spindle.ORTSpeed = psParaB0_2->SpeedSpindleLoc;	
+	S_Spindle.SpeedPerVolt = psParaB0_2->SpeedSpindle10HZ;			//每10Hz对应转速当量(r/min)	
+	S_Spindle.RigidHighestSpeed = psParaB0_2->RigidGapMaxSpeed*6.0;	//r/min to d/s	
+	System.SpindleSpeedbackmodle = psParaB0_2->RigidGapSpeedMode;  	//刚性攻丝主轴速度反馈采集模式(0 : VT总线,1:编码器)
+	S_Spindle.S_StopDistance = psParaB0_2->RigidGapStopAngle;			// 刚性攻牙S 轴停止提前量 unit:d   [1,5]
+	S_Spindle.RigidKp = divdp(psParaB0_2->RigidGapFFKP, 10.0);
+	S_Spindle.RigidKv = divdp(psParaB0_2->RigidGapFFKV, 700.0);	
+	S_Spindle.RigidKa = S_Spindle.RigidKv;
+	S_Spindle.BFChageOverrideSpeed = psParaB0_2->BFGradeChangeSpeed;		//r/min   双速齿轮箱换档转速
+
+	/***********************************************************************/
+	/******* DSPB0-2组第6页，P220~P239 非线补、名义坐标*******/	
+	//重复赋值会造成不可预知的错误，此处需屏蔽(ARM-DSP B2 已作处理)
+	System.AxisCompMaxL.X = psParaB0_2->LinearOffsetCountX;	
+	System.AxisCompMaxL.Y = psParaB0_2->LinearOffsetCountY;	
+	System.AxisCompMaxL.Z = psParaB0_2->LinearOffsetCountZ;	
+	
+	OverallSign.MYORG_M_Coordinate.X = psParaB0_2->CoordORGX;
+	OverallSign.MYORG_M_Coordinate.Y = psParaB0_2->CoordORGY;		
+	OverallSign.MYORG_M_Coordinate.Z = psParaB0_2->CoordORGZ;
+	
+	System.AxisAngleLimitSpeed.X = divdp(psParaB0_2->Rsd112,60);		//切削加工加速钳制速度1...mm/min->mm/s...uint:(mm/s)
+	if(System.AxisAngleLimitSpeed.X < 1)
+	{
+		System.AxisAngleLimitSpeed.X = 1;
+	}
+	else if(System.AxisAngleLimitSpeed.X > 400)
+	{
+		System.AxisAngleLimitSpeed.X = 400;
+	}	
+	System.AxisAngleLimitSpeed.Y = divdp(psParaB0_2->Rsd113,60);		//切削加工加速钳制速度2...mm/min->mm/s...uint:(mm/s)
+	if(System.AxisAngleLimitSpeed.Y < 1)
+	{
+		System.AxisAngleLimitSpeed.Y = 1;
+	}
+	else if(System.AxisAngleLimitSpeed.Y > 400)
+	{
+		System.AxisAngleLimitSpeed.Y = 400;
+	}
+	
+	System.AxisAngleLimitSpeed.Z = divdp(psParaB0_2->Rsd114,60);		//切削加工加速钳制速度3...mm/min->mm/s...uint:(mm/s)
+	if(System.AxisAngleLimitSpeed.Z < 1)
+	{
+		System.AxisAngleLimitSpeed.Z = 1;
+	}
+	else if(System.AxisAngleLimitSpeed.Z > 400)
+	{
+		System.AxisAngleLimitSpeed.Z = 400;
+	}
+	
+	System.ReferenceFrameMode = REF_XYZ;
+
+	system_initial();
+}
+
+void ARM_MainCMD_B2(void) 
+{
+	INT16U i;
+    INT32U* LINEARDATA;
+
+	//switch(psDSPPacketInLinear->AxisID)
+	{
+		//case (1):
+			{
+				System.AxisCompMaxL.X = pPARALINEAR[0];//psDSPPacketInLinear->AxisCount - 1;		//实际补偿区域数为数组长度减1
+				LINEARDATA=pPARALINEAR[1];
+                /*if((psDSPPacketInLinear->AxisCount > COMPBUFFERLENGTH) || (psDSPPacketInLinear->AxisCount < 2))
+				{	//范围[2,COMPBUFFERLENGTH]
+					Error.CompDataCheckError = 1;
+					break;
+				}*/
+                
+				for(i=0;i<System.AxisCompMaxL.X;i++)//psDSPPacketInLinear->AxisCount;i++)
+				{
+					AxisCompBuffer[i].XL =LINEARDATA[i*2];// psDSPPacketInLinear->Info32[i*2];
+					AxisCompBuffer[i].XR =LINEARDATA[i*2+1];// psDSPPacketInLinear->Info32[i*2+1];				
+				}
+				//通过L[0]和L[1]判断补偿方向，如相等则报警。
+				if(AxisCompBuffer[1].XL == AxisCompBuffer[0].XL)
+					Error.CompDataCheckError = 1;
+				else
+					System.CompensationDirection.X = (AxisCompBuffer[1].XL > AxisCompBuffer[0].XL);		
+			}	
+			//break;
+
+		//case (2):
+			{
+				System.AxisCompMaxL.Y = pPARALINEAR[COMPBUFFERLENGTH+1];//psDSPPacketInLinear->AxisCount - 1;		//实际补偿区域数为数组长度减1
+				LINEARDATA=pPARALINEAR[COMPBUFFERLENGTH+2];
+                /*if((psDSPPacketInLinear->AxisCount > COMPBUFFERLENGTH) || (psDSPPacketInLinear->AxisCount < 2))
+				{	//范围[2,COMPBUFFERLENGTH]
+					Error.CompDataCheckError = 1;
+					break;
+				}*/
+				for(i=0;i<System.AxisCompMaxL.Y;i++)//i<psDSPPacketInLinear->AxisCount;i++)
+				{
+					AxisCompBuffer[i].YL = LINEARDATA[i*2];// psDSPPacketInLinear->Info32[i*2];
+					AxisCompBuffer[i].YR = LINEARDATA[i*2+1];// psDSPPacketInLinear->Info32[i*2+1];				
+				}
+				//通过L[0]和L[1]判断补偿方向，如相等则报警。
+				if(AxisCompBuffer[1].YL == AxisCompBuffer[0].YL)
+					Error.CompDataCheckError = 1;
+				else
+					System.CompensationDirection.Y = (AxisCompBuffer[1].YL > AxisCompBuffer[0].YL);			
+			}	
+			//break;			
+
+		//case (3):
+			{
+				System.AxisCompMaxL.Z = pPARALINEAR[COMPBUFFERLENGTH*2+1];//psDSPPacketInLinear->AxisCount - 1;		//实际补偿区域数为数组长度减1
+				LINEARDATA=pPARALINEAR[COMPBUFFERLENGTH*2+2];
+                /*if((psDSPPacketInLinear->AxisCount > COMPBUFFERLENGTH) || (psDSPPacketInLinear->AxisCount < 2))
+				{	//范围[2,COMPBUFFERLENGTH]
+					Error.CompDataCheckError = 1;
+					break;
+				}*/
+				for(i=0;i<System.AxisCompMaxL.Y;i++)//i<psDSPPacketInLinear->AxisCount;i++)
+				{
+					AxisCompBuffer[i].ZL = LINEARDATA[i*2];//psDSPPacketInLinear->Info32[i*2];
+					AxisCompBuffer[i].ZR = LINEARDATA[i*2+1];//psDSPPacketInLinear->Info32[i*2+1];				
+				}
+				//通过L[0]和L[1]判断补偿方向，如相等则报警。
+				if(AxisCompBuffer[1].ZL == AxisCompBuffer[0].ZL)
+					Error.CompDataCheckError = 1;
+				else
+					System.CompensationDirection.Z = (AxisCompBuffer[1].ZL > AxisCompBuffer[0].ZL);			
+			}	
+			//break;
+		
+		//default:
+		//	break;
+	}
+	//#endif	
+}
+//从铁电读出参数填入参数缓冲区并完成原理在通讯时做的参数初始化
+void parameter_initial()
+{
+    tsPARADSPSERVO_BUF *psPARADSPSERVO;
+	int i;
+	for(i=0;i<10;i++)
+	{
+		Task_sleep(10); //sleep a while for arm to ready the param;
+		if(SHM_MAGIC_ARMRDY==pSHM_MAGIC)
+		{
+			break;			
+		}
+	}
+	if(i>=10) //arm is not runing, that's error
+	{
+		//make some alarm and wait;
+		return;
+	}
+    //psDSPPacketState=(tsDSP_PACKET_STATE*)pdsp2armPKG;
+    //读通用参数  （地址还没有定
+    //spi_read(PROM_PARADSPB0_1,pPARADSPB0_1,sizeof(tsPARADSPB0_1_BUF));
+    //spi_read(PROM_PARADSPB0_2,pPARADSPB0_2,sizeof(tsPARADSPB0_2_BUF));
+    ARM_MainCMD_B1();
+    //读伺服参数
+    /*
+    //spi_read(PROM_PARADSPSERVO,pPARADSPSERVO,sizeof(tsPARADSPSERVO_BUF)*6);
+    //调用原理在SCI处理的函数，初始化变量参数
+    psPARADSPSERVO=(tsPARADSPSERVO_BUF *)pPARADSPSERVO;
+    ARM_MainCMD_Servo(&X_Servo, &psPARADSPSERVO[0]);
+	ARM_MainCMD_Servo(&Y_Servo, &psPARADSPSERVO[1]);
+	ARM_MainCMD_Servo(&Z_Servo, &psPARADSPSERVO[2]);
+	ARM_MainCMD_Servo(&IV_Servo,&psPARADSPSERVO[3]);
+	ARM_MainCMD_Servo(&V_Servo, &psPARADSPSERVO[4]);
+	ARM_MainCMD_Servo(&VI_Servo,&psPARADSPSERVO[5]);
+    ARM_MainCMD_Servo(&U_Servo, &psPARADSPSERVO[6]);
+	ARM_MainCMD_70();
+    //读非线补的数据 
+    //spi_read(PROM_PARALINEAR,pPARALINEAR,(COMPBUFFERLENGTH+1)*4*3);
+    ARM_MainCMD_B2();
+    */
+    //读刀补数据
+    //读其他arm使用的数据
+	// 设置标记表示dsp已经完成参数初始化，进入执行态
+	pSHM_MAGIC=SHM_MAGIC_DSPRDY;  
+}
+//func: statHandle
+// 代替原来arm 处理状态关系的功能，尤其是原来用B0系列包传递给dsp的信息
+//现在改由这个函数处理，并反向共享给ARM 
+void statHandle()
+{
+    // 跟着读回来的手轮等信息处理B0包
+    //psDSPPacketState= //SHARE MEM BUFFER;
+    /*  this is should be set when it was handle int key handle
+     
+	OverallSign.ABSORG_M_Coordinate.X = psDSPPacketInCOM->OrginX;
+	OverallSign.ABSORG_M_Coordinate.Y = psDSPPacketInCOM->OrginY;
+	OverallSign.ABSORG_M_Coordinate.Z = psDSPPacketInCOM->OrginZ;
+	
+	OverallSign.ABS_OffsetCoordinateBak.X = psDSPPacketInCOM->OffsetX;
+	OverallSign.ABS_OffsetCoordinateBak.Y = psDSPPacketInCOM->OffsetY;
+	OverallSign.ABS_OffsetCoordinateBak.Z = psDSPPacketInCOM->OffsetZ;
+	
+	STDNCSign.ZSafeHeight = psDSPPacketInCOM->SafeZ;
+	OverallSign.Z_CompesationLengthBak = psDSPPacketInCOM->ToolZ;	
+
+	OverallSign.RapidFeedrateOverride_Bak = psDSPPacketInCOM->GradeG0;		
+	OverallSign.FeedrateOverride_Bak = psDSPPacketInCOM->GradeG1;
+	S_Spindle.SpindleGrade_Bak = psDSPPacketInCOM->GradeS;
+
+	if((OverallSign.FeedrateOverride != OverallSign.FeedrateOverride_Bak) ||
+		(OverallSign.RapidFeedrateOverride != OverallSign.RapidFeedrateOverride_Bak)||
+		(S_Spindle.SpindleGrade != S_Spindle.SpindleGrade_Bak) )
+	{
+		if((++sSCIPara.SCIA_GradeCount > 1)||(STDNCSign.SingleModeSign == 1))
+		{
+			OverallSign.FeedrateOverride = OverallSign.FeedrateOverride_Bak;
+			OverallSign.RapidFeedrateOverride = OverallSign.RapidFeedrateOverride_Bak;
+			S_Spindle.SpindleGrade = S_Spindle.SpindleGrade_Bak;
+			sSCIPara.SCIA_GradeCount = 0;
+		}
+	}
+	else
+	{
+		sSCIPara.SCIA_GradeCount = 0;
+	}
+    */
+    /* NO USE 
+	if(psDSPPacketInCOM->Packet1 & 0x01)
+	{
+		sSCIPara.SCIA_BackCmdNo = 1;
+	}
+	else if(psDSPPacketInCOM->Packet1 & 0x02)
+	{
+		sSCIPara.SCIA_BackCmdNo = 2;
+	}
+	else if(psDSPPacketInCOM->Packet1 & 0x04)
+	{
+		sSCIPara.SCIA_BackCmdNo = 3;
+	}
+    */
+	//INFO1
+	/*
+	if(psDSPPacketInCOM->Info1 & 0x01)	
+		STD_run_NC_initial();
+	if(psDSPPacketInCOM->Info1 & 0x02)
+	{
+		if(Error.MainErrorSign==0)
+			CPLD_ServoOn();
+		else if(Error.AAT_OverTravel == 0)
+			CPLD_ServoOff();		
+	}
+	else
+	{
+		CPLD_ServoOff();
+		SPC_run_NC_initial();
+		STD_run_NC_initial();
+		OverallSign.NCSign = NCSIGN_NONE;
+	}
+	if(psDSPPacketInCOM->Info1 & 0x04)
+	{
+		STDNCSign.GetPositionSign = 1;
+		SPCNCSign.GetPositionSign = 1;
+		Timer0.GetPositionCounter = Timer0.GenericCounter;
+	}
+	if(psDSPPacketInCOM->Info1 & 0x08)	
+	{
+		#if SCIA_SPCDEBUG
+		SPCFeedIndex=0;
+		#endif
+		System.HandPulseVar = 0;
+		SPC_run_NC_initial();	
+	}	* /
+	//bit4=1 ARM进入单段功能
+	if(psDSPPacketInCOM->Info1 & 0x10)		
+	{
+		if(STDNCSign.SingleModeSign == 0)
+		{
+			STDNCSign.SingleModeSign = 1;
+			STDNCSign.NeedRunSingleSign = 1;
+			STDNCSign.SingleRunOver = 0;
+			NCAreaSingle.GetNextSendCount = 0;
+			NCAreaSingle.AreaGCodeLastRealSendCount = 0;
+			//NCRunSign.SingleModifyOffsetOrCompesationSign = 2;		//进入单断作变档处理
+		}
+	}
+	else
+	{
+		STDNCSign.SingleModeSign = 0;		
+	}
+	OverallSign.NCSignBk = (psDSPPacketInCOM->Info1 & 0x60) >>5;
+	if(OverallSign.NCSignBk == NCSIGN_SPC)
+	{
+		if((STDNCSign.SingleModeSign)&&(STDNCSign.NeedRunSingleSign == 0))		//单段状态		
+			STDNCSign.AddLineSign = 0;		//防止未完成上一次加线功能时不能再加线		
+		OverallSign.ABS_OffsetCoordinate.X=0;
+		OverallSign.ABS_OffsetCoordinate.Y=0;
+		OverallSign.ABS_OffsetCoordinate.Z=0;
+	}
+	else if(OverallSign.NCSignBk== NCSIGN_STD)
+	{
+		if((OverallSign.ABS_OffsetCoordinate.X != OverallSign.ABS_OffsetCoordinateBak.X)
+				||(OverallSign.ABS_OffsetCoordinate.Y != OverallSign.ABS_OffsetCoordinateBak.Y)
+				||(OverallSign.ABS_OffsetCoordinate.Z != OverallSign.ABS_OffsetCoordinateBak.Z)
+				||(OverallSign.NCSign != 1))
+		{
+			OverallSign.ABS_OffsetCoordinate = OverallSign.ABS_OffsetCoordinateBak;
+			if(STDNCSign.SingleModeSign == 1)
+			{
+				NCRunSign.SingleModifyOffsetOrCompesationSign = 1;
+				STDNCSign.GetPositionSign = 1;
+				SPCNCSign.GetPositionSign = 1;
+				Timer0.GetPositionCounter = Timer0.GenericCounter;
+			}
+		}				
+	}
+	else
+	{
+		// 通常状态下主轴恢复通常模式
+		S_Spindle.RunModeSign = S_RunModeGeneric;	
+		OverallSign.ABS_OffsetCoordinate.X=0;
+		OverallSign.ABS_OffsetCoordinate.Y=0;
+		OverallSign.ABS_OffsetCoordinate.Z=0;
+	}
+	OverallSign.NCSign =OverallSign.NCSignBk;
+	//bit7=1 单段功能单条标志
+	if(psDSPPacketInCOM->Info1 & 0x80)	
+	{
+		if(STDNCSign.SingleModeSign == 1)
+		{
+			if((STDNCSign.NeedRunSingleSign == 0)&&(STDNCSign.Waitsign == 0))
+			{	
+				STDNCSign.SingleRunOver = 0;
+				STDNCSign.NeedRunSingleSign = 1;
+				STDNCSign.RealRunCount++;	
+				STDNCSign.PrecalCode = 0;
+				STDNCSign.XYZ_Over = 0; 				
+				if( GCodeBuffer[ (STDNCSign.RealRunCount-1)%STDGCODE_MOD ].MoveCodeSign == 1 )
+				{
+					NCRunSign.RealRunCount++;
+					NCRunSign.PrecalCode = 0;
+					NCRunSign.XYZ_Over = 0;
+				}				
+				NCAreaSingle.GetNextSendCount = 0;
+				NCAreaSingle.AreaGCodeLastRealSendCount = 0;
+				//initial NC_AREAControl
+				NC_AREAControl.VNow = 0;
+			}
+		}			
+	}
+
+	//INFO2
+		
+	OverallSign.BFChageOverrideSpeedSign = (psDSPPacketInCOM->Info2 & 0x20)?1:0;	//BF双速齿轮箱换档标志
+	S_Spindle.ReachSetSpeedJudgeSign = (psDSPPacketInCOM->Info2 & 0x40)?1:0;		//主轴达到设定速度判断标志.0:判断;1:不判断.
+	
+	//INFOR3
+	Reference.NeedFindAxisSign.X = (psDSPPacketInCOM->Info3 & 0x01)?1:0;
+	Reference.NeedFindAxisSign.Y = (psDSPPacketInCOM->Info3 & 0x02)?1:0;
+	Reference.NeedFindAxisSign.Z = (psDSPPacketInCOM->Info3 & 0x04)?1:0;
+	Reference.NeedFindAxisSign.U = (psDSPPacketInCOM->Info3 & 0x40)?1:0;	
+	if(psDSPPacketInCOM->Info3 & 0x80)
+	{
+		if(Reference.SearchRefSign == 0)
+		{			
+			Reference.SearchRefSign = 1;
+			Reference.RefStep = 0;
+			Reference.FindRefSign.X = 0;
+			Reference.FindRefSign.Y = 0;
+			Reference.FindRefSign.Z = 0;
+			//复位参考点信号输入						
+			//取消复位参考点信号输入
+			RESET_REF;		
+		}
+	}
+	else
+	{
+		Reference.SearchRefSign= 0;
+	}
+	
+	//INFOR4
+	if(!((OverallSign.NCSign==NCSIGN_STD)&&((OverallSign.RapidFeedrateOverride_Bak)||(OverallSign.FeedrateOverride_Bak))))
+	{	
+		if(AutoAdjustTool.FunctionSign == 0)
+		{	
+			//自动对刀功能无效		
+			if(S_Spindle.RunModeSign==S_RunModeGeneric)
+			{	
+				//定位和攻牙模式下不允许切换主轴按键
+				if(psDSPPacketInCOM->Info4 & 0x1)
+				{
+					S_Spindle.RunSign = S_CW; 
+				}
+				else if(psDSPPacketInCOM->Info4 & 0x2)
+				{
+					S_Spindle.RunSign = S_CCW; 
+				}
+				else
+				{
+					S_Spindle.RunSign = S_STOP;	
+				}
+			}
+		}
+	}	
+	//bit2=1 单段重定位标志
+	if(psDSPPacketInCOM->Info4 & 0x4)
+	{
+		if(STDNCSign.AddLineSign == 0)
+		{
+			STDNCSign.SingleRunOver = 0;
+			STDNCSign.AddLineSign = 1;
+			STDNCSign.GetPositionSign = 1;	//重定位坐标
+			NCRunSign.SingleModifyOffsetOrCompesationSign = 0;
+			STD_Add_Code();
+		}
+	}	
+	//程式预演功能
+	if(OverallSign.NCSign==NCSIGN_STD)
+	{
+		if(psDSPPacketInCOM->Info4 & 0x8)
+			STDNCSign.ProgramPreRunSign = 1;
+		else
+			STDNCSign.ProgramPreRunSign = 0;
+	}
+	if(psDSPPacketInCOM->Info4 & 0x10)
+	{
+		if(AutoAdjustTool.FunctionSign == 0)
+		{
+			AutoAdjustTool.FunctionSign = 1;
+			AutoAdjustTool.LockCoordinateSign = 0;
+			AutoAdjustTool.ZDealEndSign = 0;						
+		}
+	}
+	else
+	{
+		AutoAdjustTool.FunctionSign = 0;
+	}
+	//攻丝回退功能   
+	if(psDSPPacketInCOM->Info4 & 0x20)
+	{
+		if(S_Spindle.RigidBackToolSign == 0)
+		{
+			S_Spindle.RigidBackToolSign = 1;
+			S_Spindle.RigidBackToolCompleteSign = 0;
+		}
+	}
+	//  断点处理标志
+	if(psDSPPacketInCOM->Info4 & 0x40)
+	{
+		STDNCSign.BreakSign = 1;
+	}
+	else
+	{
+		if(STDNCSign.BreakSign == 1)
+			STDNCSign.BreakSignBk=1;		
+		STDNCSign.BreakSign = 0;		
+	}
+	// 换刀标志
+	STDNCSign.ChangeToolSign = (psDSPPacketInCOM->Info4 & 0x80)?1:0;
+
+	//INFOR5-6
+	if(OverallSign.NCSign != NCSIGN_STD)
+	{	
+		// 非正式G 代码加工中
+		S_Spindle.SpinSpeedSet = psDSPPacketInCOM->Info5+((INT16U)psDSPPacketInCOM->Info6<<8);
+	}	
+	
+	//INFOR7 //A4 轴锁紧命令	
+	OverallSign.SPC_HandwheelSim = (psDSPPacketInCOM->Info7 & 0x08)?1:0;
+	
+	//INFOR8 原来是自动对刀模型设置，由于B1模块中有，在此已删除	
+	AutoAdjustTool.Style = psDSPPacketInCOM->Info8;
+
+	//INFO9暂未使用
+	//INF10暂未使用
+
+	//处理输出控制信息
+	sCPLD_IO_Out2Register.bit.A4LOCK = (psDSPPacketInCOM->OutInfo8 & 0x01)?(0):(1);
+	sCPLD_IO_Out2Register.bit.A5LOCK = (psDSPPacketInCOM->OutInfo8 & 0x02)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT3 = (psDSPPacketInCOM->OutInfo8 & 0x04)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT4 = (psDSPPacketInCOM->OutInfo8 & 0x08)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT5 = (psDSPPacketInCOM->OutInfo8 & 0x10)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT6 = (psDSPPacketInCOM->OutInfo8 & 0x20)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT7 = (psDSPPacketInCOM->OutInfo8 & 0x40)?(0):(1);
+	sCPLD_IO_Out2Register.bit.OUT8 = (psDSPPacketInCOM->OutInfo8 & 0x80)?(0):(1);	
+	//rCPLD_IO_OUT2= sCPLD_IO_Out2Register.all;
+	GPIOoutput_flush();
+	System.SPCMode=psDSPPacketInCOM->SPCMode;
+    */
+	//处理电子手轮功能
+	/*
+	if(psDSPPacketInCOM->SPCMode & BIT0)
+	{
+		//System.SPCRunCount=(System.SPCRunCount+1)%2;
+		//System.SPCRunCount=0;
+		//if(System.SPCRunCount==0)
+		{
+			psDSPPacketInCOMHandGrade=(tsDSP_PACKETIN_COM_HANDGRADE *)&psDSPPacketInCOM->HandGrade;
+			System.HandPulse=psDSPPacketInCOM->HandPulse;
+			System.HandGrade=psDSPPacketInCOM->HandGrade;
+			if(ARM_MainCMD_B0_HandJudge()==OK)		
+			{
+				ARM_MainCMD_B0_Hand();
+			}	
+			Timer0.JogStartCounter = Timer0.GenericCounter;
+			System.HandPulseBk=System.HandPulse;
+			System.HandGradeBk=System.HandGrade;
+		}	
+	}	
+
+	//处理手动控制功能
+	if(psDSPPacketInCOM->SPCMode & BIT1)
+	{
+		//System.SPCRunCount=(System.SPCRunCount+1)%2;
+		//System.SPCRunCount=0;
+		//if(System.SPCRunCount==0)
+		{
+			psDSPPacketInCOMJogGrade=(tsDSP_PACKETIN_COM_JOGGRADE *)&psDSPPacketInCOM->JogGrade;		
+			if(ARM_MainCMD_B0_JogJudge()==OK)		
+			{
+				ARM_MainCMD_B0_Jog();
+			}
+			Timer0.JogStartCounter = Timer0.GenericCounter;
+		}	
+	}
+	*/
+	//齿轮箱控制功能屏蔽
+/*	#if 0
+	System.GearDownRate = psDSPPacketInCOM->Info16;		
+	if(System.GearDownRate == 0)	
+		System.GearDownRate = 1;
+	#endif   */
+	System.GearDownRate = 1;
+	System.SpindleOneRing_EncoderRealDegree = divdp(360000000 , System.SpindleAxisMinUnit)*System.GearDownRate;
+	if((OverallSign.Z_CompesationLengthBak != OverallSign.Z_CompesationLength)&&(OverallSign.NCSign == NCSIGN_STD))
+	{
+		OverallSign.Z_CompesationLengthDelta = OverallSign.Z_CompesationLengthBak - OverallSign.Z_CompesationLength;
+		OverallSign.Z_CompesationLength = OverallSign.Z_CompesationLengthBak;		
+		if(STDNCSign.SingleModeSign == 1)
+		{
+			NCRunSign.SingleModifyOffsetOrCompesationSign = 1;
+			STDNCSign.GetPositionSign = 1;
+			SPCNCSign.GetPositionSign = 1;
+			Timer0.GetPositionCounter = Timer0.GenericCounter;
+		}
+	}
+	else
+	{
+		if(NCRunSign.SingleModifyOffsetOrCompesationSign == 0)
+		{
+			OverallSign.Z_CompesationLengthDelta = 0;
+		}
+	}
+	
+	if(System.ReferenceFrameMode == REF_XYZ)
+	{	
+		//如果为三轴系统，绝对坐标与名义坐标相统一
+		OverallSign.MYORG_M_Coordinate = OverallSign.ABSORG_M_Coordinate;
+	}
+
+	//计算工件坐标系相对名义坐标系的偏置坐标
+	OverallSign.ABS_MY_OffsetCoordinate.X = OverallSign.ABSORG_M_Coordinate.X-OverallSign.MYORG_M_Coordinate.X+OverallSign.ABS_OffsetCoordinate.X;
+	OverallSign.ABS_MY_OffsetCoordinate.Y = OverallSign.ABSORG_M_Coordinate.Y-OverallSign.MYORG_M_Coordinate.Y+OverallSign.ABS_OffsetCoordinate.Y;
+	OverallSign.ABS_MY_OffsetCoordinate.Z = OverallSign.ABSORG_M_Coordinate.Z-OverallSign.MYORG_M_Coordinate.Z+OverallSign.ABS_OffsetCoordinate.Z;
+
+}

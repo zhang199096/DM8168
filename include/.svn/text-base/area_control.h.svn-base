@@ -1,0 +1,92 @@
+#ifndef DSP6713_AREA_CONTROL_H
+#define DSP6713_AREA_CONTROL_H
+
+//区域计算区域
+
+#define NCAREA_STABLE_STATE			0		//区域稳速状态
+#define NCAREA_ACCELERATING_STATE	1		//区域上升状态
+#define NCAREA_DECELERATING_STATE	2		//区域下降状态
+#define NCAREA_SINGLE_STATE			3		//区域单条代码状态
+#define NCAREA_SPECIAL_STATE		4		//区域特殊状态
+
+extern tsAREA_CONTROL	NC_AREAControl;
+extern tsAREA_CONTROL NC_AREAControl_Error;
+extern tsNC_RUN_SIGN  STDNCSign_Error;
+extern tsNC_RUN_SIGN	NC_AreaRunNCSign_Error;
+
+extern tsINTERPOLATION_BUFFER InterpolationBuffer[INTERPOLATIONBUFLENGTH+1];
+
+extern INT32S MonitorInterpalationXBuf,MonitorInterpalationYBuf,MonitorInterpalationABuf;
+extern INT40AXIS PreMACHCoordinate,BehindMACHCoordinate;
+
+extern INT16U  NCArea_RigidTapTransducer(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign);
+extern INT16U  NCArea_RigidTapQuit(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode);
+extern INT16U  NCArea_RigidTapRun(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode, tsNC_RUN_SIGN *psAreaRunNCSign);
+extern INT16U  NCArea_RigidTapRunPre(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode, tsNC_RUN_SIGN *psAreaRunNCSign);
+extern void    NCArea_RigidTapRunBack(void);
+
+extern void    NCArea_ATCLockStop(tsGCODE *psAreaGcode);
+extern void    NCArea_GetEndCodeCount(tsGCODE *psAreaGcode);
+
+extern INT16U  NCArea_FeedrateOverride(tsAREA_CONTROL *psAREAControl, tsGCODE*psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign);
+extern void    NCArea_SpindleStop(tsGCODE *psAreaGcode);
+extern INT16U  NCArea_OverrideChangeFilter(tsAREA_CONTROL *psAREAControl,tsGCODE*psAreaGcode);
+extern void    NCArea_VmJudge(tsGCODE*psAreaGcode);
+
+extern INT16U  NCArea_FeedrateChangeCheck(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign);
+extern void    NCArea_FeedrateChangeDeal(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBuffer, tsNC_RUN_SIGN *psAreaRunNCSign);
+extern void    NCArea_CoordRenew(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcode);
+extern INT16U  NCArea_CoordinateRenewSPC(tsGCODE *RiGcodePointer);
+
+extern FLOAT64 NCArea_VmGet(tsGCODE *psAreaGcode); 
+extern void    NCArea_VmLimit(tsGCODE *psAreaGcode);
+
+extern FLOAT64 NCArea_Cal_i1_i2_Vveer(FLOAT64 a_de, INT32U i1,INT32U i2, FLOAT32 vset);
+extern INT16U  NCArea_Control();
+extern FLOAT64 NCArea_VminSet(tsGCODE * RiCodePT);
+extern INT16U  NCArea_AccelerationSet(tsAREA_CONTROL *AREAControl, INT32U i);
+extern FLOAT64 NCArea_DecDistance(tsAREA_CONTROL *AREAControl, FLOAT64	Vm);
+extern INT16U  NCArea_SingleState(tsAREA_CONTROL *AREAControl,tsGCODE *RiCode);
+extern FLOAT64 NCArea_Cal_i1_i2_Angle(tsGCODE * i1CodePT, tsGCODE * i2CodePT);
+
+extern INT16U  NCArea_RunPreCal();
+extern INT16U  NCArea_HyperbolaPrecalStandardCurve();//预计算标准曲线参数
+extern INT16U  NCArea_QuinticPrecalStandardCurve();//预计算五次方曲线参数
+extern INT16U  NCArea_LinearPrecalStandardCurve();//预计算梯形斜率恒定曲线参数
+extern INT16U  NCArea_SoftExponentPrecalStandardCurve()	;//预计算柔和指数曲线参数
+extern INT16U  NCArea_HardExponentPrecalStandardCurve()	;//预计算柔和指数曲线参数
+
+extern INT16U  NCArea_RunPrecalculate();
+extern INT16U  NCArea_RunPre();
+
+extern INT16U  NCArea_RunModle();
+extern INT16U  NCArea_HyperbolaRun();
+extern INT16U  NCArea_QuinticRun();
+extern INT16U  NCArea_LinearRun();	
+extern INT16U  NCArea_SoftExponentRun();
+extern INT16U  NCArea_HardExponentRun();
+extern INT16U  NCArea_ForwardFeedbackCompensate();
+
+extern INT16U  NCArea_Nowvalue();
+extern INT16U  NCArea_EndNowvalue();
+extern INT16U  NCArea_UsualNowvalue();
+
+extern INT16U  NCArea_DeltaStep(tsAREA_CONTROL *psAREAControl, tsGCODE *psAreaGcodeBufferPointer, tsNC_RUN_SIGN *psAreaRunNCSign);
+extern void    NCArea_CheckEndpointValue(tsAREA_CONTROL *AREAControl);	//检查插补点有无超出终点范围
+extern void    NCArea_CheckPointDirection(tsAREA_CONTROL *AREAControl);
+
+extern INT16U  NCArea_DealWithZeroPulse(tsAREA_CONTROL *psAREAControl); 
+extern void    NCArea_EnsureDirection(tsAREA_CONTROL *psAREAControl,tsNC_RUN_SIGN *psAreaRunNCSign);
+extern void    NCArea_JudgeLimit(tsAREA_CONTROL *psAREAControl);
+extern void    NCArea_SoftLimit(tsAREA_CONTROL *psAREAControl);
+extern INT16U  NCArea_PulseToServoCheck(INT40AXIS *psDeltaPulse);
+extern void    NCArea_Cal_V_tpr(tsAREA_CONTROL *psAREAControl);
+extern INT16U  NCArea_InterpolationBuffer(tsAREA_CONTROL *psAREAControl);
+extern INT16U  NCArea_PulseToServo(void);
+extern INT16U  NCAreaBackGapAverage(tsAREA_CONTROL *psAREAControl);
+extern void    NCArea_Run();
+
+
+#endif  // end of DSP6713_AREA_CONTROL_H definition
+
+

@@ -1,0 +1,4 @@
+---- CMD1_DA_CH Matches (3 in 1 files) ----
+Run_nc.c (d:\interactive2\work_program\clone_control\others\cnck-pulse\cnck-pulse\src):	Uint32 CMD1_DA_CH,CMD2_VOLTAGE_OUT;
+Run_nc.c (d:\interactive2\work_program\clone_control\others\cnck-pulse\cnck-pulse\src):	CMD1_DA_CH = GCodeRIPointer->SubCMD1;
+Run_nc.c (d:\interactive2\work_program\clone_control\others\cnck-pulse\cnck-pulse\src):	switch (CMD1_DA_CH) 

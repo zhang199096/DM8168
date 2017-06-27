@@ -1,0 +1,970 @@
+#ifndef DSP6713_COMMON_H
+#define DSP6713_COMMON_H
+
+#define  	RealTimeRun				0				// 实时运行
+#define  	SimulateRun				1				// 仿真运行
+
+#define	    RatioConstant			0				//斜率恒定
+#define	    TimeConstant			1				//时间恒定
+
+#define		MovePositive			1				// 正向移动
+#define		MoveNegtive			    0				// 负向移动
+
+#define		ThreeAxis			    0				//三轴
+#define		FourAxis			    1				//四轴
+#define		FiveAxis			    2				//五轴
+
+#define	    StepZero		        0		        //步骤0
+#define	    StepOne			        1		        //步骤1
+#define	    StepTwo			        2		        //步骤2
+#define	    StepThree		        3		        //步骤3
+#define	    StepFour		        4		        //步骤2
+#define	    StepFive		        5		        //步骤3
+
+#define 	STDGCODE_MOD			330
+#define 	SPCGCODE_MOD			48
+#define		ADDGCODE_MOD			5
+#define		Three_GCODE_MOD			3
+#define 	COMPBUFFERLENGTH		300
+
+/*********运动控制*********/
+#define 	VNowMIN			        0.0001			// 当前实际运行速度最小值. (mm/s)
+#define 	STD_AREA_MAX_NUMBER		100			    //定义STD 区域最大处理长度
+#define		FlexuousMaxLength		0.5			    //线段最大波折长度unit:mm
+#define		FlexuousLimitLength		0.02			//小于此长度的抖动代码滤为空代码
+#define		ReverseLimitLength		0.02			//小于此长度的反向代码滤为空代码
+
+/****主轴使用	CH0511*****/
+#define		S_STYLE_RIGIDGENERIC	0	            // 模拟控制刚性攻牙通用型: DSP 直接控制定位, 刚性攻牙电压比例1:1
+#define		S_STYLE_GENERIC			1	            // 模拟控制通用型: 无定位和刚性攻牙功能[-10~+10V]
+//#define		S_AnalogControl		2	                    // 通用模拟控制方式: 无定位和刚性攻牙功能[0~10V] edit by le
+#define		S_PulseControl			1	            // 通用脉冲控制方式
+
+#define		S_RunModeGeneric		1	            // 主轴通常方式运行标志
+#define		S_RunModeORTM253		2	            // 主轴换刀定位方式运行标志: 变频器控制定位
+#define		S_RunModeRIGID			3	            // Z  轴跟随主轴方式运行标志
+#define		S_RunModeORTM252		4	            // 主轴通用定位方式运行标志
+
+#define		S_SpeedReachSet			0	            // 主轴达到设定速度运行
+#define		S_SpeedZero				1	            // 主轴速度拉零运行
+#define		S_SpeedAcc				2	            // 主轴启动加速运行
+
+#define		S_STOP					0	            // 主轴停转
+#define		S_CW					1	            // 主轴正转
+#define		S_CCW					2	            // 主轴反转
+
+#define		S_TAP					0	            // 主轴正向右螺纹攻丝
+#define		S_REVERSETAP			1	            // 主轴反向右螺纹攻丝
+
+#define   	S_RigidSampleT			1.5		        // Z 轴跟随S 轴采样周期UNIT:ms
+#define		S_FollowErrorLimitValue	0.01	        // Z 轴跟随S 轴误差边界值 unit:mm
+#define		S_SpeedSampleT			20		        // S 轴速度计算采样周期UNIT:ms
+
+/*****轨迹超程CH0603******/
+#define 	StaticTrackLimit		0.5		        //静态轨迹判定界限0.5mm  CH0603
+#define 	Max_StaticErrorTimes 	1000	        //静态轨迹判定周期约1s
+
+#define  	REF_XYZ			        0	            //坐标系为3 坐标
+#define  	REF_XYZA		        1	            //坐标系为3+A 坐标
+#define  	REF_XYZB		        2	            //坐标系为3+B 坐标
+#define  	REF_XYZC		        3	            //坐标系为3+C 坐标
+
+/******自动对刀功能CH0512*******/
+#define	    AATLimitLength		    800	            // 至多再运行800um
+
+#define  	INTERPOLATIONBUFLENGTH 				200	//STD插补缓冲区
+#define  	SPC_INTERPOLATIONBUFLENGTH 			20	//SPC插补缓冲区
+#define 	RIGID_INTERPOLATIONBUFLENGTH		1	//刚性攻牙缓冲区
+#define 	AutoAdjust_INTERPOLATIONBUFLENGTH 	4	//自动对刀缓冲区
+
+typedef struct
+{
+	FLOAT64 XL;		//光栅尺坐标值   	单位: 最小输入单位
+	FLOAT64 YL;
+	FLOAT64 ZL;
+	FLOAT64 A4L;
+	FLOAT64 XR;		//激光实测坐标值  	单位: 最小输入单位
+	FLOAT64 YR;
+	FLOAT64 ZR;
+	FLOAT64 A4R;
+}AxisCompensation;     
+
+typedef struct
+{
+	INT32S X;
+	INT32S Y;
+	INT32S Z;
+	INT32S A;
+	INT32S U;
+}INT40AXIS;     
+
+typedef struct
+{
+	INT32U X;
+	INT32U Y;
+	INT32U Z;
+	INT32U A;
+	INT32U U;
+}UINT40AXIS;     
+
+typedef struct
+{
+	INT16U X;
+	INT16U Y;
+	INT16U Z;
+	INT16U A;
+	INT16U U;
+}UINT16AXIS;     
+
+typedef struct
+{
+	INT16S X;
+	INT16S Y;
+	INT16S Z;
+	INT16S A;
+	INT16S U;
+}INT16AXIS;     
+
+typedef struct
+{
+	INT8U X;
+	INT8U Y;
+	INT8U Z;
+	INT8U A;
+	INT8U U;
+}UINT8AXIS;   
+
+typedef struct
+{
+	FLOAT64 X;
+	FLOAT64 Y;
+	FLOAT64 Z;
+	FLOAT64 A;
+	FLOAT64 U;
+}FLOAT64AXIS;     
+
+typedef struct
+{
+	FLOAT64 X;
+	FLOAT64 Y;
+	FLOAT64 Z;	
+	FLOAT64 A;
+	FLOAT64 U;
+}VECTOR;     //所定义都为单位矢量
+
+
+/**************AREA_CONTROL  用于多段代码加减速连续处理****************/
+/***** 用于A4 A5 SPINDLE 轴计算时速度单位(degree/s), 距离单位(degree)*****/
+typedef struct
+{
+	//区域相关变量
+	INT32U	    Pointer_StartCode;			//分解代码，区域起始代码段指针
+	INT32U	    Pointer_EndCode;			//分解代码，区域终止代码段指针
+	INT32U	    Pointer_FirstInflexionCode;	//分解代码，区域一次拐点代码段指针
+	INT32U	    Pointer_SecondInflexionCode;//分解代码，区域二次拐点代码段指针
+	FLOAT64	    Ss;							//向后线段搜索距离(mm)
+	FLOAT64	    Stotal;						//区域内所有代码总运行长度 mm
+	FLOAT64	    CurrentStotal;				//从区域起点代码到当前代码终点总运行长度 mm
+	FLOAT64	    CurrentStotalLast;			//从区域起点代码到当前代码起点总运行长度 mm
+	FLOAT64 	Snow;						//从区域起点代码到当前代码当前插补点总运行长度 mm  
+	FLOAT64 	SnowOut;					//加入前馈后从区域起点代码到当前代码当前插补点总运行长度 mm  
+	FLOAT64 	DeltaSnow;					//从当前代码起点到当前代码当前插补点总运行长度 mm  
+
+	FLOAT64	    DeltaSKp;					//
+	FLOAT64	    DeltaSKv;					//
+	
+	INT32U	    I;					        //插补序号 [1,+无穷)
+	INT32U 	    TotalN;				        //总插补数	TotalN=T5/Tsample
+	FLOAT64	    Vs;					        //当前运行G代码起点运行速度. (mm/s)
+	FLOAT64	    Vm;					        // 当前运行G代码设定运行速度. (mm/s)
+	FLOAT64	    VmReal;				        // 当前运行G代码实际最高运行速度. (mm/s)
+	FLOAT64	    Ve;					        // 当前运行G代码终点运行速度. (mm/s)
+	FLOAT64 	VNow;				        // 当前实际运行速度. (mm/s)
+	FLOAT64 	VNowLast;			        // 暂存当前实际运行速度. (mm/s)	
+	FLOAT64 	VNowOut;			        // 当前实际指数化输出运行速度. (mm/s)
+	FLOAT64 	VMin;				        // 当前最小运行速度. (mm/s)
+	INT16U 	    VChangeSign;		        //速度档变化标志，需重新计算加减速曲线
+	FLOAT64 	SnowLast;			        //当前代码上次插补总运行长度 mm  
+	FLOAT64	    Sac;				        //当前代码加速过程所需距离(mm)
+	FLOAT64	    Sm;					        //当前代码稳速过程所需距离(mm)
+	FLOAT64	    Sde;				        //当前代码减速过程所需距离(mm)
+	FLOAT64	    S1;					        //抛物线AB积分面积 mm
+	FLOAT64	    S2;					        //抛物线BC积分面积 mm
+	FLOAT64	    S3;					        //直线CD积分面积 mm
+	FLOAT64	    S4;					        //抛物线DE积分面积 mm
+	FLOAT64	    S5;					        //抛物线EF积分面积 mm
+	FLOAT64	    S6;					        //抛物线EF积分面积 mm
+	FLOAT64	    S7;					        //抛物线EF积分面积 mm
+	FLOAT64	    S8;					        //抛物线EF积分面积 mm
+	FLOAT64	    S9;					        //抛物线EF积分面积 mm
+
+	FLOAT64	    T1;					        //从A到B所用时间	s
+	FLOAT64	    T2;					        //从A到C所用时间	s
+	FLOAT64	    T3;					        //从A到D所用时间	s
+	FLOAT64	    T4;					        //从A到E所用时间	s
+	FLOAT64	    T5;					        //从A到F所用时间	s
+	FLOAT64	    T6;					        //从A到F所用时间	s
+	FLOAT64	    T7;					        //从A到F所用时间	s
+	FLOAT64	    T8;					        //从A到F所用时间	s
+	FLOAT64	    T9;				        	//从A到F所用时间	s
+
+	FLOAT64	    DeltaT1;			        //AB所用时间	s
+	FLOAT64	    DeltaT2;			        //BC所用时间	s
+	FLOAT64	    DeltaT3;			        //CD所用时间	s
+	FLOAT64	    DeltaT4;			        //DE所用时间	s
+	FLOAT64	    DeltaT5;			        //EF所用时间	s
+	FLOAT64	    DeltaT6;			        //EF所用时间	s
+	FLOAT64	    DeltaT7;			        //EF所用时间	s
+	FLOAT64	    DeltaT8;			        //EF所用时间	s
+	FLOAT64	    DeltaT9;			        //EF所用时间	s
+	
+	FLOAT64	    a_ac;				        // 实际加速段加速度		
+	FLOAT64	    a_de;				        // 实际减速段加速度
+	
+	FLOAT64 	Tao_ac;				        //实际加速段时间常数Tao		s
+	FLOAT64 	Tao_de;				        //实际减速段时间常数Tao		s	
+	
+	FLOAT64 	Tao_ac_line;				//斜率型算法实际加速段时间常数Tao		s
+	FLOAT64 	Tao_de_line;				//斜率型算法实际减速段时间常数Tao		s
+	
+	FLOAT64	    Vclamp;				        // G1切削钳制速度. (mm/s)
+
+	FLOAT64		CurrentT;			        // 当前插补时间  I*Tsample	unit:s
+	VECTOR		Cosine;				        // 插补轴方向夹角余弦
+	INT40AXIS	DeltaStep;			        // 直线中每段x应走距离  unit:pulse(输出指令单位)
+	INT40AXIS	DeltaStep_Bak;		        // 暂存直线中每段x应走距离  unit:pulse(输出指令单位)
+	FLOAT64 	CurrentArcAngle;	        //当前插补周期圆弧插补的角度值(单位:弧度)
+	FLOAT64     OldArcAngle;                //上一次插补周期圆弧插补的角度值(单位:弧度)
+	INT40AXIS	NowValue;			        // 当前插补点坐标位置值--最小输入单位
+	INT40AXIS	OldValue;			        // 前一插补点坐标位置值--最小输入单位
+
+	INT40AXIS	NowPointMACHPulseOut;	    // 当前插补点MACH 坐标逆补偿输出位置值(最小输入单位)
+	INT40AXIS	OldPointMACHPulseOut;	    // 前一插补点MACH 坐标逆补偿输出位置值(输出指令单位)
+	INT40AXIS	EndPointMachPulseOut;	    // 当前代码终点MACH 坐标逆补偿输出位置值(输出指令单位)
+	INT40AXIS	NowPointMACHPulseOutA4;
+	INT40AXIS	OldPointMACHPulseOutA4; 
+
+	// 单段功能用
+	INT40AXIS	SingleAddLineOldPoint;		// 单段节点绝对位置，用于恢复位置 单位:最小输入单位
+
+	INT16U		SpeedState;					//区域速度状态
+	INT16U		SpeedStateCal;				//观察区域速度状态计算出口。
+	INT40AXIS	TrackDeltaValue;
+	INT40AXIS	TrackDeltaValue_Last;
+	
+	INT16U      Liner7CurvePreCalStat;
+	INT32U      SearchCount;	
+	INT32U	    NewGodeRunSign;          	//新代码运行 标志
+	INT32U	    A_ac_OUT;
+	INT32U	    A_de_OUT;
+	INT32U	    Vnow_OUT;
+	INT32U	    Angle_OUT;
+	INT32U	    Vs_OUT;
+	INT32U	    Ve_OUT;	
+	INT32U	    NCArea_ri;
+	INT32U      AreaPreCalStep;
+	INT32U      AreaPreCalStep2add;
+	INT40AXIS	StartPointMachPulseOut;		// 当前代码起点MACH 坐标逆补偿输出位置值(输出指令单位)	
+	FLOAT64	    T_Acc;					
+	FLOAT64	    T_Dec;	
+	FLOAT64	    T1_Acc;					
+	FLOAT64	    T1_Dec;	
+	FLOAT64	    V1_Acc;	
+	FLOAT64	    V2_Acc;	
+	FLOAT64	    A1_Acc;	
+	FLOAT64	    V1_Dec;	
+	FLOAT64	    V2_Dec;		
+	FLOAT64	    A1_Dec;
+	FLOAT64	    NewS_S[7];	
+	FLOAT64	    NewS_usedT[7];	
+	FLOAT64	    NewS_usedS[7];		
+	FLOAT64	    Vclampv_ac[3];	             // (mm/s)
+	FLOAT64	    Vclampv_de[3];	             // (mm/s)	
+	FLOAT64     Area_Sadd[8];	
+	INT32U      NeedPreCalOneMore;
+
+	////Vector Interpolate /////////
+	VECTOR      Code_CrossVector;
+	INT32S       Section_start;
+	INT32S       Section_end;	
+	INT32S       Section_run;
+	FLOAT64     S_Start;	
+	FLOAT64     S_End;		
+	FLOAT64     HL_run;	
+	FLOAT64     H_Center;
+	FLOAT64     angle_start;	
+	FLOAT64     angle_end;		
+	FLOAT64     angle_ave_start;	
+	FLOAT64     angle_ave_end;
+}tsAREA_CONTROL;
+
+//CH0512
+typedef struct
+{
+	INT32U 		SendCount;			    //DSP当前运行原代码位置指针，返回给ARM用于显示及其它用途
+	INT32U 		CodeLength;			    //命令字,确定G代码类型
+	INT16U 		CMD1,CMD2;			    //命令字,确定G代码类型
+	INT40AXIS	StartPoint;			    //起点. 单位：线性轴最小输入单位
+	INT40AXIS	EndPoint;			    //终点.  单位：线性轴最小输入单位
+	INT40AXIS	CenterPoint;		    //圆心点 .单位：线性轴最小输入单位
+	FLOAT64AXIS	DeltaPoint;		        //起点与终点的相对距离 单位: mm  
+	FLOAT64 	StartAngle;		    	//起始角度.单位: 弧度(传输单位：旋转轴最小输入单位)
+	FLOAT64 	EndAngle;			    //终止角度.单位: 弧度(传输单位：旋转轴最小输入单位)
+	FLOAT64		DeltaAngle; 			//当前角度.单位: 弧度(传输单位：旋转轴最小输入单位)
+	FLOAT64		currentAngle; 		    //当前角度.单位: 弧度(传输单位：旋转轴最小输入单位)
+	INT16U 		GGroup02;			    //平面组群选择 G17(defaut) G18 G19
+	INT16U 		GGroup15;			    //准停模态选择  G61 G64(defaut)
+	FLOAT64 	Stotal;			        //当前G代码长度  单位:mm   正值
+	FLOAT64 	StotalCheck;		    //当前G代码长度  单位:mm   正值
+	FLOAT64 	Feedrate;			    //进给速度,单位:mm/s
+	FLOAT64 	Vm;					    //根据档位确定的理论进给速度,单位:mm/s
+	FLOAT64 	Ve;					    //终点允许速度,单位:mm/s
+	FLOAT64 	Vveer;				    //起点拐点处允许进给速度  单位：mm/s
+	FLOAT64 	RadiusCheck;		    //园弧半径 单位：线性轴最小输入单位
+	INT32S		Radius;				    //园弧半径 单位：线性轴最小输入单位
+	VECTOR  	StPointVector;		    //直线或圆弧起点余弦矢量值
+	VECTOR  	EndPointVector;		    //直线或圆弧终点余弦矢量值
+	INT16U		MoveCodeSign;		    //运动代码标志,0为非运动代码，1为XYZ运动代码,2为A4运动代码
+	INT16U		VeCalSign;			    //Ve已计算标志
+	FLOAT64		cosangle;			    //相邻线段夹角余弦值
+	INT32S		ORTM252Angle;		    //定位角度
+	INT16S 		AxisMotionStyle;		//0：A4轴不运行，1：A4轴运行。3:单段加线第三步IV轴单独运行；4:IV轴单独SPC	
+	INT16S	 	FlexuousAxisSign;	    //代码有波动嫌疑标志	
+	INT8U		ToleranceBigSign;	    //大公差标志.1:大公差.0:非大公差.
+}tsGCODE;
+
+//总体标志和变量用结构体
+typedef struct
+{
+	INT16U 		NCSign;  	                        // 0:通常状态  1:标准代码；2:特殊代码-JOG HANDLE REF；INI=0
+	INT16U 		NCSignBk;               	        // 0:通常状态  1:标准代码；2:特殊代码-JOG HANDLE REF；INI=0
+	INT16U		LastFeedrateOverride;		        //上次进给速度档位
+	INT16U		LastRapidFeedrateOverride;	        //上次快进速度档位
+	INT16U 		FeedrateOverride;			        //进给档位	[0-20]
+	INT16U 	 	RapidFeedrateOverride;		        //G0快速进给档位	[0-20]
+	INT16U 		FeedrateOverride_Bak;		        //暂存进给档位	[0-20]
+	INT16U 	 	RapidFeedrateOverride_Bak;	        //暂存G0快速进给档位	[0-20]	
+	tsGCODE		STDLastMoveGCode;			        //暂存上条发送运动G代码结构内容
+	tsGCODE		SPCLastMoveGCode;			        //暂存上条发送运动G代码结构内容
+	VECTOR		LastMoveCodeEndVector;		        //上一条运动G代码终点方向矢量(代码预处理用)
+	INT16U		EveryAxisCoinValid;			        // 各轴COIN 都有效标志
+	INT16U		EveryAxisOverValid;			        // 各轴OVER 都有效标志
+	INT16U 		GetMachCoordinateRight;		        //  1:获得机床坐标正确		
+	INT40AXIS	ABS_Coordinate;				        // 当前绝对坐标值unit:最小输入单位
+	INT40AXIS	ABSORG_M_Coordinate;		        // 当前绝对坐标原点的机床坐标值unit:最小输入单位
+	UINT16AXIS	MoveSign;					        // 当前运动方向1-positive 0-negtive 
+	UINT16AXIS	TheoryMoveSign;				        // 当前代码理论方向1-positive 0-negtive 
+	INT40AXIS	MYORG_M_Coordinate;			        // 名义坐标原点的机床坐标值unit:最小输入单位
+	INT40AXIS	ABS_MY_OffsetCoordinate;	        // 工件绝对坐标相对名义坐标偏移坐标值unit:最小输入单位
+	INT40AXIS	ABS_MY_ORG_RotationOffsetCoordinate;// 工件绝对坐标原点相对名义坐标原点旋转偏置坐标值unit:最小输入单位
+	INT40AXIS	ABS_OffsetCoordinate;		        // 工件绝对坐标G52 偏移坐标值unit:最小输入单位
+	INT40AXIS	ABS_OffsetCoordinateBak;	        // 工件绝对坐标G52 偏移坐标值unit:最小输入单位
+	INT32S		Z_CompesationLength;		        // Z 轴刀具长度补偿值unit:最小输入单位
+	INT32S		Z_CompesationLengthBak;		        // Z 轴刀具长度补偿值unit:最小输入单位
+	INT32S		Z_CompesationLengthDelta;	        // Z 轴刀具长度补偿前后差值unit:最小输入单位
+	INT32S		ZSafeHeightNow;
+	FLOAT64		COS_A4;						        // A4  余弦值
+	FLOAT64		SIN_A4;						        // A4  正弦值
+	tsGCODE   	*LastGCodePointer;			        //用于断点功能
+	INT16U		LastCodeOverSign;			        //最后一条代码走完标志  1－走完
+	INT40AXIS	GapCompensateCnt;			        //反向间隙补偿标志
+	UINT16AXIS 	FlexuousAxisSign;			        //上一线段有波动嫌疑标志
+	INT32U	 	FlexuousRealSendCount;		        //上一有波动嫌疑线段的条位置指针
+	INT32U		FlexuousNCAREARealSendCount;        //上一条NCarea波动嫌疑线段的条位置指针
+	VECTOR	 	PreFlexuousVector;			        //波动嫌疑条上一条运动G代码终点方向矢量
+	UINT16AXIS	LastTheoryMoveSign;			        // (代码预处理用)上一代码理论方向1-positive 0-negtive 
+	UINT16AXIS	EncoderCompPt;				        //编码器非线性补偿计算数组位置指针
+	UINT16AXIS	PulseOutCompPt;				        //脉冲输出非线性补偿计算数组位置指针
+	INT16U		Int4IdleSign;					    //中断4 空闲标志
+	INT32U		InterpolationSendCnt;		        //缓冲区发送条数
+	INT32U		InterpolationRunCnt;		        	//缓冲区运行条数
+	UINT16AXIS	SearchRefMoveSign;			        //参考点查找方向。1：负向；2：正向
+	INT16U		BFChageOverrideSpeedSign;	        //减速箱变档标志
+	INT8U		ToleranceBigCanRunSign;		        //可执行大公差区域规划标志:0可执行,1不可执行
+	INT8U		ToleranceBigStep;
+	INT8U		RapidAccelerateStyle;			    //快进加减速类型.0:(默认) 斜率恒定加减速；1:时间恒定加减速
+	INT8U		UsualAccelerateStyle;			    //切削加减速类型.0:(默认) 斜率恒定加减速；1:时间恒定加减速
+	INT8U		HardLimitNeedGetPositionSign;
+	INT8U   		SPC_HandwheelSim;					//手轮模拟档位变化标志	
+	INT32U      	NC_SearchCount;
+	INT8U       CurrentGapSign;
+}tsOVERALLSIGN;
+
+typedef struct
+{
+    /********DSPB0-1********/
+	INT8U		ParameterWriteOpenSign;			//P000	            H2上位机总线参数写入功能。//0:关闭.		
+	INT16S		FeedAxisBusStyle;				//P001                 0: 脉冲控制型 1: M2总线 2: SERCOS2总线 	
+	//P002                                                                  //P002                主轴控制类型      
+	INT16U		SlaveMAX;				        //P003                 伺服总线最大从站数目
+	INT8U		AutoFeedMode;                   //P004                 自动上下料控制电机数量
+	INT16U		A4_Model;                       //P005                 IV轴类型选择(0-关闭；1-A；2-B；3-C)
+	INT16U		A5_Model;                       //P006                 V轴类型选择(0-关闭；1-A；2-B；3-C)
+	INT16U		A4_HardLimitValidSign;          //P007                 IV轴硬限位功能设置
+	INT16U		A5_HardLimitValidSign;          //P008                 V轴硬限位功能设置
+	INT8U    	A4_LOCK_MODE_201;               //P009                 四轴运动状态:四轴联动:0;三加一:1
+	INT8U    	M201_mode_on;                   //P009                 四轴运动选择0:M200/M201代码切换四轴联动(M200)或3+1(M201);1:系统参数选择使用三加一.		
+	//P010(预约)                                                     //P010               五轴加工类型(0-M200~203切换；1-4+1强制)
+	INT8U		TwoServoSynchMode;				//P011                 两个驱动器进行同步控制。0:无同步;1:X轴同步;	2:Y轴同步;		3:Z轴同步.
+	INT8U		TwoServoSynch_Test;				//P012                 双驱同步轴调试功能0-正常运行 1-主动轴单动 2-从动轴单动	
+	INT8U		ToolMotorControlMode;			//P013                 刀库电机控制模式。0:普通电机控制;1:安川伺服控制2:sercos总线控制	
+	//P014(预约)                                                     //P014                伺服刀库调试功能
+	INT8U    	AC_LOCK_TEST;                   //P015                 调试时A4,A5轴抱闸作假		
+	INT16U		SpindleSetupType;				//P016                 主轴配置类型
+	INT16U		SCIB_NoCom_Count;				//P017                 主轴连续不通讯次数。单位：S。
+	INT16U		SpindleErrorCount;				//P018                 主轴驱动器误报警过滤次数
+	INT16U		HardLimitFilterTime;			//P019                 硬限位时间常数.uint:ms
+
+	
+	FLOAT64		Tsample;				        //P020                  单位：s   设定插补周期 [0.1,10]ms ,传输对应[1,100]
+	FLOAT64		Tsample1;				        //P020                  单位：s   设定插补周期， 用于中断程序中  考虑停用	
+	INT16U  	PWM_PeriodRegister_MIN;			//P020                  PWM  最小写入值
+	INT16U  	PWM_PeriodRegister_MAX;			//P020                  PWM  最大写入值
+	INT16U  	PWM_PeriodRegister_ZeroPeriod;	//P020                  LPM为0时PWM  写入值	
+	INT32U 		TrackRunOutRangeSQR;	        //P021                  轨迹偏离报警范围(平方)  unit:mm.mm  
+	FLOAT64		FlexuousAxisLength;		        //P022                  曲线平滑允许误差/线段单轴最大波折长度unit:mm
+	INT8U		VeerMinAngle;					//P023                  转角减速最小角度
+	FLOAT64		VeerDeltaV;				        //P024                  拐点单轴变化速度(unit:mm/s)  设定范围[1,25.5] 传输对应[1-255] 	
+	FLOAT64		NicetyVeerDeltaV;		        //P025                  精准转向拐点单轴变化速度(unit:mm/s)  设定范围[1,25.5]传输对应[1-255] 
+	FLOAT64		VeerDeltaT; 				    //P026                  转向过程时间常数 （单位：s）    设定范围[1,255]ms 传输对应[1-255]
+	FLOAT64		NicetyVeerDeltaT;  		        //P027                  精准转向过程时间常数（单位：s）  设定范围[1,255]ms 传输对应[1-255]
+	FLOAT64		ArcFeedDownRatio;		        //P028                  圆弧减速比[0,25.5] 传输对应[0,255] 0时无效
+	FLOAT64 	ArcDownRatio;			        //P029                  圆弧定速	
+	FLOAT64 	BowstringError_Max; 			//P030                  弓高误差最大值(Uint:um)
+	FLOAT64 	ToleranceStotalquotiety;		//P031	             拟合曲线公差长度比例因子[10,100](uint:%)	
+	FLOAT64		ExponentMaxSpeed;				//P032                  运动控制指数化最大速度 unit:mm/s [0,100]
+	FLOAT64		Vnow_TsampleLinearMaxSpeed;	    //P032	             线性化减速最大速度	unit:mm/s [0,100]
+	FLOAT64		ExponentMinRatio;				//P033                  运动控制指数化最小减速比率  [0.1,0.9] 
+	INT32U		Vnow_TsampleLinearRatio;		//P033                  线性化减速比率 [1,9] 
+	FLOAT64		SPCShakeSign;					//P034	             SPC shake	手动速度减速比率；  [0.8,1.0] 
+	FLOAT64		STDShakeSign;					//P035	             STD shake	自动速度减速比率；  [0.8,1.0] 	
+	//P036                                                                   //P036                电子手轮响应系数[0~10]
+	//P037                                                                   //P037                手动功能响应系数[0~10]	
+	//P038                                                                   //P038                手动功能补偿系数[0~10]
+	INT8U  		AreaControlModle;               //P039                  区域速度计算模式
+
+
+	INT8U       FunctionSelectionSwitch_01;     //P040                  功能选择开关1
+	INT8U       FunctionSelectionSwitch_02;		//P041	             功能选择开关2
+	INT8U       FunctionSelectionSwitch_03;		//P042	             功能选择开关3	
+	INT8U       FunctionSelectionSwitch_04;		//P043                  功能选择开关4
+	INT8U       FunctionSelectionSwitch_05;		//P044                  功能选择开关5
+	INT8U       FunctionSelectionSwitch_06;		//P045                  功能选择开关6
+	INT8U       FunctionSelectionSwitch_07;		//P046                  功能选择开关7
+	INT8U       FunctionSelectionSwitch_08;		//P047	             功能选择开关8
+	INT8U       FunctionSelectionSwitch_09;		//P048                  功能选择开关9
+	INT8U       FunctionSelectionSwitch_10;		//P049	             功能选择开关10
+	INT8U       FunctionSelectionSwitch_11;		//P050                  功能选择开关11
+	INT8U       FunctionSelectionSwitch_12;		//P051                  功能选择开关12
+    //p052~p059(预约)                                           //p052-p059        功能选择开关13~20.  
+
+	
+	UINT16AXIS	EncoderCheckChoose;		        //P060-P065          监测轴光栅尺标志		
+    //P066~P071                                                         //P066~P071       编码器读数方向
+    //P072(预约)                                                     //P072                电子手轮读数方向
+    //P073                                                                  //P073                对刀仪信号电平设置
+	//P074(预约)                                                     //P074                对刀仪行程信号电平设置
+	//P075~P079(预约)                                           //P075~P079       未定义
+
+	//P080~P099(预约)   						//P080~P099 	      未定义
+
+
+    //P100~P118(预约)                                            //P100~P118       未定义	
+	INT16U	    RunState;						//P119                  运行状态设置－0: 正常运行; 1: 不输出脉冲运行; 
+
+
+	/********DSPB0-2********/
+	INT32U 		LinearAxisMinUnit;			    //P120                 线性轴最小输入单位(单位：nm)
+	FLOAT64 	UnitTo_mm;					    //P120                 线性轴位置单位换算成mm   单位:  mm/unit
+	INT32U		RotaryAxisMinUnit;			    //P121                 旋转轴最小输入单位(单位：nd)
+	FLOAT64 	UnitTo_d;					    //P121                 旋转轴位置单位换算成d	    单位:  d/unit
+	INT32U		SpindleAxisMinUnit;			    //P122                 主轴最小输入单位(单位：nd)
+	INT32U		LinearAxisOutUnitEQU;		    //P123                 线性轴输出指令单位当量(单位：nm/指令单位)
+	INT32U		RotaryAxisOutUnitEQU;		    //P124                 旋转轴输出指令单位当量(单位：nd/指令单位)
+	INT32U		SpindleAxisOutUnitEQU;		    //P125                 主轴输出指令单位当量(单位：nd/指令单位)
+	//P126(预约)                                                     //P126                线性轴换向抵消脉冲[0~1000](单位:线轴输出指令单位)
+	//P127(预约)                                                     //P127                旋转轴换向抵消脉冲[0~1000](单位:旋转轴输出指令单位)
+    //P128~P133                                                         //P128~P133       反馈编码器分辨率设置(单位:nm/pulse)
+	UINT40AXIS	Gap;						    //P134-P139         轴间隙值,单位: 最小输入单位
+	UINT40AXIS	GapPulse;					    //P134-P139         轴间隙值,单位: 输出指令单位	
+
+
+    //P140~P148                                                         //P140~P148      线性轴、IV轴、V轴手动一~三档速度设置
+    INT32U      JogGrade1;   //by vinge
+    INT32U      JogGrade2;
+    INT32U      JogGrade3;
+    FLOAT64 	SRefSpeed;                      //P149                线性轴正向搜索参考点速度设定[10~10000](单位：mm/min)。
+    FLOAT64 	SRefSpeedBack;                  //P150                线性轴负向搜索参考点速度设定[10~2000](单位：mm/min)
+	INT32U		SRefBack;						//P151                线性轴参考点返回距离，单位:最小输入单位
+	FLOAT64 	A4SRefSpeed;					//P152                IV轴正向搜素参考点速度设置
+	FLOAT64 	A4SRefSpeedBack;				//p153                IV轴负向搜素参考点速度设置
+	INT32U 		A4SRefBack;						//p154                IV轴搜素参考点返回距离
+    //P155(预约)                                                     //P155              V轴正向搜素参考点速度设置
+	//P156(预约)  								//P156 		    V轴正向搜素参考点速度设置
+	//P157(预约)  								//P157 		    V轴正向搜素参考点速度设置
+	//P158(预约)  								//P158 		    系统最大进给速度设置(单位：mm/min)
+	//P159(预约)  								//P159 		    系统限速标志
+
+
+	FLOAT64AXIS MAXSpeed;						//P160-P162        线性轴最大移动速度 单位:mm/s	 or degree/s	
+	//P163(预约)  								//P163		   IV轴最大移动速度设置(单位：degree/s)
+	//P164(预约)  								//P164 		   V轴最大移动速度设置(单位：degree/s)
+    //P165                                                                  //P165              线性轴G0速度设置
+	FLOAT64 	A4_G0Speed; 					//P166               IV 轴G0速度 degree/s
+	//P167(预约)                                                     //P167              V轴G0速度设置
+	FLOAT64 	a_SET;						    //P168               线性平台加速度 单位：mm/s.s
+	FLOAT64 	a_SET_ARM;					    //P168               线性轴运动平台加速度 单位：mm/s.s    	
+	FLOAT64 	a_A4_SET;						//P169               IV 轴运动平台加速度 单位：degree/s.s	   
+    //P170(预约)                                                     //P170              V轴运动平台加速度
+	FLOAT64 	a_SET_ARM_Nicety;			    //P171               精准运动平台加速度 单位：mm/s.s    
+	FLOAT64 	a_SET_ARM_G0;				    //P172               G0快进运动平台加速度 单位：mm/s.s    
+	FLOAT64	    ExponentTimeConstant_Nicety;	//P173               (指数型算法)精准电机机械时间常数单位0.1ms
+	FLOAT64	    ExponentTimeConstant_ac;		//P174               (指数型算法)电机机械时间常数单位*0.1ms
+	FLOAT64	    ExponentTimeConstant_de;		//P175               (指数型算法)电机机械时间常数单位*0.1ms
+	FLOAT64	    Vclamp;						    //P176               (斜线型算法)切削加工最大钳制速度mm/min->mm/s	
+	FLOAT64	    TimeConstant_ac;			    //P177               (斜线型算法)加速时间常数1.单位*0.1ms
+	FLOAT64	    TimeConstant_de;			    //P178               (斜线型算法)加速时间常数1.单位*0.1ms
+	INT32S 	    VeerMinAngle_2;				    //P179               第二转角不减速最大角度[0~180](单位：度))
+
+	FLOAT64 	Veer2_SearchLen;				//P180               第二转角向后搜索距离
+	FLOAT64 	VeerDecA;						//P181               转角指定减速速度
+	FLOAT64 	NCAreaSpeedRange;				//P182               区域起始速度终止速度差值
+	FLOAT64 	NCAreashortLen;	                //P183               短区域长度值
+	FLOAT64 	NCAreashortA; 	                //P184               短区域加减速度值	
+	FLOAT64 	LongCodeLen;		            //P185               长代码长度值mm
+	FLOAT64 	LongCodeAngle;                  //P186               长代码指定加速度角度值
+	FLOAT64 	LongCodeVm;                     //P187               长代码指定速度值	
+	FLOAT64 	LongCodeA;                      //P188               长代码指定加速度度值
+	FLOAT64 	Min_CodeStotal;                 //P189               特小线段忽略长度值
+	FLOAT64 	VecterInerpolate_MinLen;        //P190               VectorInterpolate允许最小线段长度值mm
+	FLOAT64 	VecterInerpolate_MaxLen;        //P191               VectorInterpolate允许最大线段长度值mm	
+    //P195~P199(预约)                                            //P192~P199     伺服主轴参数
+
+
+    //P200                                                                  //P200               主轴减速加速度
+    //P201~P205                                                         //P201~P205      主轴相关速度设置
+    INT16U		SpindleSpeedbackmodle;			//P206                刚性攻丝主轴速度反馈采集模式(0 : VT总线,1:编码器)	 
+    //P207                                                                  //P207               刚性攻丝主轴停止提前量[0~100](单位:度)
+    //P208                                                                  //P208               刚性攻丝前馈增益Kp[0~225]
+    //P209                                                                  //P209               刚性攻丝前馈增益Kv[0~225]
+    //P210(预约)                                                     //P210               啄式钻孔返回距离(单位:um)
+    //P211(预约)                                                     //P211               深孔钻孔安全距离(单位:um)
+    //P212(预约)                                                     //P212               镗孔设定角度[0~359999] (单位:0.001度)
+    //P213(预约)                                                     //P213               钻孔底部暂停时间(单位:ms)
+	//P214										//P214		    BF 双速齿轮箱换档转速(单位：r/min)
+    //P215(预约)                                                     //P215               BF双速齿轮箱低档最高转速(单位：r/min)
+    //P216(预约)                                                     //P216               BF双速齿轮箱高档最高转速(单位：r/min)
+    //P217(预约)                                                     //P217               BF双速齿轮箱高低档切换转速(单位：r/min)
+    //P218(预约)                                                     //P218               伺服刀库第一工位角度值(单位:0.001度)
+	//P219(预约) 								//P219		    伺服刀库调试完成标志位
+
+	
+	UINT16AXIS	AxisCompMaxL;				    //P220-P224        非线性补偿数组最长值 [0-280]	
+	//p225~p230(预约)                                           //p225~230       名义坐标设置值
+	//231(预约)                                                      //231                双驱同步允许误差设置(单位：最小输入单位)
+	FLOAT64AXIS AxisAngleLimitSpeed;			//P232~P236 	  线性轴转向速度差限制unit:mm/s
+	//p237~p239(预约)                                           //p237~239       未定义
+
+
+	/********其他DSPB0设定参数********/
+	UINT16AXIS	CompensationDirection;			//非线性误差各轴补偿方向	0-neg  1-pos
+	INT16U	    ReferenceFrameMode;				//坐标系模型
+	INT16U	    GearDownRate;	 				//减速箱减速比
+	INT32S	    SpindleOneRing_EncoderRealDegree;//主轴一圈编码器实际旋转角度;最小输入单位
+	INT16U	    SystemSimulationRunSign;		//系统仿真（老化等情况）标志。1：仿真运行。其他：正常运行。
+
+	INT8U		S_ce;	                        //S型曲线次数
+	INT32U		Average_Time;
+	INT32U	    NCInterpolateAddCnPerCercle;	
+	FLOAT64 	Vclamp_SPC;	
+	FLOAT64 	VeerAcceleration;               //转角 速度计算加速度值
+	FLOAT64 	VecterInerpolate_MinAngle;      //
+	FLOAT64 	VecterInerpolate_LinerMaxLen;   //
+	FLOAT64 	VecterInerpolate_AngleerMaxLen; //	
+	FLOAT64 	VecterInerpolate_K;             //
+	FLOAT64     VecterInerpolate_CompanLen;     //	
+	FLOAT64 	VecterInerpolate_CompanValue;   //		
+				
+	FLOAT64     G0_A_min;
+	FLOAT64     G0_A_max;
+	FLOAT64     G0_V_min;
+	FLOAT64     G0_V_max;
+	FLOAT64     G0_ka;
+	FLOAT64     G0_kb;
+	FLOAT64     t_k1;
+	FLOAT64     t_k2;	
+	
+	
+	FLOAT64 	S_T1_Acc; 	                    // uint:s
+	FLOAT64 	S_T1_Dec; 	                    //	uint:s
+
+	FLOAT64 	ForwardSpeed_kx;	            //X轴速度前馈补偿百分比
+	FLOAT64 	ForwardSpeed_ky;	            //Y轴速度前馈补偿百分比
+	FLOAT64 	ForwardSpeed_kz;	            //Z轴速度前馈补偿百分比
+	FLOAT64 	Positiongain_x; 	            //X轴位置环增益
+	FLOAT64 	Positiongain_y; 	            //Y轴位置环增益
+	FLOAT64 	Positiongain_z; 	            //Z轴位置环增益	
+
+	INT32U	    NCSTD_SearchCount;
+	INT32U	    NCSPC_SearchCount;
+
+	INT16U 		SPCMode;
+	INT16U 		SPCRunCount;
+	
+	INT32S		HandPulse;
+	INT32S		HandPulseBk;
+	INT32S		HandPulseVar;
+	INT32S      LastHandPulseVar;
+	INT16U   	HandGrade;
+	INT16U   	HandGradeBk;
+	INT16U		JogAxiss;						//手动移动轴数
+	INT16U		SPCLocateOver;
+	//执行新增位置信息的可靠性控制处理
+	INT16U 		SoftLimit;						//软限位信息
+	INT16U 		HardLimit;						//硬限位信息
+	INT32S		XLimitPos;
+	INT32S		XLimitNeg;
+	INT32S		YLimitPos;
+	INT32S		YLimitNeg;
+	INT32S		ZLimitPos;
+	INT32S		ZLimitNeg;
+}tsSYSTEM;	            //系统参数结构组
+
+typedef struct
+{
+	INT8U	        S001;	                    //伺服驱动器型号:0-关闭此轴1-脉冲控制通用型号2-VT型号3-SGDV型号
+	INT8U	        S003;	                    //切换电机方向
+	INT32U	        S037;	                    //PG分频比(脉冲单位) [Pn212]
+	INT32U	        S038;	                    //电子齿轮比(分子) [Pn20E]
+	INT32U	        S039;	                    //电子齿轮比(分母) [Pn210]	
+	INT32U	        S106;	                    //S106 编码器线数
+  	INT32U	        S107;	                    //S107 电机一转对应直线距离或旋转角度unit:nm or nd
+  	INT32U	        S108;	                    //S108 减速比分子
+	INT32U	        S109;	                    //S109 减速比分母
+	FLOAT64			PWM_PeriodRegister;	        // PWM 脉冲发生器周期  CH0906
+   	volatile INT16U *PWM_Port;			        //PWM 32BITS address
+	volatile INT16U	*LPM_CounterPort;	        //LPM counter 16bits address 
+	INT16U 			LPM_CounterRegister;        // LPM 输出计数值
+	FLOAT64			Resolution;			        // 分辨率UNIT: 最小输入单位/pulse 	
+	FLOAT64 		AxisOutUnitEQU;		        //UNIT: pulse/最小输出单位 	
+	FLOAT64 		AxisOutUnitEQUSp;	        //UNIT: mm/pulse 
+}tsSERVO;
+typedef struct 			//编码器数据结构体
+{
+	INT16U 	OldPOSValue;			// 编码器正向计数器值
+	INT16U 	NowPOSValue;			// 编码器正向计数器值
+	INT16S 	HighPOSValue;			// 编码器正向计数器值(高16位)
+	INT32S  MACH_PositionValue;		// 编码器机床坐标实际位置值   UNIT:最小输入单位(A4/A5/Spindle) 
+	INT32S  MACH_PositionValueout;	// 编码器机床坐标实际输出 位置值   
+	INT16U	EncoderDIR;				// 编码器方向设置  0:正方向
+	FLOAT64	Resolution;				// 分辨率UNIT: 最小输入单位/pulse 
+	INT16U	ResetSign;				//复位标志 1:复位标志
+	volatile INT16U *LPM_PositiveCounterPort;	// LPM 正向计数器口地址
+	INT16U 	OverSign;			//计数器溢出标志，用于主轴
+}tsENCODER;
+typedef struct
+{	
+	INT16U 		MainErrorSign;				        //总错误标志	
+	INT16U 		NCCodeLength;				        //代码长度异常
+	INT16U 		NCCodeBreak;				        //ARM发送G代码不连续	
+	INT16U 		RAMCodeCheckError;			        //运行缓冲区G代码校验报警
+	INT16U 		InterpolationOver;			        //插补量超5mm报警
+	INT16U 		TrackRunOutError;			        //轨迹偏离报警
+	INT16U 		HaveGetErrorDataSign;		        //已截取错误数据标志, when ARM ->RET
+	INT16U 		ORTError;					        // 定位完成后角度偏移标志CH0604
+ 	INT32U 		RealRunCount;				        //已截取错误数据运行条数	
+	INT16U 		AAT_OverTravel;			            //自动对刀功能报警 超行程报警
+	INT16U 		AAT_OverSpeedSign;		            // 自动对刀信号有效时超速报警 >300mm/min  1-报警
+	INT16U 		SCIBComError;			            // 主轴板与DSP 通讯报警	CH20090828	
+	INT16U 		InsideRAMCheckError;		        // 内部RAM 校验错误
+	INT16U 		OutsideRAMCheckError;		        // 外部RAM 校验错误
+	INT16U 		CompDataCheckError;			        // 非线性补偿数据校验错误	
+	INT16U 		A4RunLockError;				        // A4 轴运行时锁紧报警
+	INT16U 		A4StopUnlockError;			        // A4 轴停止时松开报警	
+	UINT16AXIS	EncoderError;				        // 轴光栅尺报警   1--报警
+	UINT16AXIS  ServoSpindleAlarmCode;		        //SERVO, Spindle报警码
+	UINT8AXIS   ServoSpindleSystemParaDifferentNum;	//SERVO,Spindle系统参数不一致序号
+	UINT16AXIS  ServoAlarm;							//伺服报警		1:报警有效
+}tsERROR;					    //报警结构组
+
+typedef struct
+{
+	INT16U	    XYZ_Over;               			// 1--完成当前G代码XYZ轴运行                                   
+	INT16U	    PrecalCode;					        // 1--已预先计算G代码 
+	INT16U 	    GetPositionSign;				    //1--需获得稳定反馈坐标值标志
+	INT16U	    NewAreaSign;				        //新区域标志
+	
+	/***单段功能****/
+	INT16U 	    SingleModeSign; 				    // 0:单段OFF;    1:单段ON; INI=0
+	INT16U 	    NeedRunSingleSign;  			    // 1:单条运行标志 INI=0
+	INT16U 	    SingleRunOver;  				    // 1:完成单条运行标志 INI=0
+
+	INT16U	    AddLineSign;					    // 增加4 条代码修正坐标不一致问题
+	INT16U	    AddLineStep;					    // 增加4 条代码指针[1,3]
+	INT32S	    ZSafeHeight;					    // Z 轴安全高度 unit: 最小输入单位\
+	
+	/***程式预演功能**/
+	INT16U	    ProgramPreRunSign;		        	// 1:预演功能有效
+	
+	UINT16AXIS	NeedBack;				            //0:  1:positive compensation 2:negtive compensation 
+
+	//CH0601  断点处理功能
+	INT16U	    BreakSign;						    //断点功能时不判断接收代码连续性
+	INT16U	    BreakSignBk;					    //断点功能时不判断接收代码连续性
+
+	INT16U	    ChangeToolSign;					    //换刀过程标志，定位不用等待完成
+	INT16U	    A4_RunSign;						    //代表A4 运行标志
+
+	FLOAT64    	F;							        //G代码设定进给速度  (mm/s)
+	FLOAT64   	FG0;						        //G0代码设定进给速度 (mm/s)
+	FLOAT64   	FG0_A4;						        //A4轴G0代码设定进给速度 (mm/s)
+	INT16U	    GGroup00;					        //G04 G09 OR 0-INVALID(defaut)
+	INT16U 	    GGroup02;					        //平面组群选择 G17(defaut) G18 G19
+	INT16U 	    GGroup15;					        //准停模态选择  G61 G64(defaut)
+	INT32U 	    RealSendCount;				        //ARM实际发送分解代码位置指针
+	INT32U 	    RealRunCount;				        //DSP实际运行分解代码位置指针
+	INT16U	    Waitsign;					        //单段模式下等侍单条结束标志发送回ARM
+	INT32U	    LastRealSendCount;			        //打入公共区域时及单段时使用
+	INT16U	    LastNCCodeSign;				        // 目前执行G 代码为最后一条,用于解决停顿问题
+	INT32U	    EndCodeCount;				        //速度为0的代码条
+	INT32U	    VeVmCalCount;				        //上次计算过Ve,Vm的代码条	
+	INT16U	    ArmAgainSendGcodeSign;		        //Arm重发代码标志.1:重发.
+	INT8U	    SingleModifyOffsetOrCompesationSign;
+}tsNC_RUN_SIGN;
+
+typedef struct
+{
+	INT16U		SearchRefSign;			// 要求搜索参考点标志
+	INT16U		RefStep;				//参考点搜索步骤
+	INT16U      RefStepA4;
+	INT16U      RefStepA5;
+	UINT16AXIS	NeedFindAxisSign;		// 需要搜索轴的标志
+	UINT16AXIS	FindRefSign;			// 已找到某轴参考点标志
+}tsREFERENCE;
+typedef struct
+{
+	INT16U	LockSign;					// 要求锁紧A4 轴标志
+	INT16U	LockGetStartTimeSign;		// 获得锁紧反馈有效后起始时间标志	
+	INT16U	RunLockCounter;				// A4 轴运行时锁紧有效计数器
+	INT16U	LockCompleteSign;			// 锁紧A4 轴完成标志
+	INT16U	LockCompleteCounter;		// 锁紧A4 轴完成记数器
+	INT16U	UnlockSign;					// 要求松开A4 轴标志
+	INT16U	UnlockGetStartTimeSign;		// 获得松开反馈有效后起始时间标志	
+	INT16U	StopUnlockCounter;			//A4 轴停止时 松开有效计数器
+	INT16U	UnlockCompleteSign;			// 松开A4 轴完成标志
+	INT16U	UnlockCompleteCounter;		// 松开A4 轴完成记数器
+	INT16U	SampleLockSign;				//采样A4 轴反馈锁紧有效标志
+}tsA4AXIS;
+
+//主轴用
+typedef struct  
+{     // bits   description
+	INT32U CW:1;			//BIT0: 	 	1:VALID
+	INT32U CCW:1;			//BIT1: 
+	INT32U ORT:1;			//BIT2: 	       定位
+	INT32U ZEROSERVO:1;		//BIT3:           定位停止零伺服控制
+	INT32U RESETALM:1;		//BIT4:           报警复位
+	INT32U A4LOCK:1;		//BIT5:		0:VALID 锁紧有效 
+	INT32U A5LOCK:1;		//BIT6:		0:VALID 锁紧有效
+	INT32U REV7:1;			//BIT7: 
+	INT32U REV8:1;			//BIT8: 
+	INT32U REV9:1;			//BIT9: 
+	INT32U REV10:1;			//BIT10:
+	INT32U REV11:1;			//BIT11:
+	INT32U REV12:1;			//BIT12:
+	INT32U REV13:1;			//BIT13:	
+	INT32U REV14:1;			//BIT14: 
+	INT32U REV15:1;			//BIT15: 
+}tsSPINDLE_OUT_BITS ;
+
+union tsSPINDLE_OUT_REG 
+{
+	INT16U all;
+	tsSPINDLE_OUT_BITS  bit;
+};
+
+//CH0507
+typedef struct
+{	//P40-P44
+	INT16U     SpindleControlStyle;		    //P002    主轴控制类型 0: VT总线 1: M2总线 2: SERCOS2总线	3.日立总线
+	FLOAT64    S_n_MIN;					    // S 主轴转速最小值 UNIT:d/s
+	FLOAT64    S_StopDistance;				// 刚性攻牙S 轴停止提前量 unit:d   [1,5]
+	FLOAT64    RigidKp;					    // 刚性跟踪补偿位置增益[1,25.5]
+	FLOAT64    RigidKv;					    // 刚性跟踪补偿加速度增益[1/70,25.5/70] 对应传输[1,25.5]
+	FLOAT64    RigidKa;					    // 刚性跟踪补偿加速度增益[1/70,25.5/70] 对应传输[1,25.5]	
+
+	FLOAT64    DeltaSbyRigidKp;			    // Z 轴补偿值根据位置unit:mm 
+	FLOAT64    DeltaSbyRigidKv;			    // Z 轴补偿值根据速度unit:mm 
+	FLOAT64    DeltaSbyRigidKa;			    // Z 轴补偿值根据加速度 unit:mm 
+	INT16U     RigidBackToolSign;			// Z 轴刚性攻牙特殊退刀标志
+	INT16U     RigidBackToolCompleteSign;	// Z 轴刚性攻牙特殊退刀完成标志
+	
+	//P160-P164
+	INT32S     ORTM253Angle;				// 换刀定位角度 unit:ud .
+	FLOAT64    ORTSpeed;					// 定位转速UNIT:r/min
+	INT16U     SpeedPerVolt;				//每伏主轴转速当量UNIT:(r/min)/10HZ
+	FLOAT64    a_ac_SET;					// 加速加速度 UNIT: d/s.s
+	FLOAT64    a_de_SET;					// 减速加速度 UNIT: d/s.s
+	FLOAT64    RigidHighestSpeed;			// 刚性攻牙最高转速UNIT:d/s
+
+	INT32U     PulsePerCycle;				// 主轴每圈编码器输出脉冲数(四细分) UNIT:pulse
+	FLOAT64    SpinSpeedSet_A;				// 当前设定转速UNIT:r/s
+	FLOAT64    Z_S_Scale;					// Z 轴(mm)与S 轴脉冲比例  Z/S		unit:mm/pulse
+	FLOAT64    Z_S_Scale_A;				    // Z 轴(mm)与S 轴(r) 比例  Z/S			unit:mm/r
+	
+	INT16U     RunModeSign;					// 主轴运行方式状态标志
+	INT16U     RunSign;						// 主轴运行状态标志  CWW  CCW	STOP
+	INT16U     RigidMode;					// 刚性攻牙方式(反向/ 正向攻牙)
+	INT32S     LastUMachValue;				//Z轴上个插补点时的U 轴机床坐标
+	INT40AXIS  RigidStartValue;		        // 刚性攻牙Z 轴起点坐标 unit:um
+	INT16U     RigidTapStartSign;			// Rigid Tap 有效时启动S 轴运行标志
+	INT16U     SpinSpeedZeroSign;			// 刚性攻牙中结尾处理标志
+	INT16U     SpinSpeedDecSign;			// 刚性攻牙中结尾处理标志
+	INT16U     RigidSpindleStopCounter;		//判断刚性攻牙主轴停止用计数器  CH0603
+	INT16U     RigidSpindleDecCounter;		//判断刚性攻牙主轴停止用计数器  CH0603	
+	INT16U     ORTCompleteSign;				// 主轴定位完成标志 
+	INT16U     ORTM253CounterTimer;			// 换刀定位计数器次数 
+	INT32S     ORTM252Angle;				// 通用定位角度  Unit:ud.
+	INT32S     ORTM252Angle_Cal;			//带减速箱主轴定位实际角度;Unit :UD
+	INT32S     ORTM252RealAngle;			//实际通用定位角度:Unit :ud
+	INT16U     ORTM252CounterTimer;			// 通用定位计数器次数
+	
+	FLOAT64    RealSpeed;					// 由总线反馈值计算速度 unit:最小输入单位/s	
+	FLOAT64    RealSpeed_encoder;			//由编码器反馈值实际计算速度 unit:最小输入单位/s	
+	FLOAT64    RealSpeed_r;				    // 由总线反馈值实际计算速度 unit:r/s	
+	FLOAT64    RealSpeed_r_encoder;		    // 由编码器反馈值实际计算速度 unit:r/s	
+	FLOAT64    RealSpeedLast;				// 由编码器反馈值实际计算速度(上次采样) unit:最小输入单位/s	
+	FLOAT64    RealSpeedLast_r;			    // 由编码器反馈值实际计算速度(上次采样) unit:r/s	
+	FLOAT64    Real_a;						// 由编码器反馈值实际计算加速度 unit:最小输入单位/s*s	
+	FLOAT64    Real_a_r;					// 由编码器反馈值实际计算加速度 unit:r/s*s	
+	FLOAT64    RealDisplaySpeed;			// 由编码器反馈值实际计算速度 unit:r/min	
+	FLOAT64    S_RemainDistance;			// 主轴剩余距离unit:r	
+
+	INT32U     SpinSpeedSet;				// 当前设定转速UNIT:r/min
+	FLOAT64    SpinSpeedOutputVolt;		    // 当前设定输出电压值UNIT:V   add by le	
+	INT32U	   BFChageOverrideSpeed;		//BF换档时速度 Uint:r/min
+	INT16U     SpindleGrade;				//主轴转速档位
+	INT16U     SpindleGrade_Bak;			//暂存主轴转速档位	
+	INT16U     LastSpindleGrade;			//暂存上一次主轴转速档位	
+	INT16U     InSignal;					//外部反馈信号
+
+	//CH0701
+	INT16U	   UnReachSetSpeedSign;		    //主轴实际速度未达到设定速度最低限标志
+	INT8U	   ReachSetSpeedJudgeSign;		//主轴实际速度达到设定速度判断标志。0:判断(通常).1:不判断。
+	INT16S	   CalSpeedOKSign;				//主轴速度稳定标志2(4)-稳定
+
+	INT32U	   SpeedHz;					    //主轴转速频率值  单位:0.01Hz
+	INT32U     VT_FeedbackSpeedHz;			//主轴驱动反馈转速频率值  单位:0.01Hz
+	INT16U	   VT_ORT_OK_Counter;			//总线型定位有效计数器－3次以上有效
+	INT32S 	   VT_FeedbackAngle;			// VT 主轴驱动器反馈角度 Unit:最小输入单位
+	INT8U	   TorqueAbs;					//扭矩绝对值
+}tsSPINDLE;
+
+
+
+typedef struct
+{	//P019
+	INT16U	    Style;						// 自动对刀模型设置0:无手动对刀, 1:有手动对刀2:无对刀功能
+	INT16U	    FunctionSign;				// 自动对刀功能标志	 1-有效ARM控制
+	INT16U	    LockCoordinateSign;			// 各轴坐标锁定标志 1-有效 传给ARM	
+    INT40AXIS	LockCoordinate;				// 锁定的各轴机床坐标 unit:um or pulse ( S 轴)
+    INT16AXIS	LockCoordinateMoveSign;		// 锁定的各轴机床坐标 的运行方向
+    INT40AXIS	LimitCoordinate;			// 锁定的各轴机床坐标 后可运行的极限坐标unit:um or pulse ( S 轴)	 
+	INT16U	    ZDealEndSign;				// Z 轴已处理到底停止标志
+	INT8U	    LevelChangeSign;			// 对刀锁定信号高低电平切换标志 1-切换
+	INT16U	    LockValidSign;				// 锁定输入信号有效标志
+	INT16U	    HaveDealAATOverTravelSign;	//已处理超行程报警标志
+}tsAUTOADJUSTTOOL;
+
+//刀库旋转轴V 轴控制功能
+typedef struct
+{
+
+	INT16U	    FunctionSign;			// V 轴控制功能标志
+	INT16U	    V_Over;					// V 轴运行到位完毕标志
+	INT16U	    PulsePerTurn;			// 每转编码器脉冲数 unit:pulse/r
+	INT16U	    RefPreState;			// 前次参考点输入口状态 inbak3  1-有效
+	INT16U	    RefCurState;			// 当前参考点输入口状态 inbak3  1-有效
+	INT32S	    CurrentAngle;			// 当前角度(与水平换刀轴一致)  单位:0.001度
+	INT16U	    PrecalCode;				// 1--已预先计算G代码 
+	INT16U	    PrecalInterplation;		// 1--已预先计算新执行段 
+    UINT16AXIS	NeedBack;				//0:  1:positive compensation 2:negtive compensation 
+}tsVAXISCONTROL;
+
+//插补输出缓冲区  CH0902
+typedef struct
+{
+	INT16S       X_GapSign;              //平摊间隙标志位
+	INT16S       Y_GapSign;
+	INT16S       Z_GapSign;
+	INT16S       GapSign;
+	INT40AXIS	DeltaPulse;				//缓冲区:  (单位: 插补段输出指令单位)
+	INT40AXIS	AverageValue;			//平摊值
+	INT40AXIS	MACHPosition;			//缓冲区:  (单位: 插补位置输出指令单位)
+	INT16U      X_PWM_PeriodRegister;	// PWM 脉冲发生器周期  ch by bill
+	INT16U      Y_PWM_PeriodRegister;			
+	INT16U      Z_PWM_PeriodRegister;			
+	INT16U      A_PWM_PeriodRegister;			
+	INT16U      B_PWM_PeriodRegister;			
+	INT16U      U_PWM_PeriodRegister;			
+	INT16U      V_PWM_PeriodRegister;			
+	INT16U      XSIGN ;                 // x轴运动方向
+	INT16U      YSIGN ;                 // y轴运动方向
+	INT16U      ZSIGN ;                 // z轴运动方向
+	INT16U      ASIGN ;                 // a轴运动方向
+	INT16U      BSIGN ;                 // b轴运动方向
+	INT16U      USIGN ;                 //u轴运动方向
+	INT16U      VSIGN ;                 // v轴运动方向
+	FLOAT64     VNowOut;			    // 暂存当前实际输出运行速度. (mm/s)
+	UINT16AXIS  MoveSign;
+}tsINTERPOLATION_BUFFER;
+
+typedef struct
+{
+	INT8U    Uint8_a;
+	INT8U    Uint8_b;
+	INT8U    Uint8_c;
+	INT8U    Uint8_d;	
+	INT16U   Uint16_a;
+	INT16U   Uint16_b;
+	INT16U   Uint16_c;
+	INT16U   Uint16_d;	
+	INT32U   Uint32_a;
+	INT32U   Uint32_b;
+	INT32U   Uint32_c;
+	INT32U   Uint32_d;	
+	INT8S    Int8_a;
+	INT8S    Int8_b;
+	INT8S    Int8_c;
+	INT8S    Int8_d;	
+	INT16S   Int16_a;
+	INT16S   Int16_b;
+	INT16S   Int16_c;
+	INT16S   Int16_d;	
+	INT32S   Int32_a;
+	INT32S   Int32_b;
+	INT32S   Int32_c;
+	INT32S   Int32_d;	
+	INT40S   Int40_a;	
+	INT40S   Int40_b;		
+	INT40U   Uint40_a;
+	INT40U   Uint40_b;	
+	FLOAT64  float64_a;	
+	FLOAT64  float64_b;	
+	FLOAT64  float64_c;	
+	FLOAT64  float64_d;	
+	FLOAT64  float64_e;	
+	FLOAT64  float64_f;	
+	FLOAT64  float64_g;	
+	FLOAT64  float64_h;	
+	FLOAT64  float64_i;	
+	FLOAT64  float64_j;	
+	FLOAT64  float64_u;	
+	FLOAT64  float64_v;	
+	FLOAT64  float64_w;	
+	FLOAT64  float64_x;	
+	FLOAT64  float64_y;	
+	FLOAT64  float64_z;		
+}tsPART_VARIANT;
+
+#endif  // end of DSP6713_COMMON_H definition
