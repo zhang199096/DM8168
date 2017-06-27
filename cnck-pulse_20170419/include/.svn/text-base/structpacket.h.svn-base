@@ -1,0 +1,578 @@
+#ifndef _STRUCT_PACKET_H_
+#define _STRUCT_PACKET_H_
+
+#include "datatype.h"
+#include "StructPoint.h"
+
+#define PARABUF_DSPB0SUB	120
+#define PARABUF_DSPB1SUB	120
+#define PARABUF_LINEARSUB	300
+#define PARABUF_CODESUB		512
+
+typedef struct
+{
+	INT16U VSub:1;		// 1
+	INT16U VAdd:1;		// 2
+	INT16U IVSub:1;		// 3
+	INT16U ZSub:1;		// 4
+	INT16U YSub:1;		// 5
+	INT16U XAdd:1;		// 6
+	INT16U Grade:1;		// 7	
+	INT16U XSub:1;		// 8
+	INT16U YAdd:1;		// 9
+	INT16U ZAdd:1;		//10
+	INT16U IVAdd:1;		//11
+	INT16U Rsd12:1;		//12
+	INT16U Rsd13:1;		//13
+	INT16U Rsd14:1;		//14
+	INT16U Rsd15:1;		//15
+	INT16U Rsd16:1;		//16
+}tsDSP_PACKETIN_COM_JOGGRADE;	
+typedef union
+{
+	INT16U all;
+	tsDSP_PACKETIN_COM_JOGGRADE bit;
+}tsDSP_JOGGRADE;
+#define mbWHEEL_X		(1<<0)
+#define mbWHEEL_Y		(1<<1)
+#define mbWHEEL_Z		(1<<2)
+#define mbWHEEL_IV		(1<<3)
+#define mbWHEEL_V		(1<<4)
+#define mbWHEEL_X1		(1<<5)
+#define mbWHEEL_X10	    (1<<6)
+#define mbWHEEL_X100	(1<<7)
+#define mbWHEEL_X1000	(1<<8)
+#define mbWHEEL_AXIS	(0x1F)
+#define mbWHEEL_GRADE	(0x1E0)
+
+typedef struct
+{
+	INT16U X:1;			// 1
+	INT16U Y:1;			// 2
+	INT16U Z:1;			// 3
+	INT16U IV:1;		// 4
+	INT16U V:1;			// 5
+	INT16U G1:1;		// 6
+	INT16U G10:1;		// 7	
+	INT16U G100:1;		// 8
+	INT16U G1000:1;		// 9
+	INT16U Rsd10:1;		//10
+	INT16U Rsd11:1;		//11
+	INT16U Rsd12:1;		//12
+	INT16U Rsd13:1;		//13
+	INT16U Rsd14:1;		//14
+	INT16U Rsd15:1;		//15
+	INT16U Rsd16:1;		//16
+}tsDSP_PACKETIN_COM_HANDGRADE;
+typedef union
+{
+	INT16U all;
+	tsDSP_PACKETIN_COM_HANDGRADE bit;
+}tsDSP_HANDGRADE;
+//B0数据包
+typedef struct
+//typedef __packed struct	
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;
+	INT32S OrginX;
+	INT32S OrginY;
+	INT32S OrginZ;
+	INT32S OrginIV;
+	INT32S OrginV;
+	INT32S OrginVI;
+	INT32S OffsetX;
+	INT32S OffsetY;
+	INT32S OffsetZ;
+	INT32S OffsetIV;
+	INT32S OffsetV;
+	INT32S OffsetVI;
+	INT32S SafeZ;
+	INT32S ToolZ;
+	INT8U GradeG0;
+	INT8U GradeG1;
+	INT8U GradeS;
+	INT8U Packet1;
+	INT8U Info1;
+	INT8U Info2;
+	INT8U Info3;
+	INT8U Info4;
+	INT8U Info5;
+	INT8U Info6;
+	INT8U Info7;
+	INT8U Info8;
+	/*#if 0
+	INT8U Info9;
+	INT8U Info10;
+	INT8U Info11;
+	INT8U Info12;
+	INT8U Info13;
+	INT8U Info14;
+	INT8U Info15;
+	INT8U Info16;
+	INT8U Info17;
+	INT8U Info18;
+	INT8U Info19;
+	INT8U Info20;
+	#endif*/
+	INT8U Info9;
+	INT8U Info10;
+	INT8U OutInfo8;		//输出控制信息
+	INT8U SPCMode;		//SPC模态 :B0-HAND; B1-JOG; B2-REF;
+	INT16U JogGrade;	//手动档位信息
+	INT16U HandGrade;	//电子手轮档位信息
+	INT32U HandPulse;	//电子手轮脉冲数值
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETIN_COM;
+typedef struct
+//typedef __packed struct	
+{
+
+	INT32S OrginX;
+	INT32S OrginY;
+	INT32S OrginZ;
+	INT32S OrginIV;
+	INT32S OrginV;
+	INT32S OrginVI;
+	INT32S OffsetX;
+	INT32S OffsetY;
+	INT32S OffsetZ;
+	INT32S OffsetIV;
+	INT32S OffsetV;
+	INT32S OffsetVI;
+	INT32S SafeZ;
+	INT32S ToolZ;
+	INT8U GradeG0;
+	INT8U GradeG1;
+	INT8U GradeS;
+	INT8U Packet1;
+
+	INT8U  Mode;		//SPC模态 :B0-HAND; B1-JOG; B2-REF; A0: STD ; 00 NO MODE
+	INT16U JogGrade;	//手动档位信息
+	INT16U HandGrade;	//电子手轮档位信息
+	INT32U HandPulse;	//电子手轮脉冲数值
+
+}tsDSP_PACKET_STATE;
+//B1数据包
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;
+	INT8U Info8[PARABUF_DSPB0SUB];
+	INT32U Info32[PARABUF_DSPB0SUB];		
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETIN_SYS;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;	
+	INT32U Info32[PARABUF_DSPB0SUB];		
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETIN_SERVO;
+//B2数据包
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;	
+	INT8U Packet;
+	INT16U AxisID;
+	INT16U AxisCount;
+	INT32S Info32[PARABUF_LINEARSUB*2];
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETIN_LINEAR;
+
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;	
+	INT8U Packet;
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETIN_ALM;
+
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;
+	INT32S PosX;
+	INT32S PosY;
+	INT32S PosZ;
+	INT32S PosIV;
+	INT32S PosV;
+	INT32S PosVI;
+	INT32S Angle;
+	INT32S Feed;
+	INT8U Info1;
+	INT8U Info2;
+	INT8U Info3;
+	INT8U Info4;
+	INT8U Info5;
+	INT8U Info6;
+	INT8U Info7;
+	INT8U Info8;
+	INT8U Info9;
+	INT8U Info10;
+	INT8U Info11;
+	INT8U Info12;
+	INT32U SendCount;
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETIN_SPC;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;	
+	INT8U Packet;
+	INT8U Info[PARABUF_CODESUB];
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETIN_STD;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;
+	INT16U Servo50;
+	INT16U Servo51;
+	INT16U Servo52;
+	INT16U Servo53;
+	INT16U Servo54;
+	INT16U Servo55;
+	INT16U Servo70;
+	INT16U Bak1[13];
+	INT8U Servo50Seq;
+	INT8U Servo51Seq;
+	INT8U Servo52Seq;
+	INT8U Servo53Seq;
+	INT8U Servo54Seq;
+	INT8U Servo55Seq;
+	INT8U servo70Seq;
+	INT8U Bak2[13];
+	INT8U Info1;
+	INT8U Info2;
+	INT8U Info3;
+	INT8U Info4;
+	INT16U AlmX;
+	INT16U AlmY;
+	INT16U AlmZ;
+	INT16U AlmIV;
+	INT16U AlmV;
+	INT16U AlmVI;
+	INT16U AlmS;
+	INT16U AlmU;
+	INT8U AlmTrackOver;
+	INT8U AlmInterpolateOver;	
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETOUT_ALM;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;	
+	INT32U Info32[PARABUF_DSPB0SUB];		
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETOUT_SERVO;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;			
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETOUT_CMD;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;
+	INT32U StdRunCount;
+	INT32U SpcRunCount;
+	INT32U Feed;
+	INT32U Speed;	
+	INT32S MacX;
+	INT32S MacY;
+	INT32S MacZ;
+	INT32S MacIV;
+	INT32S MacV;
+	INT32S MacVI;
+	INT32S Angle;
+	INT8U Info1;
+	INT8U Info2;
+	INT8U Info3;
+	INT8U Info4;
+	INT8U Info5;
+	INT8U Info6;
+	INT8U Info7;
+	INT8U Info8;
+	INT8U Info9;
+	INT8U Info10;
+	INT8U Info11;
+	INT8U Info12;	
+	INT8U Info13;
+	INT8U Info14;
+	INT8U Info15;
+	INT8U Info16;
+	INT8U Info17;
+	INT8U Info18;
+	INT8U Info19;
+	INT8U Info20;
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETOUT_B0;
+
+typedef struct
+//typedef __packed struct
+{		 
+	INT32S SendCount;
+	INT32S CMDMain;
+	INT32S CMDSub;	
+	tsPOINT5A sPointS;
+	tsPOINT5A sPointE;
+	tsPOINT3A sPointC;
+	INT32S AngleS;
+	INT32S AngleE;
+	INT32S Stotal;
+	INT32S FeedRate;
+	INT32S Vm;
+	INT32S Ve;
+	INT32S Radius;	 
+}tsDSP_PACKETOUT_B5SUB;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;
+	tsDSP_PACKETOUT_B5SUB sCode[15];	 
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETOUT_B5;
+
+typedef struct
+//typedef __packed struct
+{
+	INT32S N;
+	INT32S Pointer_StartCode;
+	INT32S Pointer_EndCode;
+	INT32S Pointer_FirstInflexionCode;
+	INT32S Pointer_SecondInflexionCode;
+	INT32S Ss;
+	INT32S Vg1;
+	INT32S Vg2;
+	INT32S SingleSign;
+	INT32S Stotal;
+	INT32S CurrentStotal;
+	INT32S CurrentStotalLast;
+	INT32S Snow;
+	INT32S DeltaSnow;
+	INT32S I;
+	INT32S TotalN;
+	INT32S Vs;
+	INT32S Vm;
+	INT32S VmReal;
+	INT32S Ve;
+	INT32S VNow;
+	INT32S VNowOut;
+	INT32S Vmin;
+	INT32S VChangeSign;
+	INT32S CurveClassNumber;
+	INT32S StotalReal;
+	INT32S StotalLast;
+	INT32S Sac;
+	INT32S Sm;
+	INT32S Sde;
+	INT32S SA;
+	INT32S S1;
+	INT32S S2;
+	INT32S S3;
+	INT32S S4;
+	INT32S S5;
+	INT32S T1;
+	INT32S T2;
+	INT32S T3;
+	INT32S T4;
+	INT32S T5;
+	INT32S DeltaT1;
+	INT32S DeltaT2;
+	INT32S DeltaT3;
+	INT32S DeltaT4;
+	INT32S DeltaT5;
+	INT32S a_ac;
+	INT32S a_de;
+	INT32S CurrentT;
+	tsPOINT6A sNowValue;
+	tsPOINT6A sOldValue;
+	tsPOINT6A sNowPointMACPulse;
+	tsPOINT6A sNowPointMACPulseOut;
+	tsPOINT6A sEndPointMACPulseOut;
+	INT32S RealSendCount;
+	INT32S RealRunCount;
+	tsPOINT6A sServoUnit;
+	INT32S SpindleUnit;
+	tsPOINT6A sSerVoPosition;
+	INT32S SpindlePosition;
+	INT32S Bak[56];
+}tsDSP_PACKETOUT_B6SUB;
+
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;
+	INT8U Packet;
+	tsDSP_PACKETOUT_B6SUB sInfo;
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKETOUT_B6;
+
+//DSP与ARM通信接收，SCIA_RxBuf
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Head;
+	INT16U Length;
+	INT8U Port;
+	INT8U Protocal;
+	INT8U Command;	
+	INT8U Packet;
+	INT16U ComID;
+	INT16U CRC;
+	INT8U End;
+}tsDSP_PACKET_TEMP;
+
+//主轴变频器通信输入
+typedef struct
+//typedef __packed struct
+{	
+	INT8U Fix;
+	INT8U Port;			//站点地址
+	INT8U Protocal;		//协议类型
+	INT8U Function;		//功能码
+	INT8U Command;		//控制命令
+	INT8U Speed1;
+	INT16U Speed23;
+	INT16U Angle;
+	INT16U Torque;
+	INT16U Check;	
+}tsSPIN_PACKETIN;
+
+//主轴变频器通信输出
+typedef struct
+//typedef __packed struct
+{
+	INT8U Fix;
+	INT8U Port;			//站点地址
+	INT8U Protocal;		//协议类型
+	INT8U Function;		//功能码
+	INT8U Command;		//控制命令
+	INT8U Speed1;
+	INT16U Speed23;
+	INT16U Angle;
+	INT8U Rsd9;
+	INT8U Rsd10;
+	INT16U Check;	
+}tsSPIN_PACKETOUT;
+
+//and envent is a hint to tell others to receive message
+
+#define DSP_EVENT_KEEPALIVE 0
+#define DSP_EVENT_KEY    1
+#define DSP_EVENT_PKGB0  2
+
+
+#endif

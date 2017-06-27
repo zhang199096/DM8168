@@ -1,0 +1,3779 @@
+// lly
+// FILE:	toolcompen.c
+//变量说明
+//Move_type 曲线走刀类型
+// 0:缩短型
+// 1:伸长型
+// 2:插入型
+//Conncetion_type  曲线转接类型
+// 0:G01--G01
+// 1:G01--G02
+// 2:G01--G03
+// 3:G02--G01 
+// 4:G03--G01 
+// 5:G02--G02
+// 6:G02--G03
+// 7:G03--G02
+// 8:G03--G03
+//DGbuf[DGwptr]=Send_DGbuf(Next_code);  //代码写入发送缓冲区
+//CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+// ch by lly 2011 1
+//将圆弧分段改到刀补后完成 
+
+//#define DEBUG
+
+#include "toolcompen.h"
+#include <math.h>
+//plcmemdef.h
+
+S32 tool_r=0;//,tool_del_x=0,tool_del_z=0;     //刀尖圆弧半径,刀具偏置
+U8  tool_dir=0; //刀具方向 0-9;
+U8  tooldir_flag=0;
+S32 tooldir_x,tooldir_z,tooldir_y; //加上刀尖方向后的r偏移量
+U8  TCGbuf_deal_full_sign;  //编译后的单元是否有数据
+U8  System_CutDirection=0;
+U8  System_CutDirectionBackup=0;
+U8  DGbuf_full_sign=0;
+TTCGarc TCGbuf_deal,TCGbuf_deal_Bk;    //接收处理缓冲单元
+TDGarc DG_data;     //发送缓冲单元
+PRE_G_CODE Finished_G;
+PRE_G_CODE Current_code;
+PRE_G_CODE Next_code;
+PRE_G_CODE Former_code;
+//PRE_G_CODE record[100];
+
+PRE_G_CODE GSEND_CODE_BUFFER[5]; //分解代码缓冲区
+
+PRE_G_CODE G_CODE_BUFFER[5];  //分解代码缓冲区
+PRE_G_CODE Cal_code;
+S8 G_CODE_BUFFER_NUM;         //缓冲区内代码个数 
+U8 record_ptr=0;
+
+
+TTCGarc TCGbufBk[TCG_BUF_MAX];  //用于缓存辅助代码，调整send_count
+U16 TCGrptrBk,TCGwptrBk;
+
+void Init_Toolcompen(void)
+{
+ 
+    PTCGline lineptr;
+    PTCGarc  arcptr;
+    PTCGfst fstptr;
+    PTCGmcode mptr;
+
+    G_CODE_BUFFER_NUM=0;
+
+    DGwptr=0;
+    DGrptr=0;
+    TCGrptr=0;
+    TCGwptr=0;
+    TCGwptrBk=0;
+    TCGrptrBk=0;
+    Former_code.Full_sign=0;
+    Former_code.Send_sign=0;
+    Current_code.Full_sign=0;
+    Current_code.Send_sign=0;
+    Next_code.Full_sign=0;
+    Next_code.Send_sign=0;
+    Current_code.EndPoint.X=unit2Meter4Digit(gC2TCState.x);
+    if(dimMode)
+        Current_code.EndPoint.X=Current_code.EndPoint.X/2;
+    Current_code.EndPoint.Z=unit2Meter4Digit(gC2TCState.z);
+    Current_code.EndPoint.Y=unit2Meter4Digit(gC2TCState.y);
+#if 0
+    mptr=(PTCGmcode)&TCGbuf[TCGwptr];
+    mptr->gnum=GCODE_41;
+    mptr->sendCount=0;
+
+    TCGwptr++;
+    fstptr=(PTCGfst)&TCGbuf[TCGwptr];
+    fstptr->gnum=GCODE_T;
+    fstptr->value=0x0100;
+    fstptr->sendCount=1;
+    toolCompensation[0].x=0;
+    toolCompensation[0].z=0;
+    toolCompensation[0].r=1000;
+    TCGwptr++;
+
+    lineptr=(PTCGline)&TCGbuf[TCGwptr];  //直线1
+    lineptr->gnum=GCODE_01;
+    lineptr->x=0;
+    lineptr->z=50000;
+    lineptr->sendCount=2;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_02;
+    arcptr->x=-60000;
+    arcptr->z=90000;
+    arcptr->r=50000;
+    arcptr->sendCount=3;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_02;
+    arcptr->x=30000;
+    arcptr->z=110000;
+    arcptr->r=70000;
+    arcptr->sendCount=4;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_03;
+    arcptr->x=60000;
+    arcptr->z=60000;
+    arcptr->r=120000;
+    arcptr->sendCount=5;
+    TCGwptr++;
+
+    lineptr=(PTCGline)&TCGbuf[TCGwptr];  //直线1
+    lineptr->gnum=GCODE_01;
+    lineptr->x=50000;
+    lineptr->z=150000;
+    lineptr->sendCount=6;
+    TCGwptr++;
+
+    lineptr=(PTCGline)&TCGbuf[TCGwptr];  //直线1
+    lineptr->gnum=GCODE_01;
+    lineptr->x=30000;
+    lineptr->z=120000;
+    lineptr->sendCount=7;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_03;
+    arcptr->x=-50000;
+    arcptr->z=130000;
+    arcptr->r=60000;
+    arcptr->sendCount=8;
+    TCGwptr++;
+
+    lineptr=(PTCGline)&TCGbuf[TCGwptr];  //直线1
+    lineptr->gnum=GCODE_01;
+    lineptr->x=-100000;
+    lineptr->z=150000;
+    lineptr->sendCount=9;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_03;
+    arcptr->x=-30000;
+    arcptr->z=180000;
+    arcptr->r=60000;
+    arcptr->sendCount=10;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_02;
+    arcptr->x=0;
+    arcptr->z=230000;
+    arcptr->r=40000;
+    arcptr->sendCount=11;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_03;
+    arcptr->x=-60000;
+    arcptr->z=230000;
+    arcptr->r=50000;
+    arcptr->sendCount=12;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_02;
+    arcptr->x=-70000;
+    arcptr->z=280000;
+    arcptr->r=45000;
+    arcptr->sendCount=13;
+    TCGwptr++;
+
+    arcptr=(PTCGarc)&TCGbuf[TCGwptr];  //圆弧
+    arcptr->gnum=GCODE_03;
+    arcptr->x=-130000;
+    arcptr->z=270000;
+    arcptr->r=50000;
+    arcptr->sendCount=14;
+    TCGwptr++;
+
+    lineptr=(PTCGline)&TCGbuf[TCGwptr];  //直线1
+    lineptr->gnum=GCODE_01;
+    lineptr->x=-130000;
+    lineptr->z=300000;
+    lineptr->sendCount=15;
+    TCGwptr++;
+
+    mptr=(PTCGmcode)&TCGbuf[TCGwptr];
+    mptr->gnum=GCODE_40;
+    mptr->sendCount=16;
+    TCGwptr++;
+
+    lineptr=(PTCGline)&TCGbuf[TCGwptr];  //直线1
+    lineptr->gnum=GCODE_01;
+    lineptr->x=-150000;
+    lineptr->z=320000;
+    lineptr->sendCount=17;
+    TCGwptr++;
+
+    mptr=(PTCGmcode)&TCGbuf[TCGwptr];
+    mptr->gnum=GCODE_M30;
+    mptr->sendCount=18;
+    TCGwptr++;
+#endif
+}
+
+void Move_Code(void)
+{
+	Former_code=Current_code;    //当前代码写入完成区，
+	Current_code=Next_code;      //读入下条代码
+	Next_code.Full_sign=0;       //下一区代码已经读空
+	Force_Send_M_code();
+    Former_code.Send_sign=0;
+}
+
+void Cut_Cir(PRE_G_CODE Current)
+{
+  G_CODE_BUFFER[0]=Current;
+  G_CODE_BUFFER_NUM++;
+  Next_code.Full_sign=0;
+}
+
+
+void Cut_Cir_SEND(PRE_G_CODE Current)
+{
+ 
+ switch(Current.CMD1)
+ 	{
+ 	 case 2:           //顺弧
+ 	    if((Current.StartAngle>0)&&(Current.StartAngle<=90.0))   //起始角在第一象限
+        	{
+     	        if((Current.EndAngle>=0)&&(Current.EndAngle<90))  //终止角在同一象限
+     	          {
+     	       	 if(Current.EndAngle<Current.StartAngle)
+     	    	 	{
+    	 	    	  GSEND_CODE_BUFFER[0] =Current;
+                       DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		         CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+    			  return;
+     	    	 	}
+    			 else  //斩出5段来
+    			 	{
+    			 	 GSEND_CODE_BUFFER[0] =Current;
+    				 GSEND_CODE_BUFFER[0].EndAngle=0;
+    				 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;      //0角度，中点X值为终点X值
+    				 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+    				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    				 GSEND_CODE_BUFFER[1]=Current;
+    				 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+    				 GSEND_CODE_BUFFER[1].EndAngle=270;
+    				 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+    				 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+    				 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+    				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    				 GSEND_CODE_BUFFER[2]=Current;
+    				 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+    				 GSEND_CODE_BUFFER[2].EndAngle=180;
+    				 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+    				 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+    				 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+    				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    				 GSEND_CODE_BUFFER[3]=Current;
+    				 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+    				 GSEND_CODE_BUFFER[3].EndAngle=90;
+    				 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+    				 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+    				 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z;
+    				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    				 GSEND_CODE_BUFFER[4]=Current;
+    				 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+    				 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+    				 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+    				 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+    				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+    			 	}
+     	    	}
+    		else if((Current.EndAngle>=90)&&(Current.EndAngle<180))   //终止角在第二象限，斩出4段来
+    			{
+    		        GSEND_CODE_BUFFER[0]=Current;
+    			 GSEND_CODE_BUFFER[0].EndAngle=0;
+    			 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+    			 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    			 GSEND_CODE_BUFFER[1]=Current;
+    			 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+    			 GSEND_CODE_BUFFER[1].EndAngle=270;
+    			 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+    			 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+    			 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    			 GSEND_CODE_BUFFER[2]=Current;
+    			 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+    			 GSEND_CODE_BUFFER[2].EndAngle=180;
+    			 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+    			 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+    			 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    			 GSEND_CODE_BUFFER[3]=Current;
+    			 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+    			 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+    			 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+    			 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+    			}
+    		else if((Current.EndAngle>=180)&&(Current.EndAngle<270))
+    			{
+    			 GSEND_CODE_BUFFER[0]=Current;
+    			 GSEND_CODE_BUFFER[0].EndAngle=0;
+    			 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+    			 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    			 GSEND_CODE_BUFFER[1]=Current;
+    			 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+    			 GSEND_CODE_BUFFER[1].EndAngle=270;
+    			 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+    			 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+    			 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    			 GSEND_CODE_BUFFER[2]=Current;
+    			 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+    			 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+    			 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+    			 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+    			}
+    		else if(Current.EndAngle>=270)
+    			{
+    			 GSEND_CODE_BUFFER[0]=Current;
+    			 GSEND_CODE_BUFFER[0].EndAngle=0;
+    			 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+    			 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+    			 GSEND_CODE_BUFFER[1]=Current;
+    			 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+    			 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+    			 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+    			 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+    			 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+    			}
+     	}
+		else if((Current.StartAngle>90)&&(Current.StartAngle<=180))   //起始角在第二象限
+			{
+			    if((Current.EndAngle>=0)&&(Current.EndAngle<90)) //终止角在第一象限
+		 	    	{
+		 	    	 GSEND_CODE_BUFFER[0]=Current;
+				 GSEND_CODE_BUFFER[0].EndAngle=90;
+				 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+				 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[1]=Current;
+				 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+				 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+				 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+				 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+		 	    	}
+				else if((Current.EndAngle>=90)&&(Current.EndAngle<180))
+					{
+					 if(Current.EndAngle<Current.StartAngle)
+		 	    	 	{
+			 	       	 GSEND_CODE_BUFFER[0]=Current;
+                                           DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+						 return;
+		 	    	 	}
+					 else  //斩出5段来
+					 	{
+					 	 GSEND_CODE_BUFFER[0]=Current;
+						 GSEND_CODE_BUFFER[0].EndAngle=90;
+						 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+						 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[1]=Current;
+						 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+						 GSEND_CODE_BUFFER[1].EndAngle=0;
+						 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+						 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[2]=Current;
+						 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+						 GSEND_CODE_BUFFER[2].EndAngle=270;
+						 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+						 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+						 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[3]=Current;
+						 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+						 GSEND_CODE_BUFFER[3].EndAngle=180;
+						 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+						 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[4]=Current;
+						 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+						 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+						 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+						 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					    }
+					}
+				else if((Current.EndAngle>=180)&&(Current.EndAngle<270))  //终止角在第三象限
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=90;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=0;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=270;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+					 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+			
+					 GSEND_CODE_BUFFER[3]=Current;
+					 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+					 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+					 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if(Current.EndAngle>=270)
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=90;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=0;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+			
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+			}
+ 		else if((Current.StartAngle>180)&&(Current.StartAngle<=270))  //起始角在第三象限
+			{
+			    if((Current.EndAngle>=0)&&(Current.EndAngle<90))
+		 	    	{
+		 	    	 GSEND_CODE_BUFFER[0]=Current;
+				 GSEND_CODE_BUFFER[0].EndAngle=180;
+				 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+				 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[1]=Current;
+				 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+				 GSEND_CODE_BUFFER[1].EndAngle=90;
+				 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+				 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+				 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+		
+				 GSEND_CODE_BUFFER[2]=Current;
+				 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+				 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+				 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+				 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+		 	    	}
+				else if((Current.EndAngle>=90)&&(Current.EndAngle<180))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=180;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>=180)&&(Current.EndAngle<270))
+					{
+					 if(Current.EndAngle<Current.StartAngle)
+		 	    	 	{
+			 	    	  GSEND_CODE_BUFFER[0]=Current;
+                                     DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                       CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+				         return;
+		 	    	 	}
+					 else  //斩出5段来
+					 	{
+					 	 GSEND_CODE_BUFFER[0]=Current;
+						 GSEND_CODE_BUFFER[0].EndAngle=180;
+						 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[1]=Current;
+						 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+						 GSEND_CODE_BUFFER[1].EndAngle=90;
+						 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+						 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+						 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[2]=Current;
+						 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+						 GSEND_CODE_BUFFER[2].EndAngle=0;
+						 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+						 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		             			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[3]=Current;
+						 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+						 GSEND_CODE_BUFFER[3].EndAngle=270;
+						 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+						 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+						 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[4]=Current;
+						 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+						 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+						 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+						 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					 	}
+					}
+				else if(Current.EndAngle>=270)
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=180;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=90;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=0;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[3]=Current;
+					 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+					 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+					 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+			}
+		else if((Current.StartAngle>270)||(Current.StartAngle==0))  //起始角在第四象限
+			{
+			    if((Current.EndAngle>=0)&&(Current.EndAngle<90))
+		 	    	{
+		 	    	 GSEND_CODE_BUFFER[0]=Current;
+				 GSEND_CODE_BUFFER[0].EndAngle=270;
+				 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+				 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[1]=Current;
+				 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+				 GSEND_CODE_BUFFER[1].EndAngle=180;
+				 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+				 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+				 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[2]=Current;
+				 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+				 GSEND_CODE_BUFFER[2].EndAngle=90;
+				 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+				 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+				 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[3]=Current;
+				 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+				 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+				 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+				 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+		 	    	}
+				else if((Current.EndAngle>=90)&&(Current.EndAngle<180))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=270;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=180;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>=180)&&(Current.EndAngle<270))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=270;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if(Current.EndAngle>=270)
+					{
+					  if((Current.EndAngle<Current.StartAngle)||(Current.StartAngle==0))
+			 	    	 	{
+				 	     	 GSEND_CODE_BUFFER[0]=Current;
+	                                    DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+			                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					        return;
+			 	    	 	}
+					 else  //斩出5段来
+					 	{
+					 	 GSEND_CODE_BUFFER[0]=Current;
+						 GSEND_CODE_BUFFER[0].EndAngle=270;
+						 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+						 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[1]=Current;
+						 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+						 GSEND_CODE_BUFFER[1].EndAngle=180;
+						 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+						 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[2]=Current;
+						 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+						 GSEND_CODE_BUFFER[2].EndAngle=90;
+						 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+						 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+						 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[3]=Current;
+						 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+						 GSEND_CODE_BUFFER[3].EndAngle=0;
+						 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+						 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[4]=Current;
+						 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+						 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+						 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+						 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				}
+			}
+		 break;
+	 case 3:           //逆弧
+	      if((Current.StartAngle>=0)&&(Current.StartAngle<90))   //起始角在第一象限
+ 	    	{
+		 	    if((Current.EndAngle>0)&&(Current.EndAngle<=90))  //终止角在同一象限
+		 	    	{
+		 	    	 if(Current.EndAngle>Current.StartAngle)
+		 	    	 	{
+			 	    	 GSEND_CODE_BUFFER[0]=Current;
+                                    DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+						 return;
+		 	    	 	}
+					 else  //斩出5段来
+					 	{
+					 	 GSEND_CODE_BUFFER[0]=Current;
+						 GSEND_CODE_BUFFER[0].EndAngle=90;
+						 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+						 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[1]=Current;
+						 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+						 GSEND_CODE_BUFFER[1].EndAngle=180;
+						 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+						 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[2]=Current;
+						 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+						 GSEND_CODE_BUFFER[2].EndAngle=270;
+						 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+						 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+						 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[3]=Current;
+						 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+						 GSEND_CODE_BUFFER[3].EndAngle=0;
+						 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+						 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[4]=Current;
+						 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+						 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+						 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+						 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					 	}
+		 	    	}
+				else if((Current.EndAngle>90)&&(Current.EndAngle<=180))   //终止角在第二象限
+					{
+				        GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=90;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>180)&&(Current.EndAngle<=270))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=90;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=180;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                     CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>270)||(Current.EndAngle==0))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=90;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=180;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=270;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+					 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[3]=Current;
+					 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+					 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+					 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+		 	}
+		else if((Current.StartAngle>=90)&&(Current.StartAngle<180))   //起始角在第二象限
+			{
+			    if((Current.EndAngle>0)&&(Current.EndAngle<=90)) //终止角在第一象限
+		 	    	{
+		 	    	 GSEND_CODE_BUFFER[0]=Current;
+				 GSEND_CODE_BUFFER[0].EndAngle=180;
+				 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+				 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[1]=Current;
+				 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+				 GSEND_CODE_BUFFER[1].EndAngle=270;
+				 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+				 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+				 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[2]=Current;
+				 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+				 GSEND_CODE_BUFFER[2].EndAngle=0;
+				 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+				 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+				 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[3]=Current;
+				 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+				 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+				 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+				 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+		 	    	}
+				else if((Current.EndAngle>90)&&(Current.EndAngle<=180))
+					{
+					 if(Current.EndAngle>Current.StartAngle)
+		 	    	 	{
+			 	    	 GSEND_CODE_BUFFER[0]=Current;
+                                    DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+						 return;
+		 	    	 	}
+					 else  //斩出5段来
+					 	{
+					 	 GSEND_CODE_BUFFER[0]=Current;
+						 GSEND_CODE_BUFFER[0].EndAngle=180;
+						 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               		CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[1]=Current;
+						 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+						 GSEND_CODE_BUFFER[1].EndAngle=270;
+						 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+						 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+						 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		              		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[2]=Current;
+						 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+						 GSEND_CODE_BUFFER[2].EndAngle=0;
+						 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+						 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		             			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[3]=Current;
+						 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+						 GSEND_CODE_BUFFER[3].EndAngle=90;
+						 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+						 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+						 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		               		CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[4]=Current;
+						 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+						 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+						 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+						 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		               		CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					 	}
+					}
+				else if((Current.EndAngle>180)&&(Current.EndAngle<=270))  //终止角在第三象限
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=180;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+	            			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		             		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>270)||(Current.EndAngle==0))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=180;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               	 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=270;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		            		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+			}
+ 		else if((Current.StartAngle>=180)&&(Current.StartAngle<270))  //起始角在第三象限
+			{
+			    if((Current.EndAngle>0)&&(Current.EndAngle<=90))
+		 	    	{
+		 	    	 GSEND_CODE_BUFFER[0]=Current;
+				 GSEND_CODE_BUFFER[0].EndAngle=270;
+				 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+				 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[1]=Current;
+				 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+				 GSEND_CODE_BUFFER[1].EndAngle=0;
+				 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+				 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+				 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[2]=Current;
+				 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+				 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+				 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+				 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+		 	    	}
+				else if((Current.EndAngle>90)&&(Current.EndAngle<=180))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=270;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=0;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=90;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[3]=Current;
+					 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+					 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+					 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>180)&&(Current.EndAngle<=270))
+					{
+					 if(Current.EndAngle>Current.StartAngle)
+		 	    	 	{
+			 	    	  GSEND_CODE_BUFFER[0]=Current;
+                                     DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                       CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+						 return;
+		 	    	 	}
+					 else  //斩出5段来
+					 	{
+					 	 GSEND_CODE_BUFFER[0]=Current;
+						 GSEND_CODE_BUFFER[0].EndAngle=270;
+						 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+						 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		             			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[1]=Current;
+						 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+						 GSEND_CODE_BUFFER[1].EndAngle=0;
+						 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+						 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               		CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[2]=Current;
+						 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+						 GSEND_CODE_BUFFER[2].EndAngle=90;
+						 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+						 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+						 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z;
+						DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		               		CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[3]=Current;
+						 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+						 GSEND_CODE_BUFFER[3].EndAngle=180;
+						 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+						 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		               		CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[4]=Current;
+						 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+						 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+						 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+						 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		               		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					 	}
+					}
+				else if((Current.EndAngle>270)||(Current.EndAngle==0))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=270;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               	 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+			}
+		else if(Current.StartAngle>=270)  //起始角在第四象限
+			{
+			    if((Current.EndAngle>0)&&(Current.EndAngle<=90))
+		 	    	{
+		 	    	 GSEND_CODE_BUFFER[0]=Current;
+				 GSEND_CODE_BUFFER[0].EndAngle=0;
+				 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+				 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+				 GSEND_CODE_BUFFER[1]=Current;
+				 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+				 GSEND_CODE_BUFFER[1].EndAngle=Current.EndAngle;
+				 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+				 GSEND_CODE_BUFFER[1].EndPoint=Current.EndPoint;
+				 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+		 	    	}
+				else if((Current.EndAngle>90)&&(Current.EndAngle<=180))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=0;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		           		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=90;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		              	 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		            		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>180)&&(Current.EndAngle<=270))
+					{
+					 GSEND_CODE_BUFFER[0]=Current;
+					 GSEND_CODE_BUFFER[0].EndAngle=0;
+					 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		           		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[1]=Current;
+					 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+					 GSEND_CODE_BUFFER[1].EndAngle=90;
+					 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+					 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+					 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		              	 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[2]=Current;
+					 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+					 GSEND_CODE_BUFFER[2].EndAngle=180;
+					 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+					 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+					 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		                      CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+					 GSEND_CODE_BUFFER[3]=Current;
+					 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+					 GSEND_CODE_BUFFER[3].EndAngle=Current.EndAngle;
+					 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+					 GSEND_CODE_BUFFER[3].EndPoint=Current.EndPoint;
+					 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		             	        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+				else if((Current.EndAngle>270)||(Current.EndAngle==0))
+					{
+					  if((Current.EndAngle>Current.StartAngle)||(Current.EndAngle==0))
+		 	    	 	{
+			 	         GSEND_CODE_BUFFER[0]=Current;
+                                     DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		                       CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+						 return;
+		 	    	 	}
+					 else  //斩出5段来
+					 	{
+					 	 GSEND_CODE_BUFFER[0]=Current;
+						 GSEND_CODE_BUFFER[0].EndAngle=0;
+						 GSEND_CODE_BUFFER[0].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[0].EndPoint.Z=Current.CenterPoint.Z+Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[0]);                      //代码写入发送缓冲区
+		              		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[1]=Current;
+						 GSEND_CODE_BUFFER[1].StartAngle=GSEND_CODE_BUFFER[0].EndAngle;
+						 GSEND_CODE_BUFFER[1].EndAngle=90;
+						 GSEND_CODE_BUFFER[1].StartPoint=GSEND_CODE_BUFFER[0].EndPoint;
+						 GSEND_CODE_BUFFER[1].EndPoint.X=Current.CenterPoint.X+Current.Radius;
+						 GSEND_CODE_BUFFER[1].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[1]);                      //代码写入发送缓冲区
+		              		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[2]=Current;
+						 GSEND_CODE_BUFFER[2].StartAngle=GSEND_CODE_BUFFER[1].EndAngle;
+						 GSEND_CODE_BUFFER[2].EndAngle=180;
+						 GSEND_CODE_BUFFER[2].StartPoint=GSEND_CODE_BUFFER[1].EndPoint;
+						 GSEND_CODE_BUFFER[2].EndPoint.X=Current.CenterPoint.X;
+						 GSEND_CODE_BUFFER[2].EndPoint.Z=Current.CenterPoint.Z-Current.Radius;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[2]);                      //代码写入发送缓冲区
+		           			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[3]=Current;
+						 GSEND_CODE_BUFFER[3].StartAngle=GSEND_CODE_BUFFER[2].EndAngle;
+						 GSEND_CODE_BUFFER[3].EndAngle=270;
+						 GSEND_CODE_BUFFER[3].StartPoint=GSEND_CODE_BUFFER[2].EndPoint;
+						 GSEND_CODE_BUFFER[3].EndPoint.X=Current.CenterPoint.X-Current.Radius;
+						 GSEND_CODE_BUFFER[3].EndPoint.Z=Current.CenterPoint.Z;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[3]);                      //代码写入发送缓冲区
+		              		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+
+						 GSEND_CODE_BUFFER[4]=Current;
+						 GSEND_CODE_BUFFER[4].StartAngle=GSEND_CODE_BUFFER[3].EndAngle;
+						 GSEND_CODE_BUFFER[4].EndAngle=Current.EndAngle;
+						 GSEND_CODE_BUFFER[4].StartPoint=GSEND_CODE_BUFFER[3].EndPoint;
+						 GSEND_CODE_BUFFER[4].EndPoint=Current.EndPoint;
+						 DGbuf[DGwptr]=Send_DGbuf(GSEND_CODE_BUFFER[4]);                      //代码写入发送缓冲区
+		                             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+					}
+			}
+		break;
+	 default:break;
+ 	}
+   }
+ }
+
+// 改变刀补方向和刀补 r 值时需调用此函数更新偏移量
+void ToolDirInit()
+{
+    if(System_CutDirection==1) //左刀补
+    {
+        switch( tool_dir)
+        {
+            case(1):
+                tooldir_x=tool_r;
+                tooldir_z=tool_r;
+                break;
+            case(2):
+                tooldir_x=tool_r;
+                tooldir_z=0-tool_r;            
+                break;
+            case(3):
+                tooldir_x=0-tool_r;
+                tooldir_z=0-tool_r;                
+                break;
+            case(4):
+                tooldir_x=0-tool_r;
+                tooldir_z=tool_r;            
+                break;
+            case(5):
+                tooldir_x=0;
+                tooldir_z=tool_r;             
+                break;
+            case(6):
+                tooldir_x=tool_r;
+                tooldir_z=0;                 
+                break;
+            case(7):
+                tooldir_x=0;
+                tooldir_z=0-tool_r; 
+                break;
+            case(8):
+                tooldir_x=0-tool_r;
+                tooldir_z=0;             
+                break;
+            default: //0,9
+                tooldir_x=0;
+                tooldir_z=0;
+        }
+    }
+    else if(System_CutDirection==2)
+    {
+        switch( tool_dir)
+        {
+            case(1):
+                tooldir_x=tool_r;
+                tooldir_z=tool_r;
+                break;
+            case(2):
+                tooldir_x=tool_r;
+                tooldir_z=0-tool_r;            
+                break;
+            case(3):
+                tooldir_x=0-tool_r;
+                tooldir_z=0-tool_r;                
+                break;
+            case(4):
+                tooldir_x=0-tool_r;
+                tooldir_z=tool_r;            
+                break;
+            case(5):
+                tooldir_x=0;
+                tooldir_z=tool_r;             
+                break;
+            case(6):
+                tooldir_x=tool_r;
+                tooldir_z=0;                 
+                break;
+            case(7):
+                tooldir_x=0;
+                tooldir_z=0-tool_r; 
+                break;
+            case(8):
+                tooldir_x=0-tool_r;
+                tooldir_z=0;             
+                break;
+            default: //0,9
+                tooldir_x=0;
+                tooldir_z=0;
+        }
+    }
+}
+// 加上刀尖角方向的偏移量
+
+
+//-----------将翻译好的G代码处理成插补用的格式-------
+//-----------入口:TCGbuf_deal全局变量----------------
+//-----------出口:Cal_code数组-----------------------
+// by vinge 新的修订后fullsign的检查在deal_tcgbuf里已经没用了
+// 只是暂时保持其原貌，不合并if else的
+ void Deal_TCGbuf(void)
+   {
+	 PTCGline  TCGlineptr;
+	 PTCGfst   TCGfstptr;
+	 switch(TCGbuf_deal.gnum)
+	 	{
+	 	 case 0:
+	 	 case 1:  //直线
+	 	    TCGlineptr=(PTCGline)&TCGbuf_deal;
+	 	if(Current_code.Full_sign==0) //为第一条代码,起点就为0
+	 		{
+	 		 Cal_code.CMD1=TCGlineptr->gnum;
+	 		 Cal_code.StartPoint=Current_code.EndPoint;
+	 		 //Cal_code.StartPoint.Z=OverallSign.ABS_Coordinate.Z;
+			 //Cal_code.StartPoint.X=OverallSign.ABS_Coordinate.X; 
+			 Cal_code.EndPoint.Y=TCGlineptr->y;//+tool_del_z;
+			 Cal_code.EndPoint.Z=TCGlineptr->z;//+tool_del_z;
+			 Cal_code.EndPoint.X=TCGlineptr->x;//+tool_del_x;     //刀偏值加了以后再算角度
+			 Cal_code.StartAngle=Cal_line_angle(Cal_code.StartPoint,Cal_code.EndPoint);
+			 Cal_code.EndAngle=Cal_code.StartAngle;
+			 Cal_code.CutDirection=System_CutDirection;
+			 
+			 Cal_code.SendCount=TCGlineptr->sendCount;
+			 Cal_code.srcLine=TCGlineptr->srcLine;
+			 Cal_code.srcCode=TCGlineptr->srcCode;
+			 Cal_code.Full_sign=1;
+	 		}
+		else 
+			{
+			 Cal_code.CMD1=TCGlineptr->gnum;
+			 Cal_code.StartPoint=Current_code.EndPoint;  //否则上条代码的末点就为当前条的起点
+			 Cal_code.EndPoint.Z=TCGlineptr->z;//+tool_del_z;
+			 Cal_code.EndPoint.X=TCGlineptr->x;//+tool_del_x; 
+			 Cal_code.EndPoint.Y=TCGlineptr->y;//+tool_del_x; 
+			 Cal_code.StartAngle=Cal_line_angle(Cal_code.StartPoint,Cal_code.EndPoint);
+			 Cal_code.EndAngle=Cal_code.StartAngle;
+			 Cal_code.CutDirection=System_CutDirection;
+			 Cal_code.SendCount=TCGlineptr->sendCount;
+			 Cal_code.srcLine=TCGlineptr->srcLine;
+			 Cal_code.srcCode=TCGlineptr->srcCode;
+			 Cal_code.Full_sign=1;
+			}
+		G_CODE_BUFFER[0]=Cal_code;
+		G_CODE_BUFFER_NUM++;
+		Trace_Record_Data(TCGbuf_deal.gnum,Cal_code.StartPoint.X,Cal_code.StartPoint.Z,Cal_code.EndPoint.X,Cal_code.EndPoint.Z,0,0,0,0,0);
+	 	break;
+	 case 2:  //顺圆 
+	 	if(Current_code.Full_sign==0) //为第一条代码，此情况不可能，不能最开始发一条圆弧
+	 		{
+	 		 //Cal_code.StartPoint.Z=OverallSign.ABS_Coordinate.Z;
+			 //Cal_code.StartPoint.X=OverallSign.ABS_Coordinate.X; 
+			 Cal_code.StartPoint=Current_code.EndPoint;
+			 Cal_code.EndPoint.Z=TCGbuf_deal.z;//+tool_del_z;
+			 Cal_code.EndPoint.X=TCGbuf_deal.x;//+tool_del_x; 
+			 Cal_code.EndPoint.Y=TCGbuf_deal.y;//+tool_del_x; 
+             Cal_code.CMD1=2;
+			 if(TCGbuf_deal.r!=0)
+			 	{
+			 	 Cal_code.Radius=TCGbuf_deal.r;
+			     Cal_Cir_Center(&Cal_code);
+			 	}
+			 else
+			 	{
+			 	 Cal_code.CenterPoint.X=Cal_code.StartPoint.X+TCGbuf_deal.i;
+			     Cal_code.CenterPoint.Z=Cal_code.StartPoint.Z+TCGbuf_deal.k;
+				 Cal_code.Radius=sqrt(pow((FLOAT64)(Cal_code.EndPoint.Z-Cal_code.CenterPoint.Z),2)+pow((FLOAT64)(Cal_code.EndPoint.X-Cal_code.CenterPoint.X),2));
+			 	}
+			 Cal_code.StartAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.StartPoint);
+			 Cal_code.EndAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.EndPoint);
+			 Cal_code.CutDirection=System_CutDirection;
+			 Cal_code.SendCount=TCGbuf_deal.sendCount;
+			 Cal_code.srcLine=TCGbuf_deal.srcLine;
+			 Cal_code.srcCode=TCGbuf_deal.srcCode;
+			 Cal_code.Full_sign=1;
+			 Cut_Cir(Cal_code);
+	 		}
+		else 
+			{
+			 Cal_code.StartPoint=Current_code.EndPoint;
+			 Cal_code.EndPoint.Z=TCGbuf_deal.z;//+tool_del_z;
+			 Cal_code.EndPoint.X=TCGbuf_deal.x;//+tool_del_x; 
+			 Cal_code.EndPoint.Y=TCGbuf_deal.y;//+tool_del_x; 
+			 Cal_code.CMD1=2;
+			 if(TCGbuf_deal.r!=0)
+			 	{
+			 	 Cal_code.Radius=TCGbuf_deal.r;
+			     Cal_Cir_Center(&Cal_code);
+			 	}
+			 else
+			 	{
+			 	 Cal_code.CenterPoint.X=Cal_code.StartPoint.X+TCGbuf_deal.i;
+			     Cal_code.CenterPoint.Z=Cal_code.StartPoint.Z+TCGbuf_deal.k;
+				 Cal_code.Radius=sqrt(pow((FLOAT64)(Cal_code.EndPoint.Z-Cal_code.CenterPoint.Z),2)+pow((FLOAT64)(Cal_code.EndPoint.X-Cal_code.CenterPoint.X),2));
+			 	}
+			 Cal_code.StartAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.StartPoint);
+			 Cal_code.EndAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.EndPoint);
+			 Cal_code.CutDirection=System_CutDirection;
+			 Cal_code.SendCount=TCGbuf_deal.sendCount;
+			 Cal_code.srcLine=TCGbuf_deal.srcLine;
+			 Cal_code.srcCode=TCGbuf_deal.srcCode;
+			 Cal_code.Full_sign=1;
+			 Cut_Cir(Cal_code);    //斩的分段圆弧中继承了同一 SEND_COUNT
+			}
+		Trace_Record_Data(TCGbuf_deal.gnum,Cal_code.StartPoint.X,Cal_code.StartPoint.Z,Cal_code.EndPoint.X,Cal_code.EndPoint.Z,Cal_code.CenterPoint.X,Cal_code.CenterPoint.Z,Cal_code.StartAngle*1000,Cal_code.EndAngle*1000,Cal_code.Radius);
+	 	break;
+	 case 3:  //逆圆
+	 	if(Current_code.Full_sign==0) //为第一条代码
+	 		{
+	 		 //Cal_code.StartPoint.Z=OverallSign.ABS_Coordinate.Z;   //当前坐标值为起点
+			 //Cal_code.StartPoint.X=OverallSign.ABS_Coordinate.X;   //
+             Cal_code.StartPoint=Current_code.EndPoint;   
+			 Cal_code.EndPoint.Z=TCGbuf_deal.z;//+tool_del_z;
+			 Cal_code.EndPoint.X=TCGbuf_deal.x;//+tool_del_x; 
+			 Cal_code.EndPoint.Y=TCGbuf_deal.y;//+tool_del_x; 
+			 Cal_code.CMD1=3;
+			 if(TCGbuf_deal.r!=0)
+			 	{
+			 	 Cal_code.Radius=TCGbuf_deal.r;
+			     Cal_Cir_Center(&Cal_code);
+			 	}
+			 else
+			 	{
+			 	 Cal_code.CenterPoint.X=Cal_code.StartPoint.X+TCGbuf_deal.i;
+			     Cal_code.CenterPoint.Z=Cal_code.StartPoint.Z+TCGbuf_deal.k;
+				 Cal_code.Radius=sqrt(pow((FLOAT64)(Cal_code.EndPoint.Z-Cal_code.CenterPoint.Z),2)+pow((FLOAT64)(Cal_code.EndPoint.X-Cal_code.CenterPoint.X),2));
+			 	}
+			 Cal_code.StartAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.StartPoint);
+			 Cal_code.EndAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.EndPoint);
+			 Cal_code.CutDirection=System_CutDirection;
+			 Cal_code.SendCount=TCGbuf_deal.sendCount;
+			 Cal_code.srcLine=TCGbuf_deal.srcLine;
+			 Cal_code.srcCode=TCGbuf_deal.srcCode;
+			 Cal_code.Full_sign=1;
+			 Cut_Cir(Cal_code);
+	 		}
+		else 
+			{
+			 Cal_code.StartPoint=Current_code.EndPoint;
+			 Cal_code.EndPoint.Z=TCGbuf_deal.z;//+tool_del_z;
+			 Cal_code.EndPoint.X=TCGbuf_deal.x;//+tool_del_x; 
+			 Cal_code.EndPoint.Y=TCGbuf_deal.y;//+tool_del_x; 
+			 Cal_code.CMD1=3;
+			 if(TCGbuf_deal.r!=0)
+			 	{
+			 	 Cal_code.Radius=TCGbuf_deal.r;
+			     Cal_Cir_Center(&Cal_code);
+			 	}
+			 else
+			 	{
+			 	 Cal_code.CenterPoint.X=Cal_code.StartPoint.X+TCGbuf_deal.i;
+			     Cal_code.CenterPoint.Z=Cal_code.StartPoint.Z+TCGbuf_deal.k;
+				 Cal_code.Radius=sqrt(pow((FLOAT64)(Cal_code.EndPoint.Z-Cal_code.CenterPoint.Z),2)+pow((FLOAT64)(Cal_code.EndPoint.X-Cal_code.CenterPoint.X),2));
+			 	}
+			 Cal_code.StartAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.StartPoint);
+			 Cal_code.EndAngle=Cal_line_angle(Cal_code.CenterPoint,Cal_code.EndPoint);
+			 Cal_code.CutDirection=System_CutDirection;
+			 Cal_code.SendCount=TCGbuf_deal.sendCount;
+			 Cal_code.srcLine=TCGbuf_deal.srcLine;
+			 Cal_code.srcCode=TCGbuf_deal.srcCode;
+			 Cal_code.Full_sign=1;
+			 Cut_Cir(Cal_code);
+			}
+		Trace_Record_Data(TCGbuf_deal.gnum,Cal_code.StartPoint.X,Cal_code.StartPoint.Z,Cal_code.EndPoint.X,Cal_code.EndPoint.Z,Cal_code.CenterPoint.X,Cal_code.CenterPoint.Z,Cal_code.StartAngle*1000,Cal_code.EndAngle*1000,Cal_code.Radius);
+	 	break;
+	 case 40:
+	 	System_CutDirection=0;  //取消刀补
+	 	break;
+	 case 41:
+	 	System_CutDirection=1;  //左刀补
+	 	ToolDirInit();
+	 	break;
+	 case 42:
+	 	System_CutDirection=2;  //右刀补
+	 	ToolDirInit();
+	 	break;
+	 case 45:
+	    System_CutDirectionBackup=System_CutDirection;
+	    System_CutDirection=0;
+	    break;
+	 case 46:
+	    System_CutDirection=System_CutDirectionBackup;
+	    ToolDirInit();
+	    break;
+	 /*
+	 case 50:
+		if(Current_code.Full_sign!=0)
+ 	    {
+ 	    	Current_code.EndPoint.Z=TCGbuf_deal.z;
+ 	    	Current_code.EndPoint.X=TCGbuf_deal.x;
+ 	    }
+ 	    break;
+ 	    */
+	 case GCODE_T:    //刀具补偿值
+	 	{  //直接使用m30m31的方法把换刀前的代码都发送出去
+    		 Former_code.Full_sign=0;
+    		 if(Current_code.Full_sign!=0)
+    		 {
+    	 	 	 if((Current_code.CMD1 == 2)||(Current_code.CMD1 == 3))
+    	 	 	 {
+                     Cut_Cir_SEND(Current_code);
+    	 	 	 }else{
+        			 DGbuf[DGwptr]=Send_DGbuf(Current_code);  //代码写入发送缓冲区
+                     CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);       //发送区
+    	 	 	 }    	 	 
+                 Current_code.Full_sign=0;		 
+    		 }
+    		 if(Next_code.Full_sign!=0)
+    		 {
+    	 	 	 if((Next_code.CMD1 == 2)||(Next_code.CMD1 == 3))
+    	 	 	 {
+                     Cut_Cir_SEND(Next_code);
+    	 	 	 }else{
+        			 DGbuf[DGwptr]=Send_DGbuf(Next_code);  //代码写入发送缓冲区
+                     CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);       //发送区
+    	 	 	 }    	 	 
+                 Next_code.Full_sign=0;
+		    }
+        	{
+        	 	U8 cpIndex;
+        	 	TCGfstptr=(PTCGfst)&TCGbuf_deal;
+        	 	cpIndex=TCGfstptr->value%100;
+        	 	tool_r=toolCompensation[cpIndex].r;
+        	 	tool_dir=toolCompensation[cpIndex].tdir;
+        	 	ToolDirInit();
+        	 	Current_code.EndPoint.Z=TCGfstptr->coordz;
+         	    Current_code.EndPoint.X=TCGfstptr->coordx;
+         	    Current_code.EndPoint.Y=TCGfstptr->coordy;
+    		//tool_del_x=toolCompensation[cpIndex].x;  //
+    		//tool_del_z=toolCompensation[cpIndex].z;  //
+    		}
+		}
+	 	break;
+	 case GCODE_LOCATE:
+		 Former_code.Full_sign=0;
+		 if(Current_code.Full_sign!=0)
+		 {
+			 if((Current_code.CMD1 == 2)||(Current_code.CMD1 == 3))
+			 {
+				 Cut_Cir_SEND(Current_code);
+			 }else{
+				 DGbuf[DGwptr]=Send_DGbuf(Current_code);  //代码写入发送缓冲区
+				 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);       //发送区
+			 }    	 	 
+			 Current_code.Full_sign=0;		 
+		 }
+		 if(Next_code.Full_sign!=0)
+		 {
+			 if((Next_code.CMD1 == 2)||(Next_code.CMD1 == 3))
+			 {
+				 Cut_Cir_SEND(Next_code);
+			 }else{
+				 DGbuf[DGwptr]=Send_DGbuf(Next_code);  //代码写入发送缓冲区
+				 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);       //发送区
+			 }    	 	 
+			 Next_code.Full_sign=0;
+		}
+		{
+			TCGfstptr=(PTCGfst)&TCGbuf_deal;
+			Current_code.EndPoint.Z=TCGfstptr->coordz;
+			Current_code.EndPoint.X=TCGfstptr->coordx;
+			Current_code.EndPoint.Y=TCGfstptr->coordy;
+		}
+	 	break;
+	 case GCODE_M30:
+	 case GCODE_M31://M31可跟在子程序调用后，用于暂时取消刀补
+	 	{
+		 Former_code.Full_sign=0;
+		 if(Current_code.Full_sign!=0)
+		 {
+	 	 	 if((Current_code.CMD1 == 2)||(Current_code.CMD1 == 3))
+	 	 	 {
+                 Cut_Cir_SEND(Current_code);
+	 	 	 }else{
+    			 DGbuf[DGwptr]=Send_DGbuf(Current_code);  //代码写入发送缓冲区
+                 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);       //发送区
+	 	 	 }    	 	 
+             Current_code.Full_sign=0;		 
+		 }
+		 if(Next_code.Full_sign!=0)
+		 {
+	 	 	 if((Next_code.CMD1 == 2)||(Next_code.CMD1 == 3))
+	 	 	 {
+                 Cut_Cir_SEND(Next_code);
+	 	 	 }else{
+    			 DGbuf[DGwptr]=Send_DGbuf(Next_code);  //代码写入发送缓冲区
+                 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);       //发送区
+	 	 	 }    	 	 
+             Next_code.Full_sign=0;
+	 	 }
+	 	}
+	 	break;
+	 default:break;
+	 	}
+	}
+	
+//---------将已经进行补偿好的代码转换成发送区格式-------
+//---------入口:已经补偿好的分解单元--------------------
+//---------出口:转换成输出缓冲区的格式------------------
+TDGBarc Send_DGbuf(PRE_G_CODE SEND_DATE)
+{
+     U8 index;
+     TDGBarc DG_Send_data;
+     PDGBline line=(PDGBline)&DG_Send_data;
+     U32 sendCount;
+     if(tooldir_flag==1) //在刀尖补偿模式下，要加上刀尖r偏置。
+     {
+         switch(SEND_DATE.CMD1)
+         {
+             case 0:
+             case 1:
+                SEND_DATE.EndPoint.X+=tooldir_x;
+                SEND_DATE.EndPoint.Z+=tooldir_z;
+             	break;
+             case 2:
+             case 3:
+                SEND_DATE.EndPoint.X+=tooldir_x;
+                SEND_DATE.EndPoint.Z+=tooldir_z;
+                SEND_DATE.CenterPoint.X+=tooldir_x;
+                SEND_DATE.CenterPoint.Z+=tooldir_z;
+                break;
+             default:
+                break;
+         }
+     }
+	 
+     switch(SEND_DATE.CMD1)
+     {
+     case 0:
+     case 1:
+     //case 50:
+     	line->gnum=SEND_DATE.CMD1;
+    	line->x=SEND_DATE.EndPoint.X;
+    	line->z=SEND_DATE.EndPoint.Z;
+    	line->y=SEND_DATE.EndPoint.Y;
+    	line->sendCount=SEND_DATE.SendCount;
+    	//index=SEND_DATE.SendCount%SENDED_BUF_MAX;
+    	line->srcLine=SEND_DATE.srcLine;
+    	line->srcCode=SEND_DATE.srcCode;
+    	//STDsendcount=SEND_DATE.SendCount;
+    	//if(SEND_DATE.CMD1!=50)
+    	//{
+        //    coordGend[index].x=line->x;
+        //    coordGend[index].z=line->z; 
+        //}
+        
+        DEBUGMSG(2,"tcp line:%x,x%d, z%d sendcount %d\n",
+        line->gnum,line->x,line->z,line->sendCount);
+     	break;
+     case 2:
+     case 3:
+     	DG_Send_data.gnum=SEND_DATE.CMD1;
+    	DG_Send_data.x=SEND_DATE.EndPoint.X;
+    	DG_Send_data.z=SEND_DATE.EndPoint.Z;
+    	DG_Send_data.y=SEND_DATE.EndPoint.Y;
+    	DG_Send_data.i=SEND_DATE.CenterPoint.X;
+    	DG_Send_data.k=SEND_DATE.CenterPoint.Z;
+    	DG_Send_data.r=SEND_DATE.Radius;
+    	DG_Send_data.s=SEND_DATE.StartAngle*1000;
+    	DG_Send_data.enagle=SEND_DATE.EndAngle*1000;
+    	DG_Send_data.sendCount=SEND_DATE.SendCount;
+    	//index=SEND_DATE.SendCount%SENDED_BUF_MAX;
+    	DG_Send_data.srcLine=SEND_DATE.srcLine;
+    	DG_Send_data.srcCode=SEND_DATE.srcCode;
+    	//STDsendcount=SEND_DATE.SendCount;
+        //coordGend[index].x=DG_Send_data.x;
+        //coordGend[index].z=DG_Send_data.z; 
+        DEBUGMSG(2,"tcp arc:%x, x%d, z%d, i%d, k%d, r%d, s%d, e%d, sendcount %d\n",
+        DG_Send_data.gnum,DG_Send_data.x,DG_Send_data.z,DG_Send_data.i,
+        DG_Send_data.k,DG_Send_data.r,DG_Send_data.s,DG_Send_data.e,DG_Send_data.sendCount);
+        break;
+     default:
+        ALARM_GRP1|=ALM_GRP1_GCODE_UNDEF;
+        gexecState=GEXEC_EXERR;
+//        PLC_NCSTAT_AUTOSTOP;
+        DEBUGMSG(2,"unKown gcode in tool compent, 0x%x\n",SEND_DATE.CMD1);
+        break;
+     }
+     return DG_Send_data;
+}
+//发送M FST代码到DG缓冲区
+void SendMFST(PTCGarc ptcgArc)
+{
+    U8 index,index1;
+    TDGBarc DG_Send_data;
+    PDGBmfst fstptr=(PDGBmfst)&DG_Send_data;
+    PDGBmfst mptr=(PDGBmfst)&DG_Send_data;
+    PDGBline line=(PDGBline)&DG_Send_data;
+    PTCGfst ptcgfst;
+    PTCGmcode ptcgm;
+    PTCGline ptcgline;
+    switch(ptcgArc->gnum)
+    {
+        case(GCODE_F):
+        case(GCODE_S):
+        case(GCODE_SCREW):
+        case(GCODE_T):
+        case(GCODE_04):
+        case(GCODE_M50):
+		case(GCODE_M65):
+        case(GCODE_54):
+        case(GCODE_96):
+        case(GCODE_97):
+        case(GCODE_98):
+        case(GCODE_99):
+        case (GCODE_M253):
+            ptcgfst=(PTCGfst)ptcgArc;
+            fstptr->gnum=ptcgfst->gnum;
+            fstptr->value=ptcgfst->value;
+            fstptr->sendCount=ptcgfst->sendCount;
+            fstptr->srcLine=ptcgfst->srcLine;
+            fstptr->srcCode=ptcgfst->srcCode;
+            //STDsendcount=fstptr->sendCount;
+            //index=(fstptr->sendCount-1)%SENDED_BUF_MAX;
+            //index1=(index+1)%SENDED_BUF_MAX;
+            //coordGend[index1]=coordGend[index];
+            *((PDGBmfst)&DGbuf[DGwptr])=*fstptr;
+            DEBUGMSG(2,"tcp fst:%x, val %d,sendcount %d\n",
+                fstptr->gnum,fstptr->value,fstptr->sendCount);
+            CYCLE_BUF_WINC(DGwptr, DG_BUF_MAX);
+            break;
+        case (GCODE_M00):
+        case (GCODE_M03):
+        case (GCODE_M04):
+        case (GCODE_M05):
+        //case (GCODE_M06):
+        //case (GCODE_M07):
+        case (GCODE_M08):
+        case (GCODE_M09):
+        case (GCODE_M10):
+        case (GCODE_M11):
+        case (GCODE_M12):
+        case (GCODE_M13):
+        case (GCODE_M19):
+        case (GCODE_M30):
+        case (GCODE_M32):
+        case (GCODE_M33):
+        case (GCODE_M41):
+        case (GCODE_M42):
+        case (GCODE_M43):
+        case (GCODE_M44):
+        case (GCODE_M254):
+        case (GCODE_M255):
+	    case (GCODE_20):
+		case (GCODE_21):
+        case (GCODE_40):
+        case (GCODE_41):
+        case (GCODE_42):
+            ptcgm=(PTCGmcode)ptcgArc;
+            mptr->gnum=ptcgm->gnum;
+            //dgm.gnum|=0x6500;
+            mptr->sendCount=ptcgm->sendCount; 
+            mptr->srcLine=ptcgm->srcLine;
+            mptr->srcCode=ptcgm->srcCode;
+            if((ptcgm->gnum==GCODE_41)||(ptcgm->gnum==GCODE_42))
+            {
+                tooldir_flag=1;
+            }else if(ptcgm->gnum==GCODE_40)
+            {
+                tooldir_flag=0;
+            }
+            //STDsendcount=mptr->sendCount;
+            //index=(mptr->sendCount-1)%SENDED_BUF_MAX;
+            //index1=(index+1)%SENDED_BUF_MAX;
+            //coordGend[index1]=coordGend[index];               
+            *((PDGBmfst)&DGbuf[DGwptr])=*mptr;
+            DEBUGMSG(2,"tcp m:%x, sencount %d\n",mptr->gnum,mptr->sendCount);
+            CYCLE_BUF_WINC(DGwptr, DG_BUF_MAX);
+            break;
+        case (GCODE_45): //stop g41g42 temply
+            tooldir_flag=0;
+            break;
+        case (GCODE_46): //restart g41 g42
+            tooldir_flag=1;
+            break;
+        case (GCODE_LOCATE): 
+            break;
+        case (GCODE_50):
+            ptcgline=(PTCGmcode)ptcgArc;
+            line->gnum=ptcgline->gnum;
+        	line->x=ptcgline->x;
+        	line->z=ptcgline->z;
+        	line->y=ptcgline->y;
+        	line->sendCount=ptcgline->sendCount;
+        	line->srcLine=ptcgline->srcLine;
+        	line->srcCode=ptcgline->srcCode;
+            Finished_G.EndPoint.X=line->x;
+            Finished_G.EndPoint.Z=line->z;
+            Finished_G.EndPoint.Y=line->y;
+            *((PDGBline)&DGbuf[DGwptr])=*line;
+            CYCLE_BUF_WINC(DGwptr, DG_BUF_MAX);
+            DEBUGMSG(2,"tcp line:%x,x%d, z%d sendcount %d\n",
+            line->gnum,line->x,line->z,line->sendCount);
+            break;
+        case(GCODE_M31):
+            break;
+        default:
+            ALARM_GRP1|=ALM_GRP1_GCODE_UNDEF;
+            gexecState=GEXEC_EXERR;
+//            PLC_NCSTAT_AUTOSTOP;
+            DEBUGMSG(2,"unKown gcode in tool compent, 0x%x\n",ptcgArc->gnum);
+            break;
+    }
+}
+
+//----对圆弧做标准变换，因为圆弧的G代码是给两种类型，需要统一-------
+//---------入口:Cal_code单元，圆弧半径值,圆弧转向------------
+//---------出口:圆心坐标值---------------------------
+ void Cal_Cir_Center(PRE_G_CODE *Cal_Point)
+     {
+      FLOAT64 R1,R2,Real_r;
+      FLOAT64 Angle;
+      FLOAT64 Middle_x,Middle_z;
+	  Real_r=(FLOAT64)Cal_Point->Radius;
+	  Middle_x=((FLOAT64)Cal_Point->StartPoint.X+(FLOAT64)Cal_Point->EndPoint.X)/2;
+	  Middle_z=((FLOAT64)Cal_Point->StartPoint.Z+(FLOAT64)Cal_Point->EndPoint.Z)/2;
+	  R1=sqrt(pow(((FLOAT64)Cal_Point->EndPoint.X-Middle_x),2)+pow(((FLOAT64)Cal_Point->EndPoint.Z-Middle_z),2));
+	  R2=sqrt(Real_r*Real_r-R1*R1);
+	  if(Cal_Point->CMD1==2)
+	     Angle=Cal_line_angle(Cal_Point->StartPoint,Cal_Point->EndPoint);  //顺圆弧
+	  else 
+	  	 Angle=Cal_line_angle(Cal_Point->EndPoint,Cal_Point->StartPoint);  //逆弧要反向
+	  Cal_Point->CenterPoint.Z=round(Middle_z+R2*sin(Angle*PI/180));
+	  Cal_Point->CenterPoint.X=round(Middle_x-R2*cos(Angle*PI/180));
+     }
+
+
+//计算直线的矢量角度，即以终点减起点的角度,角度范围[0，360)
+//入口:起点坐标结构体，终点坐标结构体
+//出口:该条代码的起始矢量角度
+FLOAT64 Cal_line_angle(INT40AXIS St_Point,INT40AXIS End_Point)   
+{
+	 FLOAT64 angle;
+	 FLOAT64 delt_x;
+	 FLOAT64 delt_z;
+	 FLOAT64 delt;
+	 
+	 delt_x=End_Point.X-St_Point.X;
+	 delt_z=End_Point.Z-St_Point.Z;
+	
+     if((delt_x==0)&&(delt_z==0))
+ 	   angle=0;
+	 if(delt_x==0)
+	 	{
+	 	 if(delt_z>0)
+	 	   angle=0;
+		 else 
+		   angle=180;
+	 	}
+	 if(delt_z==0)
+	 	{
+	 	 if(delt_x>0)
+	 	    angle=90;
+		 else
+		 	angle=270;    //
+	 	}
+	 if(delt_z<0)   //第2、3象限
+	 	{
+	 	 angle=atan(delt_x/delt_z);  //弧度
+	 	 angle=angle*180/PI;               //角度
+		 angle+=180;                       //转到实际象限去
+	 	} 
+	 if((delt_z>0)&&(delt_x>0))   //第1象限
+	 	{
+	 	 angle=atan(delt_x/delt_z);     //弧度
+	 	 angle=angle*180/PI;
+	 	}
+	 if((delt_z>0)&&(delt_x<0))   //第4现象
+	 	{
+	 	 angle=atan(delt_x/delt_z);     //弧度
+	 	 angle=angle*180/PI;
+		 angle+=360;
+	 	}
+	 return angle;
+}
+
+
+//---------------转接类型判断函数------------------
+//入口:线型1的矢量角，线型2的矢量角，线型1的类别0，1直线，2顺圆，3逆圆,线型2的类别，加工方向，1为左刀补，2为右刀补
+//出口:两个代码之间的过渡类型 0 缩短型，1 伸长型，2，插入型
+U8 Judge_move_type(PRE_G_CODE Current,PRE_G_CODE Next)
+{
+  FLOAT64 del_angle;
+  FLOAT64 Angle1,Angle2;
+  U8    tool_compen_type;    //刀补类型 0 缩短 1伸长 2 插入型
+  //U8 Connection_type; 
+  
+   //Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+   switch(Current.CMD1)
+   	{
+  	  case 0:
+	  case 1:
+	 	Angle1=Current.EndAngle;
+	 	break;
+	  case 2:
+	  	Angle1=Current.EndAngle-90;
+		if(Angle1<0)
+			Angle1+=360;
+		break;
+	  case 3:
+	 	Angle1=Current.EndAngle+90;
+		if(Angle1>=360)
+			Angle1-=360;
+	 	break;
+      default:break;
+  	 }
+	 switch(Next.CMD1)
+	  	{
+	  	 case 0:
+		 case 1:
+		 	Angle2=Next.EndAngle;
+		 	break;
+		 case 2:
+		 	Angle2=Next.StartAngle-90;
+			if(Angle2<0)
+				Angle2+=360;
+			break;
+		 case 3:
+		 	Angle2=Next.StartAngle+90;
+			if(Angle2>=360)
+				Angle2-=360;
+		 	break;
+	     default:break;
+	  	}
+
+      del_angle=180+Angle1-Angle2;
+	  while(del_angle<0)
+		del_angle+=360;
+	  while(del_angle>=360)
+		del_angle-=360;                //求得工件实体转角
+	  //在把0和360弄成一个值前，增加一段 对切圆的特殊情况做处理 
+	  //因为下面的判断不适用于此情形
+	  {
+	    if((del_angle==0)&&(Next.CMD1>1))
+	    {
+	        if(Current.CutDirection==1) //左刀补
+	        {
+	            if(Next.CMD1==3)
+	                tool_compen_type=2; //插入型 
+	            else
+	                tool_compen_type=0; //缩短型           
+	        }else{ //==2  右刀补
+	            if(Next.CMD1==3)
+	                tool_compen_type=0; //缩短型
+	            else
+	                tool_compen_type=2; //插入型
+	        }
+	        return tool_compen_type;
+	    }    
+	  }		
+	  if(Current.CutDirection==1)      //左刀补
+	  	{
+	  	 del_angle=360-del_angle;      //把角度偏转到另一边，再同右补刀同样判断 
+	  	 if(del_angle>=360)            //如果不作此判断，为使得单轴往复加工时出现此角度为360度，根据以下的判断则为
+	  	    del_angle-=360;            //缩短型，其错误原因为换边计算使造成
+	  	 if((del_angle>=0)&&(del_angle<90))
+	         tool_compen_type=2;   //插入型
+		 else if((del_angle>=90)&&(del_angle<180))
+		  	 tool_compen_type=1;   //伸长型
+	     else if(del_angle>=180)
+		 	 tool_compen_type=0;   //缩短型
+	  	}
+	  else if(Current.CutDirection==2)  //右刀补
+	  	{
+		 if((del_angle>=0)&&(del_angle<90))          //[0~90)
+			 tool_compen_type=2;    //插入型
+		 else if((del_angle>=90)&&(del_angle<180))   //[90~180)
+		     tool_compen_type=1;    //伸长型
+		 else if(del_angle>=180)                     //[180~360)
+		     tool_compen_type=0;    //缩短型
+	  	}
+	   return tool_compen_type;
+}
+
+//-----------判断前后两根曲线的类型--------
+//--入口:第一根曲线类别 CMD1(1线，2顺圆，3逆圆)，第二根曲线类别 CMD2(1线，2顺圆，3逆圆)
+//-----------出口:连接类型码-----------------
+
+U8 Juge_connection_type(U16 CMD1,U16 CMD2)
+{
+  U8 Connection_type;
+  switch(CMD1)
+  	{
+  	 case 0:
+  	 case 1:
+	 	  switch(CMD2)
+	 	  	{
+	 	  	 case 0:
+	 	  	 case 1:Connection_type=0;
+			 	break;
+			 case 2:Connection_type=1;
+			 	break;
+			 case 3:Connection_type=2;
+			 	break;
+			 default:break;
+	 	  	}
+		  break;
+	 case 2:
+	 	   switch(CMD2)
+	 	  	{
+	 	  	 case 0:
+	 	  	 case 1:Connection_type=3;
+			 	break;
+			 case 2:Connection_type=5;
+			 	break;
+			 case 3:Connection_type=6;
+			 	break;
+			 default:break;
+	 	  	}
+		   break;
+	 case 3:
+	 	   switch(CMD2)
+	 	  	{
+	 	  	 case 0:
+	 	  	 case 1:Connection_type=4;
+			 	break;
+			 case 2:Connection_type=7;
+			 	break;
+			 case 3:Connection_type=8;
+			 	break;
+			 default:break;
+	 	  	}
+		   break;
+	 default:break;
+  	}
+  return Connection_type;
+}
+
+
+void Cal_Radius(char Type)
+{
+ switch(Type)
+ 	{
+ 	 case 2:if(Current_code.CutDirection==1)
+			  Finished_G.Radius+=tool_r;    //修改圆弧半径
+			else if(Current_code.CutDirection==2)
+			  Finished_G.Radius-=tool_r;
+	 	break;
+	 case 3:if(Current_code.CutDirection==1)
+			  Finished_G.Radius-=tool_r;    //修改圆弧半径
+			else if(Current_code.CutDirection==2)
+			  Finished_G.Radius+=tool_r;
+	 	break;
+	 default:break;
+ 	}
+   Cut_Cir_SEND(Finished_G);
+
+}
+
+//-----------用余弦定理计算三角形角度-----------
+//---入口:三角型的三个边长值O1O2对应的角度
+//---出口:返回计算三角形该角的角度值
+FLOAT64 Cal_Cos_Angle(FLOAT64 Line_A,FLOAT64 Line_B,FLOAT64 Line_C)
+{ FLOAT64 Angle;  //Line_A边对应的角度
+  Angle=Line_A/2/Line_B+Line_B/2/Line_A-Line_C/2/Line_A*Line_C/Line_B;
+  if(Angle > 1.0)//除了两圆不相交，还可能是精度问题
+     Angle = 1.0;
+  if(Angle < -1.0)
+     Angle = -1.0;
+  return acos(Angle)*180/PI;
+}
+
+//-----------计算缩短型刀补时的矢量坐标-----------
+//---入口:曲线1的起始矢量角度，曲线2的起始矢量角度，走刀方向
+//---出口:计算完毕后的偏移矢量值
+delt_Compen_AXIS Shorten_type(PRE_G_CODE Current,PRE_G_CODE Next)   //缩短型刀补偿
+	{
+	  delt_Compen_AXIS Vector;
+	  FLOAT64 delt_angle;
+	  FLOAT64 Angle_aom;
+	  FLOAT64 Angle_A,Angle_B;
+	  FLOAT64 OE,OC;
+	  FLOAT64 O1O2,O1C,O2C;
+	  U8 Connection_type; 
+	  
+	  Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+	  switch(Connection_type)    
+	  	{
+	  	 case 0:   //G01---G01
+	  	      delt_angle=Next.StartAngle-Current.EndAngle;   //角度  
+		  	  if(delt_angle<0)
+			  	delt_angle+=360;
+			  else if(delt_angle>=360)
+			  	delt_angle-=360;
+			  if(Current.CutDirection==1)    //左刀补
+			  	{
+				  Vector.Z=-tool_r*(sin(Current.EndAngle*PI/180)+sin(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+				  Vector.X= tool_r*(cos(Current.EndAngle*PI/180)+cos(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+			  	}
+			  if(Current.CutDirection==2)    //右刀补
+			  	{
+			  	 Vector.Z= tool_r*(sin(Current.EndAngle*PI/180)+sin(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+				 Vector.X=-tool_r*(cos(Current.EndAngle*PI/180)+cos(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+			  	} 
+			  Finished_G=Current;       //直线
+		      Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		      Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		      DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+              CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//              record[record_ptr++]=Finished_G;
+		  	break;
+		 case 1:         //G01--G02
+	
+		    if(Current.CutDirection==1)  //G41
+		    	{
+					Angle_aom=Next.StartAngle-(Current.StartAngle+90);     //即角度AOM,直线1逆转90度可以与另一根线重合
+					OE=Next.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius+tool_r;
+					OE=OE+tool_r;   
+					Vector.Z=-OE*sin(Current.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*cos(Current.StartAngle*PI/180);
+					Vector.X=+OE*cos(Current.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*sin(Current.StartAngle*PI/180);
+		    	}
+		    else if(Current.CutDirection==2)  
+		    	{
+					Angle_aom=Next.StartAngle-(Current.StartAngle+90);     //即角度AOM
+					OE=Next.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius-tool_r;
+					OE=OE-tool_r;
+					Vector.Z=-OE*sin(Current.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*cos(Current.StartAngle*PI/180);
+					Vector.X=+OE*cos(Current.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*sin(Current.StartAngle*PI/180);		
+		    	}
+		   
+			Finished_G=Current;   //此时构造的是直线，但参考点是下一段的圆心
+		    Finished_G.EndPoint.X=Vector.X+Next.CenterPoint.X;
+		    Finished_G.EndPoint.Z=Vector.Z+Next.CenterPoint.Z;
+		    Next_code.StartAngle=Cal_line_angle(Next.CenterPoint,Finished_G.EndPoint);  //重新计算下一条圆弧的起始角
+		    DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+            CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+            Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		 	break;
+		 case 2:   //G01--G03  
+		    if(Current.CutDirection==1)
+		    	{
+					Angle_aom=Next.StartAngle-(Current.StartAngle+90);     //即角度AOM
+					OE=Next.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius-tool_r;
+					OE=OE+tool_r;
+					Vector.Z=-OE*sin(Current.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*cos(Current.StartAngle*PI/180);
+					Vector.X=+OE*cos(Current.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*sin(Current.StartAngle*PI/180);	//ch lly
+		    	}
+		    else if(Current.CutDirection==2)  
+		    	{
+					Angle_aom=Next.StartAngle-(Current.StartAngle+90);     //即角度AOM
+					OE=Next.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius+tool_r;
+					OE=OE-tool_r;
+					Vector.Z=-OE*sin(Current.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*cos(Current.StartAngle*PI/180);   //ch lly
+					Vector.X=+OE*cos(Current.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*sin(Current.StartAngle*PI/180);		
+		    	}
+		   
+			Finished_G=Current;   //直线
+		    Finished_G.EndPoint.X=Vector.X+Next.CenterPoint.X;  //参考点为下段圆心
+		    Finished_G.EndPoint.Z=Vector.Z+Next.CenterPoint.Z;
+		    Next_code.StartAngle=Cal_line_angle(Next.CenterPoint,Finished_G.EndPoint);  //重新计算下一条圆弧的起始角
+		    DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+            CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+            Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		 	break;
+		 case 3:   //G02--G01 
+		    if(Current.CutDirection==1)
+		    	{
+					Angle_aom=Next.StartAngle+90-Current.EndAngle;     //即角度AOM
+					OE=Current.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius+tool_r;
+					OE=OE+tool_r;
+					Vector.Z=-OE*sin(Next.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*cos(Next.StartAngle*PI/180);
+					Vector.X=+OE*cos(Next.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*sin(Next.StartAngle*PI/180);		
+		    	}
+		    else if(Current.CutDirection==2)  
+		    	{
+					Angle_aom=Next.StartAngle+90-Current.EndAngle;     //即角度AOM
+					OE=Current.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius-tool_r;
+					OE=OE-tool_r;
+					Vector.Z=-OE*sin(Next.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*cos(Next.StartAngle*PI/180);
+					Vector.X=+OE*cos(Next.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*sin(Next.StartAngle*PI/180);	
+		    	}
+		   
+			Finished_G=Current;   //构造圆弧
+		    Finished_G.EndPoint.X=Vector.X+Current.CenterPoint.X;  //参考点为当前圆弧圆心
+		    Finished_G.EndPoint.Z=Vector.Z+Current.CenterPoint.Z;
+		    Finished_G.EndAngle=Cal_line_angle(Current.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		    Cal_Radius(2);
+		   // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+            //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//            record[record_ptr++]=Finished_G;
+		 	break;
+		  case 4:   //G03--G01 
+		    if(Current.CutDirection==1)
+		    	{
+					Angle_aom=Next.StartAngle+90-Current.EndAngle;     //即角度AOM
+					OE=Current.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius-tool_r;
+					OE=OE+tool_r;
+					Vector.Z=-OE*sin(Next.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*cos(Next.StartAngle*PI/180);
+					Vector.X=+OE*cos(Next.StartAngle*PI/180)-sqrt(OC*OC-OE*OE)*sin(Next.StartAngle*PI/180);	  //chanlly
+		    	}
+		    else if(Current.CutDirection==2)  
+		    	{
+					Angle_aom=Next.StartAngle+90-Current.EndAngle;     //即角度AOM
+					OE=Current.Radius*cos(Angle_aom*PI/180);
+					OC=Next.Radius+tool_r;
+					OE=OE-tool_r;
+					Vector.Z=-OE*sin(Next.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*cos(Next.StartAngle*PI/180);
+					Vector.X=+OE*cos(Next.StartAngle*PI/180)+sqrt(OC*OC-OE*OE)*sin(Next.StartAngle*PI/180);	//chanlly 	
+		    	}
+			Finished_G=Current;   //构造圆弧，参考点为当前点圆心
+		    Finished_G.EndPoint.X=Vector.X+Current.CenterPoint.X;
+		    Finished_G.EndPoint.Z=Vector.Z+Current.CenterPoint.Z;
+		    Finished_G.EndAngle=Cal_line_angle(Current.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		    Cal_Radius(3);
+		    //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//            record[record_ptr++]=Finished_G;
+		 	break;
+		  case 5:  //G02--G02
+		  	if(Current.CutDirection==1)
+		  		{
+		  		 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+                 O1C=Current.Radius+tool_r;
+			     O2C=Next.Radius+tool_r;
+                 if(O1O2>0)
+                   {
+					 Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+					 Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+					 Vector.Z=O1C*cos((Angle_A+Angle_B)*PI/180);
+					 Vector.X=O1C*sin((Angle_A+Angle_B)*PI/180);
+				   }
+				  else 
+				  {
+				   Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				   Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				  }
+		  		}
+			else if(Current.CutDirection==2)
+				{
+				 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+				 O1C=Current.Radius-tool_r;
+				 O2C=Next.Radius-tool_r;
+				 if(O1O2>0)
+				   {
+					 Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+					 Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+					 Vector.Z=O1C*cos((Angle_A-Angle_B)*PI/180);
+					 Vector.X=O1C*sin((Angle_A-Angle_B)*PI/180);
+				   }
+				  else
+				  {
+				   Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				   Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				  }
+				}
+			Finished_G=Current;   //构造圆弧
+		    Finished_G.EndPoint.X=Vector.X+Current.CenterPoint.X;   //参考点为当前点圆心
+		    Finished_G.EndPoint.Z=Vector.Z+Current.CenterPoint.Z;
+		    Finished_G.EndAngle=Cal_line_angle(Current.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		    Cal_Radius(2);
+		    Next_code.StartAngle=Cal_line_angle(Next.CenterPoint,Finished_G.EndPoint);  //重新计算下一条圆弧的起始角
+		    //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+            //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+            Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		  	break;
+		 case 6:  //G02--G03
+		  	if(Current.CutDirection==1)
+		  		{
+		  		 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+				 O1C=Current.Radius+tool_r;
+				 O2C=Next.Radius-tool_r;
+				 if(O1O2>0)
+				   {
+					 Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+					 Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+					 Vector.Z=O1C*cos((Angle_A-Angle_B)*PI/180);
+					 Vector.X=O1C*sin((Angle_A-Angle_B)*PI/180);
+				   }
+				  else
+				  {
+				   Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				   Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				  }
+		  		}
+			else if(Current.CutDirection==2)
+				{
+				 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+				 O1C=Current.Radius-tool_r;
+				 O2C=Next.Radius+tool_r;
+
+				 if(O1O2>0)
+				   {
+					Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+					Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+					Vector.Z=O1C*cos((Angle_A+Angle_B)*PI/180);
+					Vector.X=O1C*sin((Angle_A+Angle_B)*PI/180);
+				   }
+				 else
+				 {
+				   Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				   Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				 }
+				}
+			Finished_G=Current;   //构造顺弧
+		    Finished_G.EndPoint.X=Vector.X+Current.CenterPoint.X;   //参考点为当前点圆心
+		    Finished_G.EndPoint.Z=Vector.Z+Current.CenterPoint.Z;
+		    Finished_G.EndAngle=Cal_line_angle(Current.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		    Cal_Radius(2);
+		    Next_code.StartAngle=Cal_line_angle(Next.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		    //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+            Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		  	break;
+		  case 7:  //G03--G02
+		  	if(Current.CutDirection==1)
+		  		{
+		  		 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+				 O1C=Current.Radius-tool_r;
+				 O2C=Next.Radius+tool_r;
+				 if(O1O2>0)
+				  {
+				   Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+				   Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+				   Vector.Z=O1C*cos((Angle_A-Angle_B)*PI/180);
+				   Vector.X=O1C*sin((Angle_A-Angle_B)*PI/180);
+				  }
+				 else
+				 {
+				   Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				   Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				 }
+				 
+		  		}
+			else if(Current.CutDirection==2)
+				{
+				 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+				 O1C=Current.Radius+tool_r;
+				 O2C=Next.Radius-tool_r;
+
+				 if(O1O2>0)
+				 {
+				  Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+				  Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+				  Vector.Z=O1C*cos((Angle_A+Angle_B)*PI/180);
+				  Vector.X=O1C*sin((Angle_A+Angle_B)*PI/180);
+				 }
+				 else
+				 {
+				   Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				   Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				 }
+				 
+				}
+			Finished_G=Current;   //构造逆弧
+		    Finished_G.EndPoint.X=Vector.X+Current.CenterPoint.X;   //参考点为当前点圆心
+		    Finished_G.EndPoint.Z=Vector.Z+Current.CenterPoint.Z;
+		    Finished_G.EndAngle=Cal_line_angle(Current.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		    Cal_Radius(3);
+		    Next_code.StartAngle=Cal_line_angle(Next.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		   // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+            //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+            Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		  	break;
+		 case 8:  //G03--G03
+		  	if(Current.CutDirection==1)
+		  		{
+		  		 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+				 O1C=Current.Radius-tool_r;
+				 O2C=Next.Radius-tool_r;
+                 if(O1O2>0)
+                    {
+					 Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+					 Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+					 Vector.Z=O1C*cos((Angle_A+Angle_B)*PI/180);
+					 Vector.X=O1C*sin((Angle_A+Angle_B)*PI/180);
+				    }
+				  else
+				  {
+				    Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				    Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				  }
+		  		}
+			else if(Current.CutDirection==2)
+				{
+				 O1O2=sqrt(pow((FLOAT64)(Next.CenterPoint.X-Current.CenterPoint.X),2)+pow((FLOAT64)(Next.CenterPoint.Z-Current.CenterPoint.Z),2));
+				 O1C=Current.Radius+tool_r;
+				 O2C=Next.Radius+tool_r;
+				 if(O1O2>0)
+				  {
+				   Angle_A=Cal_line_angle(Current.CenterPoint,Next.CenterPoint);                //求角XO1O2
+				   Angle_B=Cal_Cos_Angle(O1O2,O1C,O2C);
+				   Vector.Z=O1C*cos((Angle_A-Angle_B)*PI/180);
+				   Vector.X=O1C*sin((Angle_A-Angle_B)*PI/180);
+				  }
+				 else 
+				  {
+				   Vector.Z=O1C*cos((Next.StartAngle)*PI/180);
+				   Vector.X=O1C*sin((Next.StartAngle)*PI/180);
+				  }
+				 
+				}
+			Finished_G=Current;  //构造逆弧
+		    Finished_G.EndPoint.X=Vector.X+Current.CenterPoint.X;   //参考点为当前点圆心
+		    Finished_G.EndPoint.Z=Vector.Z+Current.CenterPoint.Z;
+		    Finished_G.EndAngle=Cal_line_angle(Current.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		    Cal_Radius(3);
+		    Next_code.StartAngle=Cal_line_angle(Next.CenterPoint,Finished_G.EndPoint);  //重新计算当前条圆弧的终止角
+		   // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+            //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+            Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		  	break;
+		 default:
+		 	break;
+	  	}
+	  return Vector;
+	}
+
+
+//-----------计算伸长型刀补时的矢量坐标-----------
+//---入口:曲线1的起始矢量角度，曲线2的起始矢量角度，走刀方向
+//---出口:计算完毕后的偏移矢量值
+delt_Compen_AXIS Elongate_type(PRE_G_CODE Current,PRE_G_CODE Next)   
+	{
+	  delt_Compen_AXIS Vector;
+	  FLOAT64 delt_angle;
+	  U8 Connection_type; 
+	  PRE_G_CODE Construt_Line;
+	  PRE_G_CODE Construt_Line1;
+	  Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+	  switch(Connection_type)
+	  	{
+	  	  case 0:    //G01--G01 伸长型的交点计算同缩短型主要区别就是反号，伸长型的左刀补和缩短型的右刀补一样，同理交换
+	  	      delt_angle=Next.StartAngle-Current.EndAngle;   //角度  
+		  	  if(delt_angle<0)
+			  	delt_angle+=360;
+			  else if(delt_angle>=360)
+			  	delt_angle-=360;
+			  
+			  if(Current.CutDirection==1)    //左刀补
+			  	{
+				   Vector.Z=-tool_r*(sin(Current.EndAngle*PI/180)+sin(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+				   Vector.X=+tool_r*(cos(Current.EndAngle*PI/180)+cos(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+			  	}
+			  if(Current.CutDirection==2)    //右刀补
+			  	{
+			  	  Vector.Z=+tool_r*(sin(Current.EndAngle*PI/180)+sin(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+				  Vector.X=-tool_r*(cos(Current.EndAngle*PI/180)+cos(Next.StartAngle*PI/180))/(1+cos(delt_angle*PI/180));
+			  	}
+				Finished_G=Current;
+			    Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+			    Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			    DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+	            CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//	            record[record_ptr++]=Finished_G;
+		 	 break;
+		  case 1:   //G01--G02  顺弧减角度
+		       Construt_Line=Next_code;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Construt_Line.StartAngle-90;
+			   if(Construt_Line.StartAngle<0)
+			   	  Construt_Line.StartAngle+=360;
+			   Vector=Elongate_type(Current,Construt_Line);    //递归调用得到第一个交点，构造直线
+			   
+			   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+			   Finished_G=Current;  //直线
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		       DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		       break;
+		  case 2:   //G01--G03 逆弧，加角度
+		       Construt_Line=Next_code;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Construt_Line.StartAngle+90;
+			   if(Construt_Line.StartAngle>360)
+			   	  Construt_Line.StartAngle-=360;
+			   Vector=Elongate_type(Current,Construt_Line);    //递归调用得到第一个交点
+			   
+			   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+			   Finished_G=Current;
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		       DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		       break;
+		  case 3:   //G02--G01
+		       Construt_Line=Current;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Construt_Line.EndAngle-90;
+			   if(Construt_Line.StartAngle<0)
+			   	  Construt_Line.StartAngle+=360;
+			   Construt_Line.EndAngle=Construt_Line.StartAngle;
+			   Vector=Cal_vector(Construt_Line.EndAngle,Current.CutDirection);
+			   Finished_G=Current;  //当前为圆弧
+			   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		 	   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			   Cal_Radius(2);
+			   //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			  // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+			   
+			   Vector=Elongate_type(Construt_Line,Next);    //递归调用得到第一个交点，构造当前为直线
+		  	   break;
+		  case 4:   //G03--G01
+		       Construt_Line=Current;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Construt_Line.EndAngle+90;
+			   if(Construt_Line.EndAngle>360)
+			   	  Construt_Line.EndAngle-=360;
+			   Construt_Line.EndAngle=Construt_Line.StartAngle;
+			   Vector=Cal_vector(Construt_Line.EndAngle,Current.CutDirection);
+			   Finished_G=Current;  //当前为逆弧
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			   Cal_Radius(3);
+		       //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+              // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+			   
+			   Vector=Elongate_type(Construt_Line,Next);    //递归调用得到第一个交点
+		  	   break;
+		  case 5:  //G02--G02
+		       Construt_Line=Current_code;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Current_code.EndAngle-90;
+			   if(Construt_Line.StartAngle<0)
+			      Construt_Line.StartAngle+=360;
+			   Construt_Line.EndAngle=Construt_Line.StartAngle;
+			   
+			   Construt_Line1=Next_code;
+		       Construt_Line1.CMD1=1;
+			   Construt_Line1.StartAngle=Next.StartAngle-90;
+			   if(Construt_Line1.StartAngle<0)
+			     Construt_Line1.StartAngle+=360;
+			   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+
+			   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+               Finished_G=Current;  //构造圆弧
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			   Cal_Radius(2);
+		      // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Vector=Elongate_type(Construt_Line,Construt_Line1);   //得到交点向量值，构造直线
+               Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+			   Finished_G=Current;
+			   Finished_G.CMD1=1;    //当前为直线
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		       DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		       break;
+		  case 6:  //G02--G03
+		       Construt_Line=Current_code;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Current_code.EndAngle-90;
+			   if(Construt_Line.StartAngle<0)
+			      Construt_Line.StartAngle+=360;
+			   Construt_Line.EndAngle=Construt_Line.StartAngle;
+			   
+			   Construt_Line1=Next_code;
+		       Construt_Line1.CMD1=1;
+			   Construt_Line1.StartAngle=Next.StartAngle+90;
+			   if(Construt_Line1.StartAngle>=360)
+			      Construt_Line1.StartAngle-=360;
+			   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+			   
+			   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+               Finished_G=Current;  //圆弧
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			   Cal_Radius(2);
+		      // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+              // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Vector=Elongate_type(Construt_Line,Construt_Line1);   //得到交点向量值，构造直线
+			   Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+               Finished_G=Current;
+			   Finished_G.CMD1=1;
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		       DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区 
+               Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		       break;
+		  case 7:  //G03--G02
+		       Construt_Line=Current_code;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Current_code.EndAngle+90;
+			   if(Construt_Line.StartAngle>=360)
+			     Construt_Line.StartAngle-=360;
+			   Construt_Line.EndAngle=Construt_Line.StartAngle;
+			   
+			   Construt_Line1=Next_code;
+		       Construt_Line1.CMD1=1;
+			   Construt_Line1.StartAngle=Next.StartAngle-90;
+			   if(Construt_Line1.StartAngle<0)
+			      Construt_Line1.StartAngle+=360;
+			   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+			   
+			   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+               Finished_G=Current;  //构造圆弧
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			   Cal_Radius(3);
+		      // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Vector=Elongate_type(Construt_Line,Construt_Line1);   //得到交点向量值，构造直线
+			   Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+		       Finished_G=Current;
+			   Finished_G.CMD1=1;
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		       DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送 
+		       break;
+		  case 8:  //G03--G03
+		       Construt_Line=Current_code;
+		       Construt_Line.CMD1=1;
+			   Construt_Line.StartAngle=Current_code.EndAngle+90;
+			   if(Construt_Line.StartAngle>=360)
+			      Construt_Line.StartAngle-=360;
+			   Construt_Line.EndAngle=Construt_Line.StartAngle;
+			   
+			   Construt_Line1=Next_code;
+		       Construt_Line1.CMD1=1;
+			   Construt_Line1.StartAngle=Next.StartAngle+90;
+			   if(Construt_Line1.StartAngle>=360)
+			     Construt_Line1.StartAngle-=360;
+			   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+			   
+			   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+               Finished_G=Current;  //圆弧
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			   Cal_Radius(3);
+		       //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+              // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Vector=Elongate_type(Construt_Line,Construt_Line1);   //得到交点向量值，构造直线
+
+			   Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+               Finished_G=Current;
+			   Finished_G.CMD1=1;
+		       Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		       Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		       DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+               CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+               Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+		    break;
+		  default:break;   
+	    }
+	  return Vector;
+	}
+
+//-----------计算插入型刀补的矢量坐标-----------------------------
+//---------入口:曲线1的起始矢量角度，曲线2的起始矢量角度，走刀方向
+//---------出口:计算完毕后的偏移矢量值----------------------------
+
+delt_Compen_AXIS Cut_in_type(PRE_G_CODE Current,PRE_G_CODE Next)
+ {
+  delt_Compen_AXIS Vector;
+  U8 Connection_type; 
+  PRE_G_CODE Construt_Line;
+  PRE_G_CODE Construt_Line1;
+  Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+  switch(Connection_type)
+  	{
+  	 case 0:  //G01--G01
+	 	 if(Current.CutDirection==1) //G41
+		 	{
+			 Vector.Z=-tool_r*(sin(Current.EndAngle*PI/180)-cos(Current.EndAngle*PI/180));
+			 Vector.X= tool_r*(sin(Current.EndAngle*PI/180)+cos(Current.EndAngle*PI/180));
+
+			 Vector.Z1=-tool_r*(sin(Next.StartAngle*PI/180)+cos(Next.StartAngle*PI/180));   //此为增加线段的终点
+			 Vector.X1=-tool_r*(sin(Next.StartAngle*PI/180)-cos(Next.StartAngle*PI/180));
+		 	}
+		 
+		 if(Current.CutDirection==2)  //G42
+		 	{
+		 	 Vector.Z= tool_r*(sin(Current.EndAngle*PI/180)+cos(Current.EndAngle*PI/180));
+			 Vector.X= tool_r*(sin(Current.EndAngle*PI/180)-cos(Current.EndAngle*PI/180));
+
+			 Vector.Z1= tool_r*(sin(Next.StartAngle*PI/180)-cos(Next.StartAngle*PI/180));   //此为增加线段的终点
+			 Vector.X1=-tool_r*(sin(Next.StartAngle*PI/180)+cos(Next.StartAngle*PI/180));
+		 	}
+		 Finished_G=Current;
+		 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+         CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//         record[record_ptr++]=Finished_G;
+        
+         Finished_G=Current;
+         Finished_G.EndPoint.X=Vector.X1+Current.EndPoint.X;
+		 Finished_G.EndPoint.Z=Vector.Z1+Current.EndPoint.Z;
+		 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+         CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//         record[record_ptr++]=Finished_G;
+		 break;
+	 case 1:  //G01--G02
+	       Construt_Line=Next;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.StartAngle-90;
+		   if(Construt_Line.StartAngle<0)
+		   	  Construt_Line.StartAngle+=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+		   
+		   Vector=Cut_in_type(Current,Construt_Line);    //递归调用得到第一个交点
+
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+		  Finished_G=Current;
+          Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		  Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		  DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+          CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+          Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+	      break;
+	 case 2:  //G01--G03
+	       Construt_Line=Next;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.StartAngle+90;
+		   if(Construt_Line.StartAngle>=360)
+		   	 Construt_Line.StartAngle-=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+		   
+		   Vector=Cut_in_type(Current,Construt_Line);    //递归调用得到第一个交点
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+		
+		   Finished_G=Current;
+           Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+	       break;
+	 case 3:  //G02--G01
+	       Construt_Line=Current;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.EndAngle-90;
+		   if(Construt_Line.StartAngle<0)
+		   	 Construt_Line.StartAngle+=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+
+           Finished_G=Current;  //构造圆弧
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   Cal_Radius(2);
+		   //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+		   
+		   Vector=Cut_in_type(Construt_Line,Next);    //递归调用得到第一个交点
+	      break;
+	 case 4:  //G03--G01
+	 	   Construt_Line=Current;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.EndAngle+90;
+		   if(Construt_Line.StartAngle>=360)
+		   	 Construt_Line.StartAngle-=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+
+           Finished_G=Current;  //构造圆弧
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   Cal_Radius(3);
+		   //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+		   
+		   Vector=Cut_in_type(Construt_Line,Next);    //递归调用得到第一个交点
+	 	break;
+     case 5: //G02--G02
+           Construt_Line=Current;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.EndAngle-90;
+		   if(Construt_Line.StartAngle<0)
+		   	 Construt_Line.StartAngle+=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+
+		   Construt_Line1=Next;
+	       Construt_Line1.CMD1=1;
+		   Construt_Line1.StartAngle=Construt_Line1.StartAngle-90;
+		   if(Construt_Line1.StartAngle<0)
+		   	 Construt_Line1.StartAngle+=360;
+		   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+
+
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+		   Finished_G=Current;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   Cal_Radius(2);
+		   //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+          
+		   
+		   Vector=Cut_in_type(Construt_Line,Construt_Line1);    //递归调用得到第一个交点
+		 
+		   Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+		   
+		   Finished_G=Current;
+		   Finished_G.CMD1=1;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+	 	break;
+		
+	 case 6: //G02--G03
+	       Construt_Line=Current;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.EndAngle-90;
+		   if(Construt_Line.StartAngle<0)
+		   	 Construt_Line.StartAngle+=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+		   
+		   Construt_Line1=Next;
+	       Construt_Line1.CMD1=1;
+		   Construt_Line1.StartAngle=Construt_Line1.StartAngle+90;
+		   if(Construt_Line1.StartAngle>=360)
+		   	 Construt_Line1.StartAngle-=360;
+		   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+		   Finished_G=Current;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   Cal_Radius(2);
+		   //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           
+		   Vector=Cut_in_type(Construt_Line,Construt_Line1);    //递归调用得到第一个交点
+		   
+		   Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+		 
+		   Finished_G=Current;
+		   Finished_G.CMD1=1;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+	 	break;
+	 case 7: //G03--G02
+	       Construt_Line=Current;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.EndAngle+90;
+		   if(Construt_Line.StartAngle>=360)
+		   	 Construt_Line.StartAngle-=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+		   
+		   Construt_Line1=Next;
+	       Construt_Line1.CMD1=1;
+		   Construt_Line1.StartAngle=Construt_Line1.StartAngle-90;
+		   if(Construt_Line1.StartAngle<0)
+		   	 Construt_Line1.StartAngle+=360;
+		   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+		   Finished_G=Current;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   Cal_Radius(3);
+		  // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           
+		   Vector=Cut_in_type(Construt_Line,Construt_Line1);    //递归调用得到第一个交点
+		   
+		   Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+		   Finished_G=Current;
+		   Finished_G.CMD1=1;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+//           record[record_ptr++]=Finished_G;
+	 	break;
+	 case 8: //G03--G03
+	 	   Construt_Line=Current;
+	       Construt_Line.CMD1=1;
+		   Construt_Line.StartAngle=Construt_Line.EndAngle+90;
+		   if(Construt_Line.StartAngle>=360)
+		   	 Construt_Line.StartAngle-=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+		   
+		   Construt_Line1=Next;
+	       Construt_Line1.CMD1=1;
+		   Construt_Line1.StartAngle=Construt_Line1.StartAngle+90;
+		   if(Construt_Line1.StartAngle>=360)
+		   	 Construt_Line1.StartAngle-=360;
+		   Construt_Line1.EndAngle=Construt_Line1.StartAngle;
+
+		   Vector=Cal_vector(Construt_Line.StartAngle,Current.CutDirection);
+		   Finished_G=Current;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   Cal_Radius(3);
+		   //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           
+		   Vector=Cut_in_type(Construt_Line,Construt_Line1);    //递归调用得到第一个交点
+		
+		   Vector=Cal_vector(Construt_Line1.StartAngle,Current.CutDirection);
+		 
+		   Finished_G=Current;
+		   Finished_G.CMD1=1;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+           Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+//           record[record_ptr++]=Finished_G;
+	 	break;
+	 default:break;	
+  	}
+  return Vector;
+ }
+
+//------------计算当前点一个垂直矢量，矢量模长为刀具半径长------------
+//----入口:当前点的矢量角度值，如果是圆弧，比如起点，则为起切线的矢量角度
+//----出口:当前点的矢量值
+
+delt_Compen_AXIS Cal_vector(FLOAT64 Angle,U8 CutDirection) 
+	{
+	 delt_Compen_AXIS Vector; 
+	 if(CutDirection==1)
+	 	{
+	     Vector.Z=-tool_r*sin(Angle*PI/180);
+	     Vector.X= tool_r*cos(Angle*PI/180);
+		}
+     else if(CutDirection==2)
+     	{
+     	 Vector.Z= tool_r*sin(Angle*PI/180);
+		 Vector.X=-tool_r*cos(Angle*PI/180);
+     	}
+	 return Vector;
+	}
+
+//------------缩短型刀补的建立---------
+//--入口:当前代码结构体，预读代码结构体
+//--出口:补偿后的坐标矢量--------------
+
+delt_Compen_AXIS Shorten_build_type(PRE_G_CODE Current,PRE_G_CODE Next)
+	{
+	 delt_Compen_AXIS Vector; 
+	 U8 Connection_type; 
+	 Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+	 switch(Connection_type)
+	 	{
+	 	 case 0:    //G01--G01
+	 	     Vector=Cal_vector(Next.StartAngle,Current.CutDirection);
+			 Finished_G=Current;
+		     Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		     Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		     DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//             record[record_ptr++]=Finished_G;
+		 	break;
+		 case 1:    //G01--G02 
+		     Vector=Cal_vector(Next.StartAngle-90,Current.CutDirection);   //缩短型的起始角不边
+			 Finished_G=Current;
+		     Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		     Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		     DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+             Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+//             record[record_ptr++]=Finished_G;
+		    break;
+		 case 2:    //G01--G03   //逆弧的始边向量逆时针旋转90度得切边矢量
+		     Vector=Cal_vector(Next.StartAngle+90,Current.CutDirection);
+			 Finished_G=Current;
+		     Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		     Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		     DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+             Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+//             record[record_ptr++]=Finished_G;
+		    break;
+		 case 3:    //G02--G01 以下几种模式均不能实现圆弧建立
+		 case 4:    //G03--G01 
+		 case 5:    //G02--G02 
+		 case 6:    //G02--G03
+		 case 7:    //G03--G02
+		 case 8:    //G03--G03  
+		 default:break;	   //由于其它模式均是圆弧转接，因此不可能建立刀补
+	 	}
+	  return Vector;
+	}
+
+//---------------伸长型刀补的建立-------------------
+//---------------入口:起始矢量角，走刀方向----------
+//---------------出口:补偿后的坐标------------------
+delt_Compen_AXIS Elongate_build_type(PRE_G_CODE Current,PRE_G_CODE Next)
+  {
+   delt_Compen_AXIS Vector;
+   U8 Connection_type; 
+   PRE_G_CODE Construt_Line;
+   Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+   switch(Connection_type)
+   	{
+   	 case 0:   //G01--G01
+   	        Vector=Cal_vector(Current.EndAngle,Current.CutDirection); 
+			Finished_G=Current;
+			Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+			Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+	        CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//	        record[record_ptr++]=Finished_G;
+			Vector=Elongate_type(Current,Next);    //再求得另外一个矢量,其输出在另外一个函数里面完成
+	 	break;
+	 case 1:    //G01--G02 
+	         Vector=Cal_vector(Current.EndAngle,Current.CutDirection); 
+			 Finished_G=Current;
+			 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+			 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+			
+//	         record[record_ptr++]=Finished_G;
+             //交叉点的获得等同于直线与圆弧切线的交点 ，这里是顺弧，是减90度等同
+             Construt_Line=Next;
+			 Construt_Line.StartAngle=Next.StartAngle-90;
+			 if(Construt_Line.StartAngle<0)
+			 	Construt_Line.StartAngle+=360;
+			 Construt_Line.EndAngle=Construt_Line.StartAngle;
+			 Construt_Line.CMD1=1;
+			 Vector=Elongate_type(Current,Construt_Line);
+			 
+			 //第二个矢量点的取得，等同与缩短型G01--G02的建立
+			 Vector=Cal_vector(Next.StartAngle-90,Current.CutDirection);
+			 Finished_G=Current;
+			 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+			 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+			 Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+//	         record[record_ptr++]=Finished_G;
+			 
+	      break;
+	 case 2:    //G01--G03
+	         Vector=Cal_vector(Current.EndAngle,Current.CutDirection); 
+			 Finished_G=Current;
+			 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+			 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+			 
+//	         record[record_ptr++]=Finished_G;
+            //交叉点的获得等同于直线与圆弧切线的交点 ,这里是逆弧，所以要加90等同
+             Construt_Line=Next;
+			 Construt_Line.StartAngle=Next.StartAngle+90;
+			 if(Construt_Line.StartAngle>=360)
+			 	Construt_Line.StartAngle-=360;
+			 Construt_Line.EndAngle=Construt_Line.StartAngle;
+			 Construt_Line.CMD1=1;
+			 Vector=Elongate_type(Current,Construt_Line);   //内部本身要发送一个
+            
+		     Vector=Cal_vector(Next.StartAngle+90,Current.CutDirection);
+			 Finished_G=Current;
+			 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+			 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+			 Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+//	         record[record_ptr++]=Finished_G;
+		    break;
+	 case 3:          //G02--G01 
+	 case 4:          //G03--G01 
+	 case 5:          //G02--G02 
+	 case 6:          //G02--G03
+	 case 7:          //G03--G02
+	 case 8:          //G03--G03
+	 default:break;   //其余情况均无法够建刀补
+   	}
+  return Vector;
+}
+
+//-------------插入型刀补的建立---------------
+//-------------入口:起始矢量角，走刀方向------
+//-------------出口:补偿后的坐标--------------
+delt_Compen_AXIS Cut_in_build_type(PRE_G_CODE Current,PRE_G_CODE Next)
+{
+   delt_Compen_AXIS Vector,Vector1;
+   U8 Connection_type; 
+   PRE_G_CODE Construt_Line;
+   Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+   switch(Connection_type)
+   	{ 
+   	 case 0:    //G01--G01先得到一个矢量点  
+   	    Vector=Cal_vector(Current.EndAngle,Current.CutDirection);  
+		Finished_G=Current;
+		Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+		Vector=Cut_in_type(Current,Next);          //调用插入型再刀补偿得两个矢量点  
+        //Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+	 	break;
+	 case 1:   //G01--G02
+
+         Vector=Cal_vector(Current.EndAngle,Current.CutDirection);
+	     Finished_G=Current;
+		 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+	 	 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+         
+         Construt_Line=Next;
+		 Construt_Line.StartAngle=Next.StartAngle-90;
+		 if(Construt_Line.StartAngle<0)
+		 	Construt_Line.StartAngle+=360;
+		 Construt_Line.EndAngle=Construt_Line.StartAngle;
+		 Construt_Line.CMD1=1;
+		 Vector1=Cut_in_type(Current,Construt_Line);   //得两个点
+         
+         Vector=Cal_vector(Next.StartAngle-90,Current.CutDirection);
+	     Finished_G=Current;
+		 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+	 	 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+         Force_Send_M_code();                       //圆弧斩出多段，所以此时需要发送
+	 	break;
+	  case 2:  //G01--G03
+
+	     Vector=Cal_vector(Current.EndAngle,Current.CutDirection);
+	     Finished_G=Current;
+		 Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+	 	 Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		 DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		 CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+		 
+          Construt_Line=Next;
+		  Construt_Line.StartAngle=Next.StartAngle+90;
+		  if(Construt_Line.StartAngle>=360)
+		 	Construt_Line.StartAngle-=360;
+		  Construt_Line.EndAngle=Construt_Line.StartAngle;
+		  Construt_Line.CMD1=1;
+		  Vector=Cut_in_type(Current,Construt_Line);
+          
+		  Vector=Cal_vector(Next.StartAngle+90,Current.CutDirection);
+	      Finished_G=Current;
+		  Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+	 	  Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		  DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		  CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+		  Force_Send_M_code();                        //圆弧斩出多段，所以此时需要发送
+	 	break;
+	 case 3:
+	 case 4:
+	 case 5:
+	 case 6:
+	 case 7:
+	 case 8:
+	 default:break;  //其余情况，无法构建刀补
+   	}
+  return Vector;
+}
+
+
+//---------缩短型刀补的取消-------
+//--入口:起始矢量角，走刀方向
+//--出口:补偿后的坐标
+
+delt_Compen_AXIS Shorten_cancle_type(PRE_G_CODE Current,PRE_G_CODE Next)
+	{
+	 delt_Compen_AXIS Vector;
+	 U8 Connection_type; 
+	 Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+	 switch(Connection_type)
+	 	{
+	 	 case 0:  //G01--G01   //第一个点等同于伸长型G01--G01之间的建立
+		    Vector=Cal_vector(Current.EndAngle,Current.CutDirection); 
+			Finished_G=Current;
+		    Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+	 	    Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		    DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		    CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//	        record[record_ptr++]=Finished_G;
+		 	break;
+		 case 1:   //G01--G02
+		 case 2:   //G01--G03
+		    break;
+		 case 3:   //G02--G01
+		    Vector=Cal_vector(Current.EndAngle-90,Current.CutDirection);  //顺弧减90度
+		    Finished_G=Current;
+		    Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;      
+            Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			Cal_Radius(2);
+			  
+           // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+           // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//            record[record_ptr++]=Finished_G;
+		    break;
+		 case 4:   //G03--G01
+		    Vector=Cal_vector(Current.EndAngle+90,Current.CutDirection);   //逆弧加90度
+		    Finished_G=Current;
+		    Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;      
+            Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			Cal_Radius(3);
+            //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+            //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//            record[record_ptr++]=Finished_G;
+			break;
+		 case 5:   //G02--G02
+		 case 6:   //G02--G03
+		 case 7:   //G03--G02
+		 case 8:   //G03--G03
+		 default:break;
+	 	}
+	 return Vector;
+	}
+
+
+//-------------伸长型刀补的取消---------------
+//-------------入口:起始矢量角，走刀方向------
+//-------------出口:补偿后的坐标--------------
+delt_Compen_AXIS Elongate_cancle_type(PRE_G_CODE Current,PRE_G_CODE Next)
+{
+    delt_Compen_AXIS Vector;
+	PRE_G_CODE Construt_Line;
+	U8 Connection_type; 
+	Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+    switch(Connection_type)
+    	{
+    	 case 0:     //G01--G01
+		   Vector=Elongate_type(Current,Next);  //调用伸长型刀补
+		   Vector=Cal_vector(Next.StartAngle,Current.CutDirection);
+           Finished_G=Current;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+	 	   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		   CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//	       record[record_ptr++]=Finished_G;
+		   break;
+		 case 1:     //G01--G02
+		 case 2:     //G01--G03
+		    break;
+		 case 3:     //G02--G01
+		      Vector=Cal_vector(Current.EndAngle-90,Current.CutDirection);
+			  Finished_G=Current;
+			  Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		 	  Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			  Cal_Radius(2);
+			 // DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			 // CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//		      record[record_ptr++]=Finished_G;
+			  
+              Construt_Line=Current;
+			  Construt_Line.StartAngle=Current.EndAngle-90;
+			  if(Construt_Line.StartAngle<0)
+			 	Construt_Line.StartAngle+=360;
+			  Construt_Line.EndAngle=Construt_Line.StartAngle;
+			  Construt_Line.CMD1=1;
+			  Vector=Elongate_type(Construt_Line,Next);  //直线在前
+
+			  Vector=Cal_vector(Next.StartAngle,Current.CutDirection);
+			  Finished_G=Next;
+			  Finished_G.SendCount=Current.SendCount;
+			  Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		 	  Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			  DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			  CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//		      record[record_ptr++]=Finished_G;
+			 break;
+		 case 4:      //G03--G01
+		      Vector=Cal_vector(Current.EndAngle+90,Current.CutDirection);
+		      Finished_G=Current;
+			  Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		 	  Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			  Cal_Radius(3);
+			  //DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			  //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//		      record[record_ptr++]=Finished_G;
+			  
+              Construt_Line=Current;
+			  Construt_Line.StartAngle=Current.EndAngle+90;
+			  if(Construt_Line.StartAngle>=360)
+			 	Construt_Line.StartAngle-=360;
+			  Construt_Line.EndAngle=Construt_Line.StartAngle;
+			  Construt_Line.CMD1=1;
+			  Vector=Elongate_type(Construt_Line,Next);
+
+			  Vector=Cal_vector(Next.StartAngle,Current.CutDirection);
+			  Finished_G=Next;  //直线方式
+			  Finished_G.SendCount=Current.SendCount;
+			  Finished_G.EndPoint.X=Vector.X+Next.StartPoint.X;
+		 	  Finished_G.EndPoint.Z=Vector.Z+Next.StartPoint.Z;
+			  DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+			  CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+//		      record[record_ptr++]=Finished_G;
+		    break;
+		 case 5:          //G02--G02
+		 case 6:          //G02--G03
+		 case 7:          //G03--G02
+		 case 8:          //G03--G03
+		 default:break;   //其余情况不存在取消
+    	}
+   return Vector;
+}
+
+//-------------插入型刀补的取消---------------
+//-------------入口:起始矢量角，走刀方向------
+//-------------出口:补偿后的坐标--------------
+delt_Compen_AXIS Cut_in_cancle_type(PRE_G_CODE Current,PRE_G_CODE Next)
+{
+    delt_Compen_AXIS Vector;
+	U8 Connection_type; 
+	PRE_G_CODE Construt_Line;
+	Connection_type=Juge_connection_type(Current.CMD1,Next.CMD1);
+    switch(Connection_type)
+    	{
+    	 case 0:    //G01--G01
+		   Vector=Cut_in_type(Current,Next);   //调用插入型刀补 
+		   
+		   Vector=Cal_vector(Next.StartAngle,Current.CutDirection);
+		   Finished_G=Current;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;
+		   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   DGbuf[DGwptr]=Send_DGbuf(Finished_G);  //代码写入发送缓冲区
+		   CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);    //发送区
+////		   record[record_ptr++]=Finished_G;
+		   break;
+		 case 1:    //G01--G02
+		 case 2:    //G01--G03
+		   break;
+		 case 3:    //G02--G01
+	       Vector=Cal_vector(Current.EndAngle-90,Current.CutDirection);
+	       Finished_G=Current;
+		   Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;         //圆弧部分
+	 	   Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+		   Cal_Radius(2);
+		   
+		   //DGbuf[DGwptr]=Send_DGbuf(Finished_G);                      //代码写入发送缓冲区
+		   //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+//	       record[record_ptr++]=Finished_G;
+		   
+		   Construt_Line=Current;
+		   Construt_Line.StartAngle=Current.EndAngle-90;
+		   if(Construt_Line.StartAngle<0)
+		 	  Construt_Line.StartAngle+=360;
+		   Construt_Line.EndAngle=Construt_Line.StartAngle;
+		   Construt_Line.CMD1=1;
+		   Vector=Cut_in_cancle_type(Construt_Line,Next);  //这个函数里面已经包含了最尾的处理
+		   break;
+		 case 4:    //G03--G01
+			Vector=Cal_vector(Current.EndAngle+90,Current.CutDirection);
+			Finished_G=Current;
+		    Finished_G.EndPoint.X=Vector.X+Current.EndPoint.X;         //圆弧部分
+	 	    Finished_G.EndPoint.Z=Vector.Z+Current.EndPoint.Z;
+			Cal_Radius(3);
+		    //DGbuf[DGwptr]=Send_DGbuf(Finished_G);                      //代码写入发送缓冲区
+		    //CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);                         //发送区
+//	        record[record_ptr++]=Finished_G;
+			
+			Construt_Line=Current;
+			Construt_Line.StartAngle=Current.EndAngle+90;
+			if(Construt_Line.StartAngle>=360)
+				Construt_Line.StartAngle-=360;
+			Construt_Line.EndAngle=Construt_Line.StartAngle;
+			Construt_Line.CMD1=1;
+			Vector=Cut_in_cancle_type(Construt_Line,Next);
+		   break;
+		 case 5:   //
+		 case 6:   //
+		 case 7:   //
+		 case 8:   //
+		 default:break;     //其余情况不可能存在取消状态
+    	}
+   return Vector;
+}
+
+
+//-------------------------------------------------------
+//**********用于圆弧前强制发送辅助缓冲区内代码***********
+//-------------------------------------------------------
+void Force_Send_M_code(void)
+{
+  
+  while(!CYCLE_BUF_EMPTY(TCGwptrBk,TCGrptrBk))  //发送缓冲区有辅助代码
+	 {
+	   TCGbuf_deal_Bk=TCGbufBk[TCGrptrBk];       //先读缓冲区
+       CYCLE_BUF_RINC(TCGrptrBk,TCG_BUF_MAX);
+       SendMFST(&TCGbuf_deal_Bk);   
+	 }
+}
+//-------------------------------------------
+//**********发送辅助缓冲区内的代码***********
+//-------------------------------------------
+void Send_M_code(void)
+{
+  U8 sign=0;
+  while(!CYCLE_BUF_EMPTY(TCGwptrBk,TCGrptrBk))  //发送缓冲区有辅助代码
+	 {
+	  if(Current_code.Full_sign==0)                //辅助代码为开始代码，也可以直接判断send_count=1;
+      {
+          TCGbuf_deal_Bk=TCGbufBk[TCGrptrBk];       //先读缓冲区
+          CYCLE_BUF_RINC(TCGrptrBk,TCG_BUF_MAX);
+          SendMFST(&TCGbuf_deal_Bk);                                          //再发送
+      }
+	  else if(Former_code.Send_sign!=0)            //前级已经有代码发送
+	  {
+        TCGbuf_deal_Bk=TCGbufBk[TCGrptrBk];        //先读缓冲区
+        if((TCGbuf_deal_Bk.sendCount>=Former_code.SendCount)&&(TCGbuf_deal_Bk.sendCount<=Current_code.SendCount))
+        {
+            CYCLE_BUF_RINC(TCGrptrBk,TCG_BUF_MAX);
+            SendMFST(&TCGbuf_deal_Bk); 
+            sign=1;
+        }else{
+            break;
+        }
+	  }else{
+	    break;
+	  }
+	 }
+	 if(sign==1)
+	     Former_code.Send_sign=0;
+}
+
+//------------------------------------------------------------------------
+//***********将辅助代码保存进缓冲发送区内，调整SEND_COUNT*****************
+//*******如果辅助代码为M30，则将缓冲区内的所有代码发送完******************
+//------------------------------------------------------------------------
+void Save_M_code(void)
+{
+  TDGarc dgarc;
+  PDGBmfst mptr=(PDGBmfst)&dgarc;
+  PDGBmfst fstptr=(PDGBmfst)&dgarc;
+  if((TCGbuf_deal.gnum==GCODE_M30)||(TCGbuf_deal.gnum==GCODE_M31))  //最末一条代码，此时要发送完缓冲区内的所有代码
+ 	{
+ 	  while(!CYCLE_BUF_EMPTY(TCGwptrBk,TCGrptrBk))
+      {
+          TCGbuf_deal_Bk=TCGbufBk[TCGrptrBk];     //先读缓冲区
+          CYCLE_BUF_RINC(TCGrptrBk,TCG_BUF_MAX);
+          SendMFST(&TCGbuf_deal_Bk);
+      }
+ 	  SendMFST(&TCGbuf_deal);
+ 	  if(TCGbuf_deal.gnum==GCODE_M30)
+        gexecState=GEXEC_TOOLCE;
+    }
+  else   
+ 	 {
+ 	   TCGbufBk[TCGwptrBk]=TCGbuf_deal;             //普通辅助代码写入缓冲区
+ 	   CYCLE_BUF_WINC(TCGwptrBk,TCG_BUF_MAX);  
+ 	 }
+}
+
+//------------------------------------------
+//*********刀补主函数***********************
+//------------------------------------------
+ void Tool_Compensation(void)
+   {
+     U8 Move_type;            //暂存三种类型，缩短、伸长、插入
+     delt_Compen_AXIS Send_real_value;
+     //PDGBarc PDGarcptr;
+     PTCGarc TCGarcptr;       //先设一个Garc指针
+     if(CYCLE_BUF_EMPTY(TCGwptr, TCGrptr))
+     {
+        if(gexecState==GEXEC_READE)
+        {
+           gexecState=GEXEC_TOOLCE; 
+        }
+         return ; 
+     }	 
+     if((CYCLE_BUF_DEEP(DGwptr,DGrptr,DG_BUF_MAX)>15)||(CYCLE_BUF_EMPTY(TCGwptr,TCGrptr)))       //发送缓冲空间不够或者无代码进来时直接返回
+	 	return;
+     while((!CYCLE_BUF_EMPTY(TCGwptr,TCGrptr))&&(CYCLE_BUF_DEEP(DGwptr,DGrptr,DG_BUF_MAX)<=15)&&(G_CODE_BUFFER_NUM<1))  //非空且缓冲区足够
+     	{
+     	 TCGarcptr=(PTCGarc)&TCGbuf[TCGrptr];
+     	 TCGbuf_deal=*TCGarcptr;
+		 CYCLE_BUF_RINC(TCGrptr,TCG_BUF_MAX);
+
+		 Send_M_code();   //发送辅助缓冲区内的代码
+		 
+		 Deal_TCGbuf();   //G代码通过整形成标准码，非G代码的模态指令，当场执行
+		 
+		 if(TCGbuf_deal.gnum<=3)    //读到G代码，打入Next区域
+		 	{
+		 	 break;
+		 	}
+		 else
+		 	{
+		 	 Save_M_code();
+		 	}
+     	}
+	 
+	 if(G_CODE_BUFFER_NUM<=0)   //无代码，直接返回
+	 	return;
+	 else
+	 	{
+	 	 Next_code=G_CODE_BUFFER[0];
+		 G_CODE_BUFFER_NUM--;
+		 G_CODE_BUFFER[0]=G_CODE_BUFFER[1];
+		 G_CODE_BUFFER[1]=G_CODE_BUFFER[2];
+		 G_CODE_BUFFER[2]=G_CODE_BUFFER[3];
+		 G_CODE_BUFFER[3]=G_CODE_BUFFER[4];
+		 Next_code.Send_sign=0;
+	 	}
+	 
+	 if(Current_code.Full_sign==0)        //无完成代码，当前区中是第一条代码
+	 	{
+	 	 if(Next_code.Full_sign!=0)
+	 	 	{
+ 	 	     Move_Code();   
+	 	 	}
+		 return;
+	 	}
+	 else if(Next_code.Full_sign!=0)   //当前区已经有代码,且下一区也有代码才执行，否则返回
+	 	{    
+	 	 if(Current_code.CutDirection==0)             //无刀补
+	 	 	{
+	 	 	 Former_code=Current_code;                //直接传输
+	 	 	 if((Current_code.CMD1 == 2)||(Current_code.CMD1 == 3))
+	 	 	 {
+	 	 	 	Cut_Cir_SEND(Current_code);
+	 	 	 }else{
+			 DGbuf[DGwptr]=Send_DGbuf(Current_code);  //代码写入发送缓冲区
+             CYCLE_BUF_WINC(DGwptr,DG_BUF_MAX);       //发送区
+	 	 	 }
+             Force_Send_M_code();
+             Former_code.Send_sign=0;
+	 	 	 Current_code=Next_code;
+	 	 	 Next_code.Full_sign=0;      //
+	 	 	}
+		 else if(Current_code.CutDirection==1)  //当前为左刀补
+		 	{
+		 	   //无上条代码或者上条代码刀补为0时需要建立刀补
+             if((Former_code.Full_sign==0)||((Former_code.Full_sign!=0)&&(Former_code.CutDirection==0))) //G40--G40
+             	{
+             	  if(Current_code.CMD1<=1)   //G01 只有在本条为直线的情况下，下一条才允许刀补取消
+		 	 	 	{
+		 	 	 	 Move_type=Judge_move_type(Current_code,Next_code);
+					 switch(Move_type)
+					 	{
+					 	 case 0:Send_real_value=Shorten_build_type(Current_code,Next_code);       //缩短型
+								Move_Code();     //代码移动
+						 	break;
+							
+						 case 1:Send_real_value=Elongate_build_type(Current_code,Next_code);      //伸长型
+								Move_Code();   
+						 	break;
+						 case 2:Send_real_value=Cut_in_build_type(Current_code,Next_code);        //插入型
+								Move_Code();   
+						 	break;
+						 default:break;
+					 	}
+		 	 	 	}
+             	}
+			 else if(Next_code.CutDirection==0)      //下条代码无刀补偿，则进入取消刀补程序
+			 	{ 
+			 	  if(Next_code.CMD1<=1)              //下条为直线才可以
+	 	 	 	 	{
+	 	 	 	 	 Move_type=Judge_move_type(Current_code,Next_code);
+					 switch(Move_type)
+					 	{
+					 	 case 0:Send_real_value=Shorten_cancle_type(Current_code,Next_code);    //缩短型
+								Move_Code();   
+						 	break;
+						 case 1:Send_real_value=Elongate_cancle_type(Current_code,Next_code);    //伸长型
+								Move_Code();   
+						 	break;
+						 case 2:Send_real_value=Cut_in_cancle_type(Current_code,Next_code);      //插入型
+								Move_Code();   
+						 	break;
+						 default:break;
+					 	}
+	 	 	 	 	}
+			 	}
+			 else if(Next_code.CutDirection==1)       //G41--G41  同向代码，进入自动转接
+			 	{
+			 	  Move_type=Judge_move_type(Current_code,Next_code);
+				  switch(Move_type)
+				  	{
+				  	 case 0:Send_real_value=Shorten_type(Current_code,Next_code);
+							Move_Code();   
+					 	break;
+					 case 1:Send_real_value=Elongate_type(Current_code,Next_code);
+							Move_Code();   
+					 	break;
+					 case 2:Send_real_value=Cut_in_type(Current_code,Next_code);
+							Move_Code();   
+					 	break;
+					 default:break;
+				  	}
+			 	}
+		 	}
+		 else if(Current_code.CutDirection==2)    //当前为右刀补
+		 	{
+		 	 if((Former_code.Full_sign==0)||((Former_code.Full_sign!=0)&&(Former_code.CutDirection==0)))  //建立刀补
+		 	 	{
+		 	 	  if(Current_code.CMD1<=1)        //G01 只有在本条为直线的情况下，下一条才允许刀补取消
+		 	 	 	{
+		 	 	 	 Move_type=Judge_move_type(Current_code,Next_code);
+					 switch(Move_type)
+					 	{
+					 	 case 0:Send_real_value=Shorten_build_type(Current_code,Next_code);    //缩短型
+								Move_Code();   
+						 	break;
+						 case 1:Send_real_value=Elongate_build_type(Current_code,Next_code);   //伸长型
+							    Move_Code();   
+						 	break;
+						 case 2:Send_real_value=Cut_in_build_type(Current_code,Next_code);     //插入型
+								Move_Code();   
+						 	break;
+						 default:break;
+					 	}
+		 	 	 	}
+		 	 	}
+			 
+			  else if(Next_code.CutDirection==0)   //下条代码无刀补偿，则进入取消刀补程序
+			 	{ 
+			 	  if(Next_code.CMD1<=1)            //当前条为直线才可以
+	 	 	 	 	{
+	 	 	 	 	 Move_type=Judge_move_type(Current_code,Next_code);
+					 switch(Move_type)
+					 	{
+					 	 case 0:Send_real_value=Shorten_cancle_type(Current_code,Next_code);    //缩短
+								Move_Code();   
+						 	break;
+						 case 1:Send_real_value=Elongate_cancle_type(Current_code,Next_code);   //伸长型
+								Move_Code();   
+						 	break;
+						 case 2:Send_real_value=Cut_in_cancle_type(Current_code,Next_code);     //插入型
+								Move_Code();   
+						 	break;
+						 default:break;
+					 	}
+	 	 	 	 	}
+			 	}
+			  else if(Former_code.CutDirection==2)     //G42--G42  同类代码，自然转接
+			 	{
+			 	  Move_type=Judge_move_type(Current_code,Next_code);
+				  switch(Move_type)
+				  	{
+				  	 case 0:Send_real_value=Shorten_type(Current_code,Next_code);
+							Move_Code();   
+					 	break;
+					 case 1:Send_real_value=Elongate_type(Current_code,Next_code);
+							Move_Code();   
+					 	break;
+					 case 2:Send_real_value=Cut_in_type(Current_code,Next_code);
+							Move_Code();   
+					 	break;
+					 default:break;
+				  	}
+			 	}
+		 	}
+	 	}  
+   }
+
+

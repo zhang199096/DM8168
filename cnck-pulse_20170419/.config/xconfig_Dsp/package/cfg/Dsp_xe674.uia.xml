@@ -1,0 +1,1045 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<uiaEventData>
+   <hdr>
+      <hdrType>
+         <word>0</word>
+         <width>5</width>
+         <lsb>27</lsb>
+         <enumValue value="0">
+            <name>Event</name>
+         </enumValue>
+         <enumValue value="1">
+            <name>EventWithTimestamp</name>
+         </enumValue>
+         <enumValue value="2">
+            <name>EventWithSnapshotId</name>
+         </enumValue>
+         <enumValue value="3">
+            <name>EventWithSnapshotIdAndTimestamp</name>
+         </enumValue>
+      </hdrType>
+      <hdrLayout>
+         <!-- Header for an event with no timestamps or calling address -->
+         <header name="Event">
+            <numWords>2</numWords>
+            <word index="0">
+               <bitfield name="lengthInMAUs">
+                  <width>11</width>
+                  <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="sequenceID">
+                  <width>16</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="1">
+               <bitfield name="eventID">
+               <width>16</width>
+               <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="moduleID">
+               <width>16</width>
+               <lsb>0</lsb>
+               </bitfield>
+            </word>
+         </header>
+         <!-- Header for an event with 64b timestamp -->
+         <header name="EventWithTimestamp">
+            <numWords>4</numWords>
+            <word index="0">
+               <bitfield name="lengthInMAUs">
+                  <width>11</width>
+                  <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="sequenceID">
+                  <width>16</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="1">
+               <bitfield name="timestampLSW">
+                  <width>32</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="2">
+               <bitfield name="timestampMSW">
+                  <width>32</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="3">
+               <bitfield name="eventID">
+                  <width>16</width>
+                  <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="moduleID">
+                  <width>16</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+         </header>
+         <!-- Header for a snapshot event (no timestamps) -->
+         <header name="EventWithSnapshotId">
+            <numWords>2</numWords>
+            <word index="0">
+               <bitfield name="lengthInMAUs">
+                  <width>11</width>
+                  <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="sequenceID">
+                  <width>16</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="1">
+               <bitfield name="eventID">
+                  <width>16</width>
+                  <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="moduleID">
+                  <width>16</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+         </header>
+         <!-- Header for a snapshot event with 64b timestamps -->
+         <header name="EventWithSnapshotIdAndTimestamp">
+            <numWords>4</numWords>
+            <word index="0">
+               <bitfield name="lengthInMAUs">
+                  <width>11</width>
+                  <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="sequenceID">
+                  <width>16</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="1">
+               <bitfield name="timestampLSW">
+                  <width>32</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="2">
+               <bitfield name="timestampMSW">
+                  <width>32</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+            <word index="3">
+               <bitfield name="eventID">
+                  <width>16</width>
+                  <lsb>16</lsb>
+               </bitfield>
+               <bitfield name="moduleID">
+                  <width>16</width>
+                  <lsb>0</lsb>
+               </bitfield>
+            </word>
+         </header>
+      </hdrLayout>
+   </hdr>
+   <evtMap id="7274">
+      <longName>xdc.runtime.Log.L_construct</longName>
+      <shortName>Log_L_construct</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>4</diagMask>
+      <msg>%3C--+construct%3A+%25p%28%27%25s%27%29</msg>
+      <eventType>LIFECYCLE</eventType>
+   </evtMap>
+   <evtMap id="7298">
+      <longName>xdc.runtime.Log.L_create</longName>
+      <shortName>Log_L_create</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>4</diagMask>
+      <msg>%3C--+create%3A+%25p%28%27%25s%27%29</msg>
+      <eventType>LIFECYCLE</eventType>
+   </evtMap>
+   <evtMap id="7319">
+      <longName>xdc.runtime.Log.L_destruct</longName>
+      <shortName>Log_L_destruct</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>4</diagMask>
+      <msg>--%3E+destruct%3A+%28%25p%29</msg>
+      <eventType>LIFECYCLE</eventType>
+   </evtMap>
+   <evtMap id="7338">
+      <longName>xdc.runtime.Log.L_delete</longName>
+      <shortName>Log_L_delete</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>4</diagMask>
+      <msg>--%3E+delete%3A+%28%25p%29</msg>
+      <eventType>LIFECYCLE</eventType>
+   </evtMap>
+   <evtMap id="7355">
+      <longName>xdc.runtime.Log.L_error</longName>
+      <shortName>Log_L_error</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>128</diagMask>
+      <msg>ERROR%3A+%25%24F%25%24S</msg>
+      <eventType>ERROR</eventType>
+   </evtMap>
+   <evtMap id="7369">
+      <longName>xdc.runtime.Log.L_warning</longName>
+      <shortName>Log_L_warning</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>128</diagMask>
+      <msg>WARNING%3A+%25%24F%25%24S</msg>
+      <eventType>WARNING</eventType>
+   </evtMap>
+   <evtMap id="7385">
+      <longName>xdc.runtime.Log.L_info</longName>
+      <shortName>Log_L_info</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>16384</diagMask>
+      <msg>%25%24F%25%24S</msg>
+      <eventType>INFO</eventType>
+   </evtMap>
+   <evtMap id="7392">
+      <longName>xdc.runtime.Log.L_start</longName>
+      <shortName>Log_L_start</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>32768</diagMask>
+      <msg>Start%3A+%25%24S</msg>
+      <eventType>ANALYSIS</eventType>
+   </evtMap>
+   <evtMap id="7403">
+      <longName>xdc.runtime.Log.L_stop</longName>
+      <shortName>Log_L_stop</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>32768</diagMask>
+      <msg>Stop%3A+%25%24S</msg>
+      <eventType>ANALYSIS</eventType>
+   </evtMap>
+   <evtMap id="7413">
+      <longName>xdc.runtime.Log.L_startInstance</longName>
+      <shortName>Log_L_startInstance</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>32768</diagMask>
+      <msg>StartInstance%3A+%25%24S</msg>
+      <eventType>ANALYSIS</eventType>
+   </evtMap>
+   <evtMap id="7432">
+      <longName>xdc.runtime.Log.L_stopInstance</longName>
+      <shortName>Log_L_stopInstance</shortName>
+      <moduleId>32777</moduleId>
+      <diagMask>32768</diagMask>
+      <msg>StopInstance%3A+%25%24S</msg>
+      <eventType>ANALYSIS</eventType>
+   </evtMap>
+   <evtMap id="7848">
+      <longName>ti.sysbios.family.c64p.Hwi.LM_begin</longName>
+      <shortName>Hwi_LM_begin</shortName>
+      <moduleId>32790</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_begin%3A+hwi%3A+0x%25x%2C+func%3A+0x%25x%2C+preThread%3A+%25d%2C+intNum%3A+%25d%2C+irp%3A+0x%25x</msg>
+   </evtMap>
+   <evtMap id="7918">
+      <longName>ti.sysbios.family.c64p.Hwi.LD_end</longName>
+      <shortName>Hwi_LD_end</shortName>
+      <moduleId>32790</moduleId>
+      <diagMask>512</diagMask>
+      <msg>LD_end%3A+hwi%3A+0x%25x</msg>
+   </evtMap>
+   <evtMap id="7936">
+      <longName>ti.sysbios.knl.Clock.LW_delayed</longName>
+      <shortName>Clock_LW_delayed</shortName>
+      <moduleId>32798</moduleId>
+      <diagMask>1024</diagMask>
+      <msg>LW_delayed%3A+delay%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="7958">
+      <longName>ti.sysbios.knl.Clock.LM_tick</longName>
+      <shortName>Clock_LM_tick</shortName>
+      <moduleId>32798</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_tick%3A+tick%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="7976">
+      <longName>ti.sysbios.knl.Clock.LM_begin</longName>
+      <shortName>Clock_LM_begin</shortName>
+      <moduleId>32798</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_begin%3A+clk%3A+0x%25x%2C+func%3A+0x%25x</msg>
+   </evtMap>
+   <evtMap id="8008">
+      <longName>ti.sysbios.knl.Semaphore.LM_post</longName>
+      <shortName>Semaphore_LM_post</shortName>
+      <moduleId>32802</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_post%3A+sem%3A+0x%25x%2C+count%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="8038">
+      <longName>ti.sysbios.knl.Semaphore.LM_pend</longName>
+      <shortName>Semaphore_LM_pend</shortName>
+      <moduleId>32802</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_pend%3A+sem%3A+0x%25x%2C+count%3A+%25d%2C+timeout%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="8081">
+      <longName>ti.sysbios.knl.Swi.LM_begin</longName>
+      <shortName>Swi_LM_begin</shortName>
+      <moduleId>32803</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_begin%3A+swi%3A+0x%25x%2C+func%3A+0x%25x%2C+preThread%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="8128">
+      <longName>ti.sysbios.knl.Swi.LD_end</longName>
+      <shortName>Swi_LD_end</shortName>
+      <moduleId>32803</moduleId>
+      <diagMask>512</diagMask>
+      <msg>LD_end%3A+swi%3A+0x%25x</msg>
+   </evtMap>
+   <evtMap id="8146">
+      <longName>ti.sysbios.knl.Swi.LM_post</longName>
+      <shortName>Swi_LM_post</shortName>
+      <moduleId>32803</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_post%3A+swi%3A+0x%25x%2C+func%3A+0x%25x%2C+pri%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="8186">
+      <longName>ti.sysbios.knl.Task.LM_switch</longName>
+      <shortName>Task_LM_switch</shortName>
+      <moduleId>32804</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_switch%3A+oldtsk%3A+0x%25x%2C+oldfunc%3A+0x%25x%2C+newtsk%3A+0x%25x%2C+newfunc%3A+0x%25x</msg>
+   </evtMap>
+   <evtMap id="8254">
+      <longName>ti.sysbios.knl.Task.LM_sleep</longName>
+      <shortName>Task_LM_sleep</shortName>
+      <moduleId>32804</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_sleep%3A+tsk%3A+0x%25x%2C+func%3A+0x%25x%2C+timeout%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="8299">
+      <longName>ti.sysbios.knl.Task.LD_ready</longName>
+      <shortName>Task_LD_ready</shortName>
+      <moduleId>32804</moduleId>
+      <diagMask>512</diagMask>
+      <msg>LD_ready%3A+tsk%3A+0x%25x%2C+func%3A+0x%25x%2C+pri%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="8340">
+      <longName>ti.sysbios.knl.Task.LD_block</longName>
+      <shortName>Task_LD_block</shortName>
+      <moduleId>32804</moduleId>
+      <diagMask>512</diagMask>
+      <msg>LD_block%3A+tsk%3A+0x%25x%2C+func%3A+0x%25x</msg>
+   </evtMap>
+   <evtMap id="8372">
+      <longName>ti.sysbios.knl.Task.LM_yield</longName>
+      <shortName>Task_LM_yield</shortName>
+      <moduleId>32804</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_yield%3A+tsk%3A+0x%25x%2C+func%3A+0x%25x%2C+currThread%3A+%25d</msg>
+   </evtMap>
+   <evtMap id="8420">
+      <longName>ti.sysbios.knl.Task.LM_setPri</longName>
+      <shortName>Task_LM_setPri</shortName>
+      <moduleId>32804</moduleId>
+      <diagMask>768</diagMask>
+      <msg>LM_setPri%3A+tsk%3A+0x%25x%2C+func%3A+0x%25x%2C+oldPri%3A+%25d%2C+newPri+%25d</msg>
+   </evtMap>
+   <evtMap id="8476">
+      <longName>ti.sysbios.knl.Task.LD_exit</longName>
+      <shortName>Task_LD_exit</shortName>
+      <moduleId>32804</moduleId>
+      <diagMask>512</diagMask>
+      <msg>LD_exit%3A+tsk%3A+0x%25x%2C+func%3A+0x%25x</msg>
+   </evtMap>
+   <evtMap id="8507">
+      <longName>ti.sdo.ipc.GateMP.LM_enter</longName>
+      <shortName>GateMP_LM_enter</shortName>
+      <moduleId>32823</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_enter%3A+Gate+%28remoteGate+%3D+%25d%2C+resourceId+%3D+%25d%29+entered%2C+returning+key+%3D+%25d</msg>
+   </evtMap>
+   <evtMap id="8585">
+      <longName>ti.sdo.ipc.GateMP.LM_leave</longName>
+      <shortName>GateMP_LM_leave</shortName>
+      <moduleId>32823</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_leave%3A+Gate+%28remoteGate+%3D+%25d%2C+resourceId+%3D+%25d%29+left+using+key+%3D+%25d</msg>
+   </evtMap>
+   <evtMap id="8655">
+      <longName>ti.sdo.ipc.GateMP.LM_create</longName>
+      <shortName>GateMP_LM_create</shortName>
+      <moduleId>32823</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_create%3A+Gate+%28remoteGate+%3D+%25d%2C+resourceId+%3D+%25d%29+created</msg>
+   </evtMap>
+   <evtMap id="8714">
+      <longName>ti.sdo.ipc.GateMP.LM_open</longName>
+      <shortName>GateMP_LM_open</shortName>
+      <moduleId>32823</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_open%3A+Remote+gate+%28remoteGate+%3D+%25d%2C+resourceId+%3D+%25d%29+opened</msg>
+   </evtMap>
+   <evtMap id="8777">
+      <longName>ti.sdo.ipc.GateMP.LM_delete</longName>
+      <shortName>GateMP_LM_delete</shortName>
+      <moduleId>32823</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_delete%3A+Gate+%28remoteGate+%3D+%25d%2C+resourceId+%3D+%25d%29+deleted</msg>
+   </evtMap>
+   <evtMap id="8836">
+      <longName>ti.sdo.ipc.GateMP.LM_close</longName>
+      <shortName>GateMP_LM_close</shortName>
+      <moduleId>32823</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_close%3A+Gate+%28remoteGate+%3D+%25d%2C+resourceId+%3D+%25d%29+closed</msg>
+   </evtMap>
+   <evtMap id="8893">
+      <longName>ti.sdo.ipc.MessageQ.LM_setTrace</longName>
+      <shortName>MessageQ_LM_setTrace</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_setTrace%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+traceFlag+%3D+%25d</msg>
+   </evtMap>
+   <evtMap id="8962">
+      <longName>ti.sdo.ipc.MessageQ.LM_alloc</longName>
+      <shortName>MessageQ_LM_alloc</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_alloc%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+was+allocated</msg>
+   </evtMap>
+   <evtMap id="9027">
+      <longName>ti.sdo.ipc.MessageQ.LM_staticMsgInit</longName>
+      <shortName>MessageQ_LM_staticMsgInit</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_staticMsgInit%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+was+set+in+MessageQ_staticMsgInit</msg>
+   </evtMap>
+   <evtMap id="9120">
+      <longName>ti.sdo.ipc.MessageQ.LM_free</longName>
+      <shortName>MessageQ_LM_free</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_free%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+was+freed</msg>
+   </evtMap>
+   <evtMap id="9180">
+      <longName>ti.sdo.ipc.MessageQ.LM_putLocal</longName>
+      <shortName>MessageQ_LM_putLocal</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_putLocal%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+was+placed+onto+queue+0x%25x</msg>
+   </evtMap>
+   <evtMap id="9261">
+      <longName>ti.sdo.ipc.MessageQ.LM_putRemote</longName>
+      <shortName>MessageQ_LM_putRemote</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_putRemote%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+was+given+to+processor+%25d+transport</msg>
+   </evtMap>
+   <evtMap id="9352">
+      <longName>ti.sdo.ipc.MessageQ.LM_rcvByTransport</longName>
+      <shortName>MessageQ_LM_rcvByTransport</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_rcvByTransport%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+was+received</msg>
+   </evtMap>
+   <evtMap id="9425">
+      <longName>ti.sdo.ipc.MessageQ.LM_get</longName>
+      <shortName>MessageQ_LM_get</shortName>
+      <moduleId>32824</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_get%3A+Message+0x%25x+%28seqNum+%3D+%25d%2C+srcProc+%3D+%25d%29+was+received+by+queue+0x%25x</msg>
+   </evtMap>
+   <evtMap id="9501">
+      <longName>ti.sdo.ipc.gates.GateHWSpinlock.LM_enter</longName>
+      <shortName>GateHWSpinlock_LM_enter</shortName>
+      <moduleId>32859</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_enter%3A+Gate+%28lockNum+%3D+%25d%29+entered%2C+returning+key+%3D+%25d</msg>
+   </evtMap>
+   <evtMap id="9559">
+      <longName>ti.sdo.ipc.gates.GateHWSpinlock.LM_leave</longName>
+      <shortName>GateHWSpinlock_LM_leave</shortName>
+      <moduleId>32859</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_leave%3A+Gate+%28lockNum+%3D+%25d%29+left+using+key+%3D+%25d</msg>
+   </evtMap>
+   <evtMap id="9609">
+      <longName>ti.sdo.ipc.gates.GateHWSpinlock.LM_create</longName>
+      <shortName>GateHWSpinlock_LM_create</shortName>
+      <moduleId>32859</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_create%3A+Gate+%28lockNum+%3D+%25d%29+created</msg>
+   </evtMap>
+   <evtMap id="9648">
+      <longName>ti.sdo.ipc.gates.GateHWSpinlock.LM_open</longName>
+      <shortName>GateHWSpinlock_LM_open</shortName>
+      <moduleId>32859</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_open%3A+Remote+gate+%28lockNum+%3D+%25d%29+opened</msg>
+   </evtMap>
+   <evtMap id="9691">
+      <longName>ti.sdo.ipc.gates.GateHWSpinlock.LM_delete</longName>
+      <shortName>GateHWSpinlock_LM_delete</shortName>
+      <moduleId>32859</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_delete%3A+Gate+%28lockNum+%3D+%25d%29+deleted</msg>
+   </evtMap>
+   <evtMap id="9730">
+      <longName>ti.sdo.ipc.gates.GateHWSpinlock.LM_close</longName>
+      <shortName>GateHWSpinlock_LM_close</shortName>
+      <moduleId>32859</moduleId>
+      <diagMask>256</diagMask>
+      <msg>LM_close%3A+Gate+%28lockNum+%3D+%25d%29+closed</msg>
+   </evtMap>
+   <modIdMap id="32770">
+      <moduleName>xdc.runtime.Assert</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Assert.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32771">
+      <moduleName>xdc.runtime.Core</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32772">
+      <moduleName>xdc.runtime.Defaults</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32773">
+      <moduleName>xdc.runtime.Diags</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Diags.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32774">
+      <moduleName>xdc.runtime.Error</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Error.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32775">
+      <moduleName>xdc.runtime.Gate</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Gate.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32776">
+      <moduleName>xdc.runtime.GateNull</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>GateNull.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32777">
+      <moduleName>xdc.runtime.Log</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Log.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32778">
+      <moduleName>xdc.runtime.Main</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32779">
+      <moduleName>xdc.runtime.Memory</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Memory.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32780">
+      <moduleName>xdc.runtime.Registry</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Registry.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32781">
+      <moduleName>xdc.runtime.Startup</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Startup.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32782">
+      <moduleName>xdc.runtime.System</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>System.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32783">
+      <moduleName>xdc.runtime.SysMin</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>SysMin.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32784">
+      <moduleName>xdc.runtime.Text</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Text.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32785">
+      <moduleName>xdc.runtime.Timestamp</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>Timestamp.c</cFileName>
+   </modIdMap>
+   <modIdMap id="1">
+      <moduleName>xdc.runtime.Main_Module_GateProxy</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="2">
+      <moduleName>xdc.runtime.Memory_HeapProxy</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="3">
+      <moduleName>xdc.runtime.System_SupportProxy</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="4">
+      <moduleName>xdc.runtime.System_Module_GateProxy</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="5">
+      <moduleName>xdc.runtime.Timestamp_SupportProxy</moduleName>
+      <packageVersion>2, 1, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32789">
+      <moduleName>ti.sysbios.family.c64p.Exception</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/</packageBase>
+      <cFileName>Exception.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32790">
+      <moduleName>ti.sysbios.family.c64p.Hwi</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/</packageBase>
+      <cFileName>Hwi.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32791">
+      <moduleName>ti.sysbios.family.c64p.TimestampProvider</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/</packageBase>
+      <cFileName>TimestampProvider.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32792">
+      <moduleName>ti.sysbios.family.c64p.Cache</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/</packageBase>
+      <cFileName>Cache.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32794">
+      <moduleName>ti.sysbios.hal.Hwi</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/</packageBase>
+      <cFileName>Hwi.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32795">
+      <moduleName>ti.sysbios.hal.Timer</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/</packageBase>
+      <cFileName>Timer.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32796">
+      <moduleName>ti.sysbios.hal.Cache</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/</packageBase>
+      <cFileName>Cache.c</cFileName>
+   </modIdMap>
+   <modIdMap id="6">
+      <moduleName>ti.sysbios.hal.Hwi_HwiProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="7">
+      <moduleName>ti.sysbios.hal.Timer_TimerProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="8">
+      <moduleName>ti.sysbios.hal.Cache_CacheProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/hal/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32798">
+      <moduleName>ti.sysbios.knl.Clock</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>Clock.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32799">
+      <moduleName>ti.sysbios.knl.Idle</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>Idle.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32800">
+      <moduleName>ti.sysbios.knl.Intrinsics</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>Intrinsics.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32801">
+      <moduleName>ti.sysbios.knl.Queue</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>Queue.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32802">
+      <moduleName>ti.sysbios.knl.Semaphore</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>Semaphore.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32803">
+      <moduleName>ti.sysbios.knl.Swi</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>Swi.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32804">
+      <moduleName>ti.sysbios.knl.Task</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>Task.c</cFileName>
+   </modIdMap>
+   <modIdMap id="9">
+      <moduleName>ti.sysbios.knl.Intrinsics_SupportProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="10">
+      <moduleName>ti.sysbios.knl.Task_SupportProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/knl/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32806">
+      <moduleName>ti.sysbios.gates.GateHwi</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/gates/</packageBase>
+      <cFileName>GateHwi.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32807">
+      <moduleName>ti.sysbios.gates.GateAll</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/gates/</packageBase>
+      <cFileName>GateAll.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32808">
+      <moduleName>ti.sysbios.gates.GateSwi</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/gates/</packageBase>
+      <cFileName>GateSwi.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32809">
+      <moduleName>ti.sysbios.gates.GateMutexPri</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/gates/</packageBase>
+      <cFileName>GateMutexPri.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32810">
+      <moduleName>ti.sysbios.gates.GateMutex</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/gates/</packageBase>
+      <cFileName>GateMutex.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32811">
+      <moduleName>ti.sysbios.BIOS</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/</packageBase>
+      <cFileName>BIOS.c</cFileName>
+   </modIdMap>
+   <modIdMap id="11">
+      <moduleName>ti.sysbios.BIOS_RtsGateProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32813">
+      <moduleName>xdc.runtime.knl.GateThread</moduleName>
+      <packageVersion>1, 0, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/knl/</packageBase>
+      <cFileName>GateThread.c</cFileName>
+   </modIdMap>
+   <modIdMap id="12">
+      <moduleName>xdc.runtime.knl.GateThread_Proxy</moduleName>
+      <packageVersion>1, 0, 0</packageVersion>
+      <packageBase>E:/ti/xdctools_3_23_04_60/packages/xdc/runtime/knl/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32816">
+      <moduleName>ti.sdo.utils.NameServer</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/utils/</packageBase>
+      <cFileName>NameServer.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32817">
+      <moduleName>ti.sdo.utils.NameServerRemoteNull</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/utils/</packageBase>
+      <cFileName>NameServerRemoteNull.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32818">
+      <moduleName>ti.sdo.utils.MultiProc</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/utils/</packageBase>
+      <cFileName>MultiProc.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32819">
+      <moduleName>ti.sdo.utils.List</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/utils/</packageBase>
+      <cFileName>List.c</cFileName>
+   </modIdMap>
+   <modIdMap id="13">
+      <moduleName>ti.sdo.utils.NameServer_SetupProxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/utils/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32821">
+      <moduleName>ti.sysbios.syncs.SyncSem</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/syncs/</packageBase>
+      <cFileName>SyncSem.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32823">
+      <moduleName>ti.sdo.ipc.GateMP</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>GateMP.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32824">
+      <moduleName>ti.sdo.ipc.MessageQ</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>MessageQ.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32825">
+      <moduleName>ti.sdo.ipc.SharedRegion</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>SharedRegion.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32826">
+      <moduleName>ti.sdo.ipc.ListMP</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>ListMP.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32827">
+      <moduleName>ti.sdo.ipc.Ipc</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>Ipc.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32828">
+      <moduleName>ti.sdo.ipc.Notify</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>Notify.c</cFileName>
+   </modIdMap>
+   <modIdMap id="14">
+      <moduleName>ti.sdo.ipc.GateMP_RemoteSystemProxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="15">
+      <moduleName>ti.sdo.ipc.GateMP_RemoteCustom1Proxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="16">
+      <moduleName>ti.sdo.ipc.GateMP_RemoteCustom2Proxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="17">
+      <moduleName>ti.sdo.ipc.MessageQ_SetupTransportProxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="18">
+      <moduleName>ti.sdo.ipc.Notify_SetupProxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="19">
+      <moduleName>ti.sdo.ipc.Notify_Module_GateProxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32830">
+      <moduleName>ti.sysbios.heaps.HeapMem</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/heaps/</packageBase>
+      <cFileName>HeapMem.c</cFileName>
+   </modIdMap>
+   <modIdMap id="20">
+      <moduleName>ti.sysbios.heaps.HeapMem_Module_GateProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/heaps/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32833">
+      <moduleName>ti.sysbios.timers.dmtimer.Timer</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/timers/dmtimer/</packageBase>
+      <cFileName>Timer.c</cFileName>
+   </modIdMap>
+   <modIdMap id="21">
+      <moduleName>ti.sysbios.timers.dmtimer.Timer_TimerSupportProxy</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/timers/dmtimer/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32836">
+      <moduleName>ti.uia.events.DvtTypes</moduleName>
+      <packageVersion>1, 0, 0, 2</packageVersion>
+      <packageBase>E:/ti/uia_1_01_01_14/packages/ti/uia/events/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32838">
+      <moduleName>ti.uia.runtime.LoggerSM</moduleName>
+      <packageVersion>1, 0, 0, 2</packageVersion>
+      <packageBase>E:/ti/uia_1_01_01_14/packages/ti/uia/runtime/</packageBase>
+      <cFileName>LoggerSM.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32839">
+      <moduleName>ti.uia.runtime.UIAMetaData</moduleName>
+      <packageVersion>1, 0, 0, 2</packageVersion>
+      <packageBase>E:/ti/uia_1_01_01_14/packages/ti/uia/runtime/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32841">
+      <moduleName>ti.sysbios.xdcruntime.GateThreadSupport</moduleName>
+      <packageVersion>1, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/xdcruntime/</packageBase>
+      <cFileName>GateThreadSupport.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32843">
+      <moduleName>ti.sysbios.family.c62.TaskSupport</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c62/</packageBase>
+      <cFileName>TaskSupport.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32844">
+      <moduleName>ti.sysbios.family.c62.IntrinsicsSupport</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c62/</packageBase>
+      <cFileName>IntrinsicsSupport.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32846">
+      <moduleName>ti.sysbios.family.c64p.ti81xx.TimerSupport</moduleName>
+      <packageVersion>2, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/bios_6_33_05_46/packages/ti/sysbios/family/c64p/ti81xx/</packageBase>
+      <cFileName>TimerSupport.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32848">
+      <moduleName>ti.sdo.ipc.notifyDrivers.NotifyDriverShm</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/notifyDrivers/</packageBase>
+      <cFileName>NotifyDriverShm.c</cFileName>
+   </modIdMap>
+   <modIdMap id="22">
+      <moduleName>ti.sdo.ipc.notifyDrivers.NotifyDriverShm_InterruptProxy</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/notifyDrivers/</packageBase>
+      <cFileName>null</cFileName>
+   </modIdMap>
+   <modIdMap id="32851">
+      <moduleName>ti.sdo.ipc.family.ti81xx.NotifySetup</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/family/ti81xx/</packageBase>
+      <cFileName>NotifySetup.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32852">
+      <moduleName>ti.sdo.ipc.family.ti81xx.InterruptDsp</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/family/ti81xx/</packageBase>
+      <cFileName>InterruptDsp.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32854">
+      <moduleName>ti.sdo.ipc.transports.TransportShm</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/transports/</packageBase>
+      <cFileName>TransportShm.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32855">
+      <moduleName>ti.sdo.ipc.transports.TransportShmSetup</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/transports/</packageBase>
+      <cFileName>TransportShmSetup.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32857">
+      <moduleName>ti.sdo.ipc.nsremote.NameServerRemoteNotify</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/nsremote/</packageBase>
+      <cFileName>NameServerRemoteNotify.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32859">
+      <moduleName>ti.sdo.ipc.gates.GateHWSpinlock</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/gates/</packageBase>
+      <cFileName>GateHWSpinlock.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32860">
+      <moduleName>ti.sdo.ipc.gates.GatePeterson</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/gates/</packageBase>
+      <cFileName>GatePeterson.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32861">
+      <moduleName>ti.sdo.ipc.gates.GateMPSupportNull</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/gates/</packageBase>
+      <cFileName>GateMPSupportNull.c</cFileName>
+   </modIdMap>
+   <modIdMap id="32863">
+      <moduleName>ti.sdo.ipc.heaps.HeapMemMP</moduleName>
+      <packageVersion>1, 0, 0, 0</packageVersion>
+      <packageBase>E:/ti/ipc_1_24_03_32/packages/ti/sdo/ipc/heaps/</packageBase>
+      <cFileName>HeapMemMP.c</cFileName>
+   </modIdMap>
+   <transport>
+   <!-- This tag must be here for DVT to work. All data is in transport2 -->
+   </transport>
+   <services>
+   </services>
+   <!-- CPU Clock settings from ti.platforms.evmTI816X.Platform.Instance#0 for TMS320TI816X [ti.catalog.c6000] -->
+   <cpuClock>
+      <maxClockFreqMSW>0</maxClockFreqMSW>
+      <maxClockFreqLSW>800000000</maxClockFreqLSW>
+      <canFrequencyBeChanged>false</canFrequencyBeChanged>
+   </cpuClock>
+   <eventCorrelation>
+      <isEnabled>false</isEnabled>
+      <cpuTimestamp>
+         <!-- C6000 device uses an internal timestamp -->
+         <maxTimerFreqMSW>0</maxTimerFreqMSW>
+         <maxTimerFreqLSW>800000000</maxTimerFreqLSW>
+         <cyclesPerTick>1</cyclesPerTick>
+      </cpuTimestamp>
+   </eventCorrelation>
+</uiaEventData>

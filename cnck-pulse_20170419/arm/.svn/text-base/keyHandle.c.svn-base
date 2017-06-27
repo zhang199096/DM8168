@@ -1,0 +1,3500 @@
+/************************************************************************
+*   file name: keyhandle.c
+*   author : vinge
+*   create date: 20090905
+*   version: 0: 20090905--init version,  ;
+****************************************************************************
+*/
+#include "keyhandle.h"
+//extern U8 coordShowing;
+ U8 keyVersion[3];
+//extern void upgrade(void);
+/*
+*------------------------------------------------------------------------------
+* function: keyHandle
+* parameter: void
+* return   : void
+* description : handle the key event: check if the curkey var has a not zero
+*               value; if it does, dispatch the key event; change interface 
+*------------------------------------------------------------------------------
+*/
+void keyHandle(U8 keyval)
+{
+   //U8 keyval;
+   // TkeyInfo tempkeyval;
+    static U16 jogKeyPrev=0;
+
+    //Msg_Send(1,keyval);
+    //if we are in edit ,get the key we warn    
+    if((currentGUI==GUINUM_EDIT)&&(sysMode==SYS_MODE_EDIT)||(currentGUI==GUINUM_MDI)&&(sysMode==SYS_MODE_MDI))
+    {
+        if((keyval<127)||  //the up and roll is left for gui key handle
+            ((keyval>=KEY_F1)&&(keyval<=KEY_F6))|| 
+            ((keyval>=KEY_PAGEUP)&&(keyval<=KEY_RIGHT))||
+            (keyval==KEY_ENTER)||(keyval==KEY_CANCLE))
+        {
+            /*if(editKey==0)
+            {
+               // editKey=keyval;
+            }*/
+            return;
+        }
+    }
+    /*
+    if(keyLock==TRUE)
+    {   //enter and numkey is usable
+        if(!((keyval==KEY_ENTER)||
+            ((keyval>='0')&&(keyval<='9'))))
+            return;
+    }
+    if(assure!=0)
+    {
+        if(keyval==KEY_ENTER)
+        {           
+           assureEnter();
+           assure=0;
+        }else{
+            assure=0;
+            showMsg=FALSE;
+        }
+        return;
+    }
+    
+    if(keyval==KEY_ENTER)
+    {
+        //compile and exec the command
+        cmderr=cmdScanExec();
+        if(cmderr!=GERR_OK)
+        {   //tell task 3 to show err message
+            showMsg=TRUE;
+        }else{
+            cmdbufClear();
+			showMsg=FALSE;
+        }
+    }else if(keyval==KEY_CANCLE){
+        if(trace_zoom_on||trace_move_on)
+        {
+            trace_move_on=0;
+            trace_zoom_on=0;
+            showMsg=FALSE;
+        }
+    }else if(keyval<0x20)
+    {
+        return;
+    }else */
+    if(keyval<128)
+    {
+        //Msg_Send(1,keyval+100);
+    }
+
+    switch(keyval)
+    {
+        case (196):
+            currentGUI = GUINUM_EDIT;
+            break;
+        case (193):
+            currentGUI = GUINUM_HD;
+            break;
+        case (192):
+        case (KEY_MACHLOCK):
+            //if it is not in auto mode or program is not runing
+            if(GEXEC_STATE_RUNING)
+                break;
+            if(sysMode!=SYS_MODE_MDI)
+                break;
+            machLockKeyHanle();
+            break;
+        case (194):
+        case(KEY_RUN): //this is the real run key
+            runKeyHandle();
+            break;
+        /*case (KEY_POSITION):
+        case (KEY_PROGRAM):
+        case (KEY_COMPENS):
+        case (KEY_ALARM):
+        case (KEY_PARAM):
+        case (KEY_DGN):
+            interfaceKeyHandle(keyval);
+            break;*/
+        case (KEY_FUP):
+        case (KEY_F1):
+        case (KEY_F2):
+        case (KEY_F3):
+        case (KEY_F4):
+        case (KEY_F5):
+        case (KEY_F6):        
+        case (KEY_FROLL):
+            funcKeyHandle(keyval);
+            break;
+        case(KEY_AXISX):
+        case(KEY_AXISY):
+        case(KEY_AXISZ):
+        case(KEY_RATE1 ):
+        case(KEY_RATE10 ):
+        case(KEY_RATE100 ):
+            whellKeyHandle(keyval);
+            break;
+        case(KEY_JOG_GRADE):
+            jogGradeKeyHandle(keyval);
+        case(KEY_SPIN_CW):
+        case(KEY_SPIN_CCW):
+        case(KEY_SPIN_STOP):
+            spindleKeyHandle(keyval);
+            break; 
+        case(KEY_COOL):
+        case(KEY_OIL):
+        case(KEY_TOOL):
+            assistenKeyHandle(keyval);
+            break;
+
+        case(KEY_SPIN_AC):
+        case(KEY_RAPID_AC):
+        case(KEY_FEED_AC):
+        case(KEY_SPIN_DC):
+        case(KEY_RAPID_DC):
+        case(KEY_FEED_DC):
+            gradeKeyHandle(keyval);
+            break;  
+        case(KEY_EDIT):
+        case(KEY_AUTO):
+        case(KEY_MDI):
+        case(KEY_REF):
+        case(KEY_WHEEL):
+        case(KEY_JOG):
+            sysModeChange(keyval);
+            break;
+        case (KEY_SINGLE):
+            singleKeyHandle();
+            break;
+        case(KEY_JUMPSEG):
+            jumpSegKeyHandle();
+            break;
+        case(KEY_FALSERUN):
+            falseRunKeyHanle();
+            break;
+        case(KEY_WHELLRUN):
+            whellRunKey();
+            break;
+        case(KEY_STARTP):
+            if(DSPparam.sysbyte[92]==0)
+                goZero(1,3);
+            break;
+        case(KEY_PAUSE):
+            pauseKeyHandle();
+            break;
+        case (KEY_RST):
+            softReset();
+            if(coolSign==1)
+            {
+                assistenKeyHandle(KEY_COOL);
+            }
+            break;
+        case(KEY_SPIN_SPOT):
+            spindle_spotMove();
+            break;
+        case(KEY_VERSION):
+            //keyVersion[0]=tempkeyval.key2arm.s;
+            //keyVersion[1]=tempkeyval.key2arm.shortedkey;
+            //keyVersion[2]='\0';
+            break;
+        default:
+            break;
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: assureEnter
+* parameter: void
+* return   : void
+* description : some event must be assure before real do it 
+*------------------------------------------------------------------------------
+*/
+void assureEnter(void)
+{
+    switch(assure)
+    {
+        case(ASSURE_FILE_DELETE):
+            //FileManageDel();
+            break;
+        case(ASSURE_DISK_FORMAT):
+            //FileManageFormat();
+            break;
+        case(ASSURE_PARAM_DEFAULT):
+            paramLoadDefault();
+            break;
+        case(ASSURE_PARAM_LOAD):
+            paramLoadFromFile();
+            break;
+        case(ASSURE_UPGRADE):
+            //upgrade();
+            break;
+        case(ASSURE_TOOLCOMP_LOAD):
+            toolCompLoadFromFile();
+            break;
+        case(ASSURE_REFP_LOAD):
+//            refpLoadFromFile();
+            break;
+        case(ASSURE_G54_LOAD):
+//            g54LoadFromFile();
+            break;
+        case(ASSURE_CLEARALL):
+//            toolclearall();
+            break;
+        default:
+            break;            
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: function key dispacth
+* parameter: void
+* return   : void
+* description : handle the key event: check if the curkey var has a not zero
+*               value; if it does, dispatch the key event; change interface 
+*------------------------------------------------------------------------------
+*/
+void interfaceKeyHandle(U8 key)
+{
+    prevGUI=currentGUI;
+    switch(key)
+    {
+        case (KEY_POSITION):
+            if((currentGUI>GUINUM_COORDS)||(currentGUI<GUINUM_COORD))
+            {
+                currentGUI=GUINUM_COORD;
+            }            
+            break;
+        case (KEY_PROGRAM):
+            if(sysMode==SYS_MODE_AUTO)//not allow to hd operation in std
+                return ;
+            currentMenu=0;
+            currentGUI=GUINUM_HD;
+            break;
+        case (KEY_COMPENS):
+            currentMenu=0;
+            currentGUI=GUINUM_TCOMP;
+            break;     
+        case (KEY_ALARM):
+            currentGUI=GUINUM_ALARM ; 
+            break;
+        case (KEY_PARAM):
+            //switch menu
+            currentGUI=GUINUM_PARAM;
+            currentMenu=0;
+            break;
+        case (KEY_DGN):
+            currentGUI=GUINUM_DGN;
+            break;         
+    }     
+}
+
+
+
+void jogGradeKeyHandle(U8 keyval)
+{
+    
+    if((SYS_MODE_JOG==sysMode)||(SYS_MODE_ZERO==sysMode)
+        ||(SYS_MODE_MDI==sysMode))
+    {
+        jogGrade=(jogGrade+1)%3;
+        switch(jogGrade)
+        {
+            case(0):
+                jogFeed=DSPparam.sysdword[30];
+                break;
+            case(1):
+                jogFeed=DSPparam.sysdword[31];
+                break;
+            case(2 ):
+                 jogFeed=DSPparam.sysdword[32];
+                break;
+            default:
+                jogGrade=0;
+                jogFeed=DSPparam.sysdword[30];
+                break;
+        }
+        IIC_Write1(IICADDR_GRADEJ,jogGrade);
+    }
+}
+
+void spindleKeyHandle(U8 key)
+{
+    if((sysMode!=SYS_MODE_JOG)
+    &&(sysMode!=SYS_MODE_WHEEL)
+    )//&&(sysMode!=SYS_MODE_MDI))
+    {
+        if((sysMode==SYS_MODE_AUTO)&&(pauseFlag==TRUE))
+        {
+            if(spindleAutoStateChanged==FALSE)
+            {
+                spindleAutoStateBak=gWorkState.sdir;
+                spindleAutoStateChanged=TRUE;                
+            }            
+        }else{
+            return;
+        }
+    }
+    if((addLineMode!=0)&&((sysMode==SYS_MODE_JOG)||(sysMode==SYS_MODE_WHEEL)))
+    {
+        if(spindleAutoStateChanged==FALSE)
+        {
+            spindleAutoStateBak=gWorkState.sdir;
+            spindleAutoStateChanged=TRUE;
+        }         
+    }
+    switch(key)
+    {
+        case(KEY_SPIN_CW):
+            if((spinRunSign==0)&&(gWorkState.chuck==12))
+            {
+                spinRunSign=1;
+                gWorkState.sdir=3;
+                //setIOOUT(IOOUT_SPIN_RUN, TRUE);                
+//                PLC_NCSTAT_SRUN;
+            }else if(gWorkState.chuck==13){
+                showHint(GERR_SRUN_IN_TLOSE, SHOW_TIME_NORMAL);
+            }
+            break;
+        case(KEY_SPIN_CCW):
+            if((spinRunSign==0)&&(gWorkState.chuck==12))
+            {
+               spinRunSign=2;
+               gWorkState.sdir=4;
+               //setIOOUT(IOOUT_SPIN_RUN, TRUE);               
+//               PLC_NCSTAT_SRUN;
+            }else if(gWorkState.chuck==13){
+                showHint(GERR_SRUN_IN_TLOSE, SHOW_TIME_NORMAL);
+            }
+            break;
+        case(KEY_SPIN_STOP):    
+            spinRunSign=0;
+            gWorkState.sdir=5;
+            //setIOOUT(IOOUT_SPIN_RUN, FALSE);
+//            PLC_NCSTAT_SSTOP;
+            break;
+        }
+}
+void assistenKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_COOL):
+            if(CYCLE_BUF_EMPTY(mbufwptr, mbufrptr))
+            {
+                coolSign^=1;
+                //setIOOUT(IOOUT_COOL,coolSign);
+                //plcFbuf[0]=(plcFbuf[0]&0xFFFB)|(coolSign<<2);
+                if(coolSign==1)
+                    mfuncBuf[mbufwptr]=MFUNC_COOLON;
+                else
+                    mfuncBuf[mbufwptr]=MFUNC_COOLOFF;
+                CYCLE_BUF_WINC(mbufwptr, MBUF_MAX);
+            }
+            break;
+        case(KEY_OIL):
+
+                if(CYCLE_BUF_EMPTY(mbufwptr, mbufrptr))
+                {
+                    oilSign=1;
+                    mfuncBuf[mbufwptr]=MFUNC_OILON;
+                    CYCLE_BUF_WINC(mbufwptr, MBUF_MAX);
+                }
+            //PLC_NCCMD_OIL_ON;
+            break;
+        case(KEY_TOOL):
+            if((sysMode!=SYS_MODE_MDI)
+                &&(sysMode!=SYS_MODE_JOG)
+                &&(sysMode!=SYS_MODE_WHEEL))
+                return;
+            if(!TCodeUseSub)
+            {
+                if(Toolchange==0)
+                {
+                    U8 tool_num;
+                    tool_num = curTool/100;
+                    if(SYSparam[170].val==1)
+                    { //swiss style mach
+                        tool_num=(tool_num+1)%TOOL_MAX;
+                        nextTool=tool_num*100;//curTool+1; 
+                        Toolchange=1;
+                    }else{
+                        if(tool_num<SYSparam[170].val)
+                            nextTool = (tool_num+1)*100;
+    					    
+                        else
+                            nextTool = 100;
+    					//mfuncBuf[mbufwptr]=MFUNC_TOOL;
+                        //CYCLE_BUF_WINC(mbufwptr, MBUF_MAX);
+    					//PLC_NCMCODE_NUM(123);//add by lxw
+                        Toolchange = 1;
+                    }
+                }
+                break;
+            }
+            // t use sub porg, we run it in mdi
+            if(!((mfuncState==MFUNCS_OFF)&&(CYCLE_BUF_EMPTY(mbufwptr,mbufrptr))))
+            {
+                return;
+            }
+            if(Toolchange==1)
+                return;
+            if(GEXEC_STATE_RUNING)
+                return;
+            if((refFounded&(BITX|BITZ|(Yavailable?BITY:0)))!=(BITX|BITZ|(Yavailable?BITY:0)))
+                return;
+            gexecState=GEXEC_AUTO_START;
+            if(mdimode.runO9XXX==0)
+            {
+                U8 tool_num,t1,t2;
+                tool_num = curTool/100;
+                tool_num=(tool_num+1)%TOOL_MAX;
+                //nextTool=tool_num*100;//curTool+1; 
+                //conver to text;
+                t1=tool_num/10;
+                t2=tool_num%10;
+     /*           editbuf_O9XXX[0]='T';
+                editbuf_O9XXX[1]=t1+'0';
+                editbuf_O9XXX[2]=t2+'0';
+                editbuf_O9XXX[3]='0';
+                editbuf_O9XXX[4]='0';
+                editbuf_O9XXX[5]='\r';
+                editbuf_O9XXX[6]='\n';
+                editbuf_O9XXX[7]='\0';*/
+                mdimode.mdirunning=1;
+                mdimode.runO9XXX=1;
+                manMakeRunKeyDelay=100;
+                modeBackup=sysMode;
+                singleModeFlag=0;
+                singleRunFlag=0;
+                sysModeChange(KEY_AUTO);  
+            }
+        }
+}
+/*
+*------------------------------------------------------------------------------
+* function: spindle_spotMove
+* parameter: key value
+* return   : void
+* description : handle the grade key event:,change the grade key as the input
+*------------------------------------------------------------------------------
+*/
+void spindle_spotMove()
+{
+    if(gWorkState.sdir==5)
+    {
+        if(((sysMode==SYS_MODE_AUTO)&&(pauseFlag==TRUE))
+        ||(sysMode==SYS_MODE_JOG)||(sysMode==SYS_MODE_WHEEL))
+        {
+            spindleSpotTimer=SYSparam[161].val;
+            //spindleSpotSaveSpeed=gWorkState.s;
+            gWorkState.sdir=3;
+            spinRunSign=1;            
+            //gWorkState.s=SYSparam[41].val;
+        }
+    }else if(spindleSpotTimer!=0)
+    {
+        spindleSpotTimer=SYSparam[161].val;
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: gradeKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the grade key event:,change the grade key as the input
+*------------------------------------------------------------------------------
+*/
+void gradeKeyHandle(U8 key)
+{
+    U8 needUpdate=0; //0 nothing, 1 rapid,2 feed 3 spindle  
+    switch(key)
+    {
+        case (KEY_SPIN_AC):
+            if(spindleGrade<20)
+            {
+                spindleGrade++;
+                needUpdate=3;
+            }
+            break;
+        case (KEY_RAPID_AC):
+            if(rapidGrade<12)
+            {
+                rapidGrade++;
+                needUpdate=1;
+            }
+            break;
+        case (KEY_FEED_AC):
+            if(feedGrade<15)
+            {
+                feedGrade++;
+                needUpdate=2;
+            }
+            break;     
+
+        case (KEY_SPIN_DC):
+            if(spindleGrade>0)
+            {
+                spindleGrade--;
+                needUpdate=3;
+            }
+            break;               
+        case (KEY_RAPID_DC):
+            if(rapidGrade>0)
+            {
+                rapidGrade--;
+                needUpdate=1;
+            }
+            break;
+        case (KEY_FEED_DC):
+            if(feedGrade>0)
+            {
+                feedGrade--;
+                needUpdate=2;
+            }
+            break;     
+    }       
+    if(needUpdate!=FALSE)
+    {
+        switch(needUpdate)
+        {
+            case (1):
+                IIC_Write1(IICADDR_GRADER, rapidGrade);
+                break;
+            case (2):
+                IIC_Write1(IICADDR_GRADEF,feedGrade);
+                break;
+            case (3):
+                IIC_Write1(IICADDR_GRADES, spindleGrade);
+                break;
+        }
+        //U32 grade=(spindleGrade<<16)|(feedGrade<<8)|rapidGrade;
+        //IIC_Write4(IICADDR_GRADER, grade);
+        
+        taskEventBuf[taskEventCount]=TEVENT_IDLE;
+        taskEventCount++;
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: whell related key handle
+* parameter: void
+* return   : void
+* description : handle the whell related keys
+*------------------------------------------------------------------------------
+*/
+void whellKeyHandle(U8 key)
+{
+	U16 prev=whellGrade;
+	U32 jogprev=jogFeed;
+    if((SYS_MODE_WHEEL==sysMode)||(SYS_MODE_MDI==sysMode))
+    {
+        switch(key)
+        {
+            case (KEY_AXISX):
+                whellControlAxis=AXISX;
+                break;
+                
+             case (KEY_AXISY):
+                whellControlAxis=AXISY;
+                break;           
+            case(KEY_AXISZ):
+                whellControlAxis=AXISZ;
+                break;
+            case(KEY_RATE1 ):
+                whellGrade=1;
+                break;
+            case(KEY_RATE10 ):
+                whellGrade=10;
+                break;
+            case(KEY_RATE100 ):
+                whellGrade=100;
+                if(softLimitNegState&BITA4)
+                { // if in restrect area
+                    whellGrade=10;
+                }                
+                break;
+        }
+        if(whellGrade!=prev)
+        {        
+            IIC_Write1(IICADDR_GRADEW, whellGrade);
+        }
+        
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: function key dispacth
+* parameter: void
+* return   : void
+* description : handle the key event: check if the curkey var has a not zero
+*               value; if it does, dispatch the key event; change interface 
+*------------------------------------------------------------------------------
+*/
+void funcKeyHandle(U8 key)
+{    
+    switch(currentGUI)
+    {
+        case (GUINUM_MAIN):
+            guiMainFkeyHanle(key);
+            break;
+        case (GUINUM_COORD):
+        //    guiCoordFkeyHandle(key);
+        //    break;
+        case (GUINUM_COORDW):
+        case (GUINUM_COORDR):
+        case (GUINUM_COORDM):
+        case (GUINUM_COORDL):
+        case (GUINUM_COORDS):
+        //case (GUINUM_TRACE):
+        case (GUINUM_SIMTRACE):            
+            guiCoordWorkFkeyHandle(key);
+            break;  
+            /*
+        case (GUINUM_COORDS):
+            guiCoordSrcFkeyHandle(key);
+        	break;*/
+        case (GUINUM_HD):
+            guiHDFkeyHandle(key);
+            break;
+        case (GUINUM_EDIT):
+            guiEditFkeyHandle( key);
+            break;
+        case (GUINUM_TCOMP):
+        case (GUINUM_REFP):
+        case (GUINUM_G5X):
+		case (GUINUM_VAR):        
+       
+            guiToolCompFkeyHandle(key);
+            break;
+        case (GUINUM_ALARM):
+            guiAlarmFkeyHandle(key);
+            break;
+        case (GUINUM_PARAM):
+        case (GUINUM_PARAMGROUP):
+        case (GUINUM_PASSWORD):
+        case (GUINUM_SETTING):
+        case (GUINUM_COLOUR):
+            guiParmFkeyHandle(key);
+            break;           
+        case (GUINUM_DGN):
+        case (GUINUM_DGN_FILE):
+        case( GUINUM_DGN_FONT):
+        case(GUINUM_DGN_AXIS_IO):
+            guiDGNFkeyHandle(key);
+        case (GUINUM_BANK):
+            guiGeneralFkeyHandle(key); 
+            break;
+        case (GUINUM_MDI):
+            guiMDIFkeyHandle(key); 
+            break;
+        case(GUINUM_PLC_LADDER):
+        case(GUINUM_PLC_PROG):
+        
+        case(GUINUM_PLC_F):
+        case(GUINUM_PLC_G):
+        case(GUINUM_PLC_CT):
+        case(GUINUM_PLC_TM):
+        case(GUINUM_PLC_R):
+        case(GUINUM_PLC_D):
+        case(GUINUM_PLC_M):
+	    case(GUINUM_PLC_X):
+	    case(GUINUM_PLC_Y):
+	        guiPLCFKeyHandle(key);
+            break;
+        case(GUINUM_T):
+	 	//guiTKeyHandle(key);
+	 	    break;
+        
+    }
+       
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiGeneralFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the interface with no useful f key
+*------------------------------------------------------------------------------
+*/
+
+void dirKeyHandle(U8 key)
+{
+    switch(currentGUI)
+    {
+        case(GUINUM_HD):
+            guiHDDirKeyHandle(key);
+            break;
+        case(GUINUM_PARAM):
+            //set the current select param
+            guiParamDirKeyHandle( key);
+            break;
+        case(GUINUM_TCOMP):
+           //set the current select tool compent
+            guiToolCPDirKeyHandle( key);
+            break;
+        case(GUINUM_ALARM):
+            guiAlarmDirKeyHandle( key);
+            break;
+        case(GUINUM_REFP):
+            guiCoorRefDirKeyHandle( key);
+            break;
+        case(GUINUM_G5X):
+            guiG5XDirKeyHandle( key);
+            break;
+        case(GUINUM_VAR):
+            guiVarDirKeyHandle(key);
+        case(GUINUM_SETTING):
+            guiSettingDirKeyHandle(key);
+            break;
+        /*case(GUINUM_TRACE):
+            guiTraceDirKeyHandle(key);
+            break;*/
+        case(GUINUM_DGN_FONT):
+            guiFontTestDirKeyHandle(key);
+            break;
+        case(GUINUM_PASSWORD):
+            guiPasswordDirKeyHandle(key);
+            break;
+        case(GUINUM_PLC_PROG):
+            guiPLCprogDirKeyHandle(key);
+            break;  
+        case(GUINUM_PLC_LADDER):
+            //guiPLCxyDirKeyHandle(key);
+            guiPLCladderDirKeyHandle(key);
+            break; 
+        case(GUINUM_PLC_X):
+            guiPLCxDirKeyHandle(key);
+            break;
+        case(GUINUM_PLC_Y):
+            guiPLCyDirKeyHandle(key);
+            break;            
+        case(GUINUM_PLC_F):
+            //guiPLCfDirKeyHandle(key);
+        case(GUINUM_PLC_G):
+            //guiPLCgDirKeyHandle(key);            
+            break;  
+        case(GUINUM_PLC_CT):
+            guiPLCctDirKeyHandle(key);
+            break;  
+        case(GUINUM_PLC_TM):
+            guiPLCtmDirKeyHandle(key);
+            break;  
+        case(GUINUM_PLC_R):
+            guiPLCrDirKeyHandle(key);
+            break;  
+        case(GUINUM_PLC_D):
+            guiPLCdDirKeyHandle(key);
+            break;  
+        case(GUINUM_PLC_M):
+            guiPLCkDirKeyHandle(key);
+            break;            
+        case(GUINUM_COLOUR):
+            guiColourKeyHandle(key);
+            break; 
+        case(GUINUM_PARAMGROUP):
+            guiParamGroupKeyHandle(key);
+            break;
+        case(GUINUM_SIMTRACE):
+            guiSimTraceKeyHandle(key);
+            break;
+        default: break;
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: runKeyHandle
+* parameter: void
+* return   : void
+* description : handle the run key press event; 
+* it case a bat run if in auto mode and gexec state==done
+* or a singel code why gcode is runing and in single mode 
+*------------------------------------------------------------------------------
+*/
+void runKeyHandle()
+{
+    if(manMakeRunKeyDelay!=0) //for mdi run only
+        return;
+    if(sysMode!=SYS_MODE_AUTO)
+    {        
+        sysModeChange(KEY_AUTO);        
+    }
+    //check if the save door not to be check and is closed
+    if((SYSparam[90].val>0)&&(safedoorFlag==0))
+    {
+//        showHint(OPERR_SAFEDOOROPEN,SHOW_TIME_FEVER);
+        return;
+    }
+    //check if the plc function call is runing, if yes, wait
+    if(!((mfuncState==MFUNCS_OFF)&&(CYCLE_BUF_EMPTY(mbufwptr,mbufrptr))))
+    {
+        return;
+    }
+    if(Toolchange==1)
+        return;
+    if(GEXEC_STATE_RUNING)
+    {
+        //check chuck state since it may be changed in pause
+        if(chuckAutoStateChanged==TRUE)
+        {
+            //if(gWorkState.chuck!=chuckAutoStateBak)
+            if((gWorkState.chuck==13)&&
+              (chuckAutoStateBak==12))
+            {                    
+                showHint(GERR_STATE_NORESUM, SHOW_TIME_NORMAL);
+                return;
+            }else{
+                chuckAutoStateChanged=FALSE;
+            }
+        }
+        //check tail state since it may be change
+        if(tailAutoStateChanged==TRUE)
+        {            
+            if(((gWorkState.tail==11)&&(tailAutoStateBak==10))
+             ||((gWorkState.tail==10)&&(tailAutoStateBak==11)))
+            {                    
+                showHint(GERR_STATE_NORESUM, SHOW_TIME_NORMAL);
+                return;
+            }else{
+                tailAutoStateChanged=FALSE;
+            }
+        }
+        if(spindleAutoStateChanged==TRUE)
+        {
+            if(gWorkState.sdir!=spindleAutoStateBak)
+            {                    
+                showHint(GERR_STATE_NORESUM, SHOW_TIME_NORMAL);
+                return;
+            }else{
+                spindleAutoStateChanged=FALSE;
+            }
+        }        
+        // run single code if we are runing bat code and in single mode
+        //if((singleModeFlag==1)&&(singleRunFlag!=1))//(DSPState&BIT_SINGLE_END))
+        if((singleModeFlag==1)&&(singleRunFlag!=1)&&(DSPState&BIT_SINGLE_END))
+        {
+            if(pauseFlag==0)
+            {
+                singleRunFlag=1;
+            }
+        }
+        if(pauseFlag==1)
+        {
+            pauseFlag=0;
+        }
+        if(singleModeFlag==2)
+            singleModeFlag=0;
+    }/*else if((gexecState==GEXEC_DONE)||(gexecState==GEXEC_CMPLE))
+    {//start run bat code if we are now stop
+        //autoRunStart();
+        if((refFounded&(BITX|BITZ|(Yavailable?BITY:0)))!=(BITX|BITZ|(Yavailable?BITY:0)))
+            return;
+        gexecState=GEXEC_RUNINIT;
+        if((singleModeFlag==1))//&&(DSPState&BIT_SINGLE_END))
+        {
+            singleRunFlag=1;
+        }
+    }*/else{
+        if((refFounded&(BITX|BITZ|(Yavailable?BITY:0)))!=(BITX|BITZ|(Yavailable?BITY:0)))
+            return;
+       // gexecState=GEXEC_AUTO_START;
+       //change for test now 
+        gexecState=GEXEC_RUN;
+
+        if(mdimode.inmdi)
+        {
+            mdimode.mdirunning=1;
+        }
+        if((singleModeFlag==1))//&&(DSPState&BIT_SINGLE_END))
+        {
+            singleRunFlag=1;
+        }
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: singleKeyHandle
+* parameter: void
+* return   : void
+* description : change single mode to the reverst state 
+*------------------------------------------------------------------------------
+*/
+void singleKeyHandle()
+{  //single mode flag ==2 means single is cancle bug run is not start yet
+    if(mdimode.runO9XXX==1)
+        return;
+    if((0==singleModeFlag)||(singleModeFlag==2))
+    {
+        singleModeFlag=1;
+    }else if(singleModeFlag==1)
+    {
+        if(GEXEC_STATE_RUNING)
+        {
+            singleModeFlag=2;
+        }else
+            singleModeFlag=0;        
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: jumpSegKeyHandle
+* parameter: void
+* return   : void
+* description : change jump mode to the reverst state 
+*------------------------------------------------------------------------------
+*/
+void jumpSegKeyHandle()
+{
+    //if it is not in auto mode or program is not runing
+    if((GEXEC_STATE_RUNING)&&(SYSparam[97].val==0))
+        return; 
+    if(0==jumpSegFlag)
+    {
+        jumpSegFlag=1;
+    }else{
+        jumpSegFlag=0;
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: singleKeyHandle
+* parameter: void
+* return   : void
+* description : change single mode to the reverst state 
+*------------------------------------------------------------------------------
+*/
+void machLockKeyHanle()
+{
+    if(0==machLockFlag)
+    {
+        machLockFlag=1;
+        machLockReg.refStateBak=refFounded;
+        machLockReg.tool=gWorkState.t;        
+        machLockReg.chuckBak=gWorkState.chuck;
+        machLockReg.tailBak=gWorkState.tail;
+        machLockReg.coolSignBak=coolSign;
+        machLockReg.orgworkg50Bak=coordOrginWorkG5x[0];
+        machLockReg.g5xBak=gWorkState.GG05;
+        machLockReg.workBak=coordWork;
+        machLockReg.orgRelateBak=coordOrginRelate;
+        machLockReg.m4xBak=gWorkState.m4x;
+        refFounded=BITX|BITZ|(Yavailable?BITY:0);
+    }else{
+        U8 toolshift=0;
+        machLockFlag=0;
+        refFounded=machLockReg.refStateBak;
+        gWorkState.t=machLockReg.tool;
+        curTool=machLockReg.tool;
+        toolshift=curTool%100;
+        gWorkState.GG05=machLockReg.g5xBak;        
+        coordOrginWorkG5x[0]=machLockReg.orgworkg50Bak;
+        coordOrginWork.x=coordOrginWorkG5x[0].x+coordOrginWorkG5x[gWorkState.GG05].x;//暂时考虑在机床锁状态下更改G54等的值有效
+        coordOrginWork.z=coordOrginWorkG5x[0].z+coordOrginWorkG5x[gWorkState.GG05].z;
+        coordShiftWork.x=toolCompensation[toolshift].x;
+        coordShiftWork.z=toolCompensation[toolshift].z;
+        coordWork=machLockReg.workBak;
+        coordOrginRelate=machLockReg.orgRelateBak;
+        gWorkState.sdir=5;
+        gWorkState.chuck=machLockReg.chuckBak;
+        gWorkState.tail=machLockReg.tailBak;
+        coolSign=machLockReg.coolSignBak;
+        gWorkState.m4x=machLockReg.m4xBak;
+        coordCurGend=coordWork;
+        coordCurGendMach.x=coordCurGend.x+coordOrginWork.x+coordShiftWork.x;
+        coordCurGendMach.z=coordCurGend.z+coordOrginWork.z+coordShiftWork.z;
+        
+        //set the tool offset back
+    }    
+    
+}
+/*
+*------------------------------------------------------------------------------
+* function: MSTLockKeyHanle
+* parameter: void
+* return   : void
+* description : change single mode to the reverst state 
+*------------------------------------------------------------------------------
+* /
+void MSTLockKeyHanle()
+{
+    //if it is not in auto mode or program is not runing
+    if((sysMode!=SYS_MODE_AUTO)
+    ||(gexecState<GEXEC_CMPLE)    
+    ||(gexecState>GEXEC_SENDE))  
+    {
+        if(0==MSTLockFlag)
+        {
+            MSTLockFlag=1;
+        }else{
+            MSTLockFlag=0;
+        }    
+    }
+}
+
+/*
+*------------------------------------------------------------------------------
+* function: MSTLockKeyHanle
+* parameter: void
+* return   : void
+* description : change single mode to the reverst state 
+*------------------------------------------------------------------------------
+*/
+void falseRunKeyHanle()
+{
+    //if it is not in auto mode or program is not runing
+    if(GEXEC_STATE_RUNING)
+        return;    
+    if(0==falseRunFlag)
+    {
+        falseRunFlag=1;
+    }else{
+        falseRunFlag=0;
+    }    
+    
+}
+/*
+*------------------------------------------------------------------------------
+* function: whellRunKey
+* parameter: void
+* return   : void
+* description : 
+*------------------------------------------------------------------------------
+*/
+void whellRunKey()
+{
+    if(sysMode!=SYS_MODE_AUTO)
+    {
+        whellRunFlag=FALSE;
+        return;
+    }
+    if(whellRunFlag==FALSE)
+        whellRunFlag=TRUE;
+    else
+       whellRunFlag=FALSE; 
+     whellRunState=0;
+}
+/*
+*------------------------------------------------------------------------------
+* function: pauseKeyHandle
+* parameter: void
+* return   : void
+* description : handle the puase Key event,it change the pause flag in automode
+*------------------------------------------------------------------------------
+*/
+void pauseKeyHandle()
+{
+    if(mdimode.runO9XXX==1)
+        return;
+    if(sysMode!=SYS_MODE_AUTO)
+    {
+        /*if(currentGUI>=GUINUM_PLC_PROG)
+        {  //run key is used to debug plc when in plc guis
+            if(plcRunflag==PLC_RUNSTAT_RUN)
+                plcRunflag=PLC_RUNSTAT_STOP;
+            return;
+        }*/
+        return;
+    }
+    pauseFlag=1;
+
+}
+/*
+*------------------------------------------------------------------------------
+* function: handle the chuck input button state
+* parameter: key value
+* return   : void
+* description : handle the interface with no useful f key
+*------------------------------------------------------------------------------
+*/
+void chuckKeyHandle()
+{
+    if((sysMode!=SYS_MODE_AUTO)||
+        ((sysMode==SYS_MODE_AUTO)&&
+            ((gexecState<GEXEC_RUNINIT)||(gexecState>=GEXEC_DONE)))||
+        ((sysMode==SYS_MODE_AUTO)&&
+            ((pauseFlag==1)||((singleModeFlag==1)&&(DSPState&BIT_SINGLE_END))))
+       )
+    {
+        if(spinRunSign!=0)
+            return;
+        if(gWorkState.chuck==12)
+        {
+            if((CYCLE_BUF_EMPTY(mbufwptr,mbufrptr))&&(mfuncState==MFUNCS_OFF))
+            {
+                gWorkState.chuck=13;
+                mfuncBuf[mbufwptr]=MFUNC_CHUCKOFF;
+                CYCLE_BUF_WINC(mbufwptr,MBUF_MAX);
+                if(((sysMode==SYS_MODE_AUTO)&&
+                ((pauseFlag==1)||((singleModeFlag==1)&&(DSPState&BIT_SINGLE_END))))||
+                ((addLineMode!=0)&&((sysMode==SYS_MODE_JOG)||(sysMode==SYS_MODE_WHEEL))))
+                {
+                    if(chuckAutoStateChanged==FALSE)
+                    {
+                        chuckAutoStateBak=12;
+                        chuckAutoStateChanged=TRUE;
+                    }
+                }
+            }
+        }else{
+            if((CYCLE_BUF_EMPTY(mbufwptr,mbufrptr))&&(mfuncState==MFUNCS_OFF))
+            {
+                gWorkState.chuck=12;
+                mfuncBuf[mbufwptr]=MFUNC_CHUCKON;
+                CYCLE_BUF_WINC(mbufwptr,MBUF_MAX);
+                if(((sysMode==SYS_MODE_AUTO)&&
+                ((pauseFlag==1)||((singleModeFlag==1)&&(DSPState&BIT_SINGLE_END))))||
+                ((addLineMode!=0)&&((sysMode==SYS_MODE_JOG)||(sysMode==SYS_MODE_WHEEL))))
+                {
+                    if(chuckAutoStateChanged==FALSE)
+                    {
+                        chuckAutoStateBak=13;
+                        chuckAutoStateChanged=TRUE;
+                    }
+                }
+            }            
+        }       
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: handle the tail input button state
+* parameter: key value
+* return   : void
+* description : 
+*------------------------------------------------------------------------------
+*/
+void tailKeyHandle()
+{
+    if((sysMode!=SYS_MODE_AUTO)||
+        ((sysMode==SYS_MODE_AUTO)&&
+            ((gexecState<GEXEC_RUNINIT)||(gexecState>=GEXEC_DONE)))||
+        ((sysMode==SYS_MODE_AUTO)&&
+            ((pauseFlag==1)||((singleModeFlag==1)&&(DSPState&BIT_SINGLE_END))))
+       )
+    {
+        if(spinRunSign!=0)
+            return;
+        if(gWorkState.tail==10)
+        {
+            if((CYCLE_BUF_EMPTY(mbufwptr,mbufrptr))&&(mfuncState==MFUNCS_OFF))
+            {
+                gWorkState.tail=11;
+                mfuncBuf[mbufwptr]=MFUNC_TAILOFF;
+                CYCLE_BUF_WINC(mbufwptr,MBUF_MAX);
+                if(((sysMode==SYS_MODE_AUTO)&&
+                ((pauseFlag==1)||((singleModeFlag==1)&&(DSPState&BIT_SINGLE_END))))||
+                ((addLineMode!=0)&&((sysMode==SYS_MODE_JOG)||(sysMode==SYS_MODE_WHEEL))))
+                {
+                    if(tailAutoStateChanged==FALSE)
+                    {
+                        tailAutoStateBak=10;
+                        tailAutoStateChanged=TRUE;
+                    }
+                }
+            }
+        }else{
+            if((CYCLE_BUF_EMPTY(mbufwptr,mbufrptr))&&(mfuncState==MFUNCS_OFF))
+            {
+                gWorkState.tail=10;
+                mfuncBuf[mbufwptr]=MFUNC_TAILON;
+                CYCLE_BUF_WINC(mbufwptr,MBUF_MAX);
+                if(((sysMode==SYS_MODE_AUTO)&&
+                ((pauseFlag==1)||((singleModeFlag==1)&&(DSPState&BIT_SINGLE_END))))||
+                ((addLineMode!=0)&&((sysMode==SYS_MODE_JOG)||(sysMode==SYS_MODE_WHEEL))))
+                {
+                    if(tailAutoStateChanged==FALSE)
+                    {
+                        tailAutoStateBak=11;
+                        tailAutoStateChanged=TRUE;
+                    }
+                }
+            }            
+        }       
+    }
+}
+
+/*
+*------------------------------------------------------------------------------
+* function: guiGeneralFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the interface with no useful f key
+*------------------------------------------------------------------------------
+*/
+void guiGeneralFkeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1):
+        case (KEY_F2):
+        case (KEY_F3):
+        case (KEY_F4):
+        case (KEY_FROLL):
+            break;        
+    }
+}
+
+/*
+*------------------------------------------------------------------------------
+* function: guiMDIFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the interface with no useful f key
+*------------------------------------------------------------------------------
+*/
+void guiMDIFkeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_COORD;
+            currentMenu=0;
+            break;
+        case (KEY_F1):
+        case (KEY_F2):
+        case (KEY_F3):
+        case (KEY_F4):
+        case (KEY_FROLL):
+            break;        
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiMainFkeyHanle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui main
+*------------------------------------------------------------------------------
+*/
+void guiMainFkeyHanle(U8 key)
+{
+    prevGUI=currentGUI;
+    if(currentMenu==1)
+        goto MENU2;
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            break;
+        case (KEY_F1):
+            currentGUI=GUINUM_COORD;  
+            coordShowing=0;
+            break;
+        case (KEY_F2):
+            if(sysMode==SYS_MODE_AUTO)//not allow to hd operation in std
+                return ;
+            /*
+            if((sysMode==SYS_MODE_EDIT)&&(editHasFile==1))
+            {
+                currentGUI=GUINUM_EDIT;
+            }else{*/
+                currentGUI=GUINUM_HD;
+                currentMenu=0;
+                //FileMangeEnter();//init info of file manage
+            //}
+            break;
+        case (KEY_F3):
+            currentMenu=0;
+            currentGUI=GUINUM_TCOMP;
+            break;     
+        case (KEY_F4):          
+            currentGUI=GUINUM_ALARM ; 
+//            alarmOffset=0; //reset alarm gui to default
+//            alarmShow=0;
+            break;
+        case(KEY_F5):
+            currentGUI=GUINUM_PARAM;
+            currentMenu=0;
+            break;
+        case(KEY_F6):
+            currentGUI=GUINUM_DGN;
+            break;
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }
+    return;
+MENU2:
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentMenu=0; 
+            break;
+        case (KEY_F1):
+            currentGUI=GUINUM_PLC_LADDER;
+            currentMenu=0;       
+            break;
+        case (KEY_F2):
+            currentGUI=GUINUM_BANK;
+            currentMenu=0;          
+            break;
+        case (KEY_F3):
+            break;     
+        case (KEY_F4):
+            break;
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }    
+    
+}
+
+
+/*
+
+*------------------------------------------------------------------------------
+* function: guiCoord3FkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui coord 3 WORK coord
+*------------------------------------------------------------------------------
+*/
+void guiCoordWorkFkeyHandle(U8 key)
+{
+    //TCoord newVal;
+    switch(key)
+    {
+        case (KEY_FUP):
+            //currentGUI=GUINUM_COORD;
+            //coordShowing=0;
+            currentGUI=GUINUM_MAIN;
+            coordShowing=0;
+            break;
+        case (KEY_F1):
+            //SET ZERO 
+            /*
+            if((currentGUI>GUINUM_MAIN)&&(currentGUI<GUINUM_COORDS))
+            {
+                currentGUI=GUINUM_COORD+((++coordShowing)%5); 
+            }else{
+                currentGUI=GUINUM_COORD;
+                coordShowing=0; 
+            }*/
+            currentGUI=GUINUM_COORD;
+            coordShowing=0;             
+            break;
+        case (KEY_F2): //clear x
+            currentGUI=GUINUM_COORDS; 
+            break;
+        case (KEY_F3): //clear z
+            currentGUI=GUINUM_SIMTRACE;
+            break;
+        case (KEY_F4):
+            if((GEXEC_STATE_RUNING)&&(mdimode.mdirunning==0))
+            {
+            }else{
+                currentGUI=GUINUM_MDI;  
+            }          
+            break;
+        case(KEY_F5):
+            break;
+        case(KEY_F6):
+            break;            
+        case (KEY_FROLL):
+            break;        
+    }    
+}
+
+/*
+*------------------------------------------------------------------------------
+* function: guiHDFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui Hard disk manage GUI
+*------------------------------------------------------------------------------
+*/
+void guiHDFkeyHandle(U8 key)
+{
+   /* if(sysMode==SYS_MODE_AUTO)//not allow to hd operation in std
+    {
+        if((key!=KEY_FUP)&&(key!=KEY_FROLL))
+            return;
+    }
+    if(currentMenu==1)
+            goto MENU2;
+    
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1): 
+            //open file
+            FileManageChangeDir();
+            //FileManageOpen();
+            break;
+        case (KEY_F2):
+            
+            //FileManageEdit();
+            FileManageOpen();
+            break;
+        case (KEY_F3):
+            FileManageCreate();            
+            break;     
+        case (KEY_F4):
+            FileManageCopy();            
+            break;
+        case(KEY_F5):
+            FileManageRename();
+            break;
+        case(KEY_F6):
+            FileManageDel();
+            break;            
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }
+    return;
+MENU2:
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;  
+        case (KEY_F1): 
+            //open file
+            FileManageMkdir();            
+            break;
+        case (KEY_F2):
+            FileManageBakupCopy();            
+            break;
+        case (KEY_F3):
+            FileManageFormat();
+            break;     
+        case (KEY_F4):
+            FileManageBackup();
+            break;
+        case(KEY_F5):
+            break;
+        case(KEY_F6):
+            break;            
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }    */
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiHDFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui Hard disk manage GUI
+*------------------------------------------------------------------------------
+*/
+void guiEditFkeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_HD;
+            currentMenu=0;
+            break;
+        case (KEY_F1):     
+            break;
+        case (KEY_F2):
+            break;
+        case (KEY_F3):
+            break;     
+        case (KEY_F4):
+            /*
+            gexecState=GEXEC_START;
+            gexecReq=TRUE;
+            grunPtr=0;
+            gCompiledCt=0;   
+            */
+            break;
+        case(KEY_F5):
+            break;
+        case(KEY_F6):
+            break;            
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }  
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiCoord3FkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui coord 2 relate coord
+*------------------------------------------------------------------------------
+*/
+void guiProgFkeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1):     
+            break;
+        case (KEY_F2):
+            break;
+        case (KEY_F3):
+            break;     
+        case (KEY_F4):
+            break;
+        case(KEY_F5):
+            break;
+        case(KEY_F6):
+            break;            
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }    
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiToolCompFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui tooo comp, offset and var
+*------------------------------------------------------------------------------
+*/
+void guiToolCompFkeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1): 
+            currentGUI=GUINUM_TCOMP;
+            break;
+        case (KEY_F2):
+            currentGUI=GUINUM_G5X;
+            break;
+        case (KEY_F3): 
+            currentGUI=GUINUM_VAR;
+            break;     
+        case (KEY_F4):
+            currentGUI=GUINUM_REFP; 
+            break;
+         case(KEY_F5):
+            if(currentMenu==0)
+            {
+                if(currentGUI==GUINUM_TCOMP)
+                {
+//                    toolCompSave2File();
+                }else if(currentGUI==GUINUM_REFP){
+//                    refpSave2File();
+                }else if(currentGUI==GUINUM_G5X){
+//                    g54Save2File();
+                }
+            }else{
+            }        
+            break;
+        case(KEY_F6):
+            if(currentMenu==0)
+            {
+                if(currentGUI==GUINUM_TCOMP)
+                {
+//                    toolCompLoadFromFile(); 
+                }else if(currentGUI==GUINUM_REFP){
+//                    refpLoadFromFile();
+                }else if(currentGUI==GUINUM_G5X){
+//                    g54LoadFromFile();
+                }
+            }else{
+                toolclearall();
+            }        
+            break;           
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }    
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiCoord3FkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui coord 2 relate coord
+*------------------------------------------------------------------------------
+*/
+void guiParmFkeyHandle(U8 key)
+{
+    if(currentMenu==1)
+            goto MENU2;
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1):
+            //currentParam=0;
+            currentGUI=GUINUM_PARAM;
+            break;
+        case (KEY_F2):
+            //currentParam=120;
+            //currentGUI=GUINUM_VAR;
+            currentGUI=GUINUM_PARAMGROUP;
+            break;
+        case (KEY_F3):
+            currentGUI=GUINUM_SETTING;            
+            break;     
+        case (KEY_F4):
+            paramSave2File(); 
+            break;
+        case(KEY_F5):
+            paramLoadFromFile();
+            break;
+        case(KEY_F6):
+            paramLoadDefault();
+            break;            
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }  
+    return;
+MENU2:
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1):
+            currentGUI=GUINUM_PASSWORD;
+            break;
+        case (KEY_F2):
+
+            currentGUI=GUINUM_COLOUR;
+
+            break;
+        case (KEY_F3):
+            
+            break;
+        case (KEY_F4):
+            break;
+        case(KEY_F5):
+            //writeLDog();
+            break;
+        case(KEY_F6):
+            break;            
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    } 
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiAlarmFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in gui coord 2 relate coord
+*------------------------------------------------------------------------------
+*/
+void guiAlarmFkeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1):
+/*            if(alarmShow==1)
+            {
+                alarmRedraw=1;
+                alarmShow=0;
+            }*/
+            break;
+        case (KEY_F2): 
+/*            if(alarmShow==0)
+            {
+                alarmRedraw=1;
+                alarmShow=1;
+            }*/
+            break;
+        case (KEY_F3): 
+            alarmClear();
+            softReset();
+            break;
+        case (KEY_F4):
+            break;
+        case(KEY_F5):
+            break;
+        case(KEY_F6):
+            break;            
+        case (KEY_FROLL):
+            break;        
+    }    
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiDGNFkeyHandle
+* parameter: key value
+* return   : void
+* description : handle the F KEY in DGN interface
+*------------------------------------------------------------------------------
+*/
+void guiDGNFkeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1):
+            //reset all debug counter
+          /*  if(currentGUI==GUINUM_DGN)
+            {
+                keyStatisError=0;
+                keyStatisRetrans=0;
+                keyStatisRecv=0;
+                DSPStatisOK=0;
+                DSPStatisFail=0;
+                DSPStatisRetrans=0;
+//                SCI_Para.SCIB_TotalTimes=0;
+//                SCI_Para.SCIB_ErrorTimes=0;
+//		  		S_Spindle.RefFound=0;
+		
+                if(sysMode==SYS_MODE_WHEEL)
+                    clear_W_encoder();
+            }else{
+                checkFontStart=0xa1a0;
+            }*/
+            break;
+        case (KEY_F2):
+            currentGUI=GUINUM_DGN;
+            break;
+        case (KEY_F3):
+            currentGUI=GUINUM_DGN_FILE;
+            break;     
+        case (KEY_F4):
+            currentGUI=GUINUM_DGN_AXIS_IO;
+            break;
+        case(KEY_F5):            
+            //a secret test function 
+            if((currentGUI==GUINUM_DGN_FONT)
+                &&(sysMode==SYS_MODE_MDI)
+                &&(ledlcdTestOnFlag==0)
+                &&(SYSparam[0].val==1))
+            {                
+//                ledlcdTestOnFlag=1;
+//                ledlcdTestStep=0;
+//                ledlcdTestStepTimer=LEDLCD_TEST_TIME_MAX;
+            }
+            currentGUI=GUINUM_DGN_FONT;
+            break;
+        case(KEY_F6):
+            //upgrade();
+            break;           
+        case (KEY_FROLL):
+            break;        
+    }    
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCprogFKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCFKeyHandle(U8 key)
+{
+    if(currentMenu==1)
+        goto MENU2;
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            break;
+        case (KEY_F1):
+            currentGUI=GUINUM_PLC_LADDER;  
+            break;
+        case (KEY_F2):
+            currentGUI=GUINUM_PLC_PROG;
+            break;
+        case (KEY_F3):
+           // currentGUI=GUINUM_PLC_CT;
+           currentGUI=GUINUM_PLC_X;
+            break;     
+        case (KEY_F4):
+           // currentGUI=GUINUM_PLC_TM;
+           currentGUI=GUINUM_PLC_Y;
+            break;
+        case(KEY_F5):
+            currentGUI=GUINUM_PLC_M;
+            currentMenu=0;
+            break;
+        case(KEY_F6):
+            currentGUI=GUINUM_PLC_D;
+            break;
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }
+    return;
+MENU2:
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentMenu=0; 
+            break;
+        case (KEY_F1):
+            currentGUI=GUINUM_PLC_R;      
+            break;
+        case (KEY_F2):
+            currentGUI=GUINUM_PLC_CT;
+            break;
+        case (KEY_F3):
+        	currentGUI=GUINUM_PLC_TM;
+            break;     
+        case (KEY_F4):
+		// currentGUI=GUINUM_PLC_F;
+			//currentGUI=GUINUM_PLC_X;
+            break;
+        case (KEY_F5):
+		//currentGUI=GUINUM_PLC_G;
+			//currentGUI=GUINUM_PLC_Y;
+            break;
+        case (KEY_F6):
+            break;             
+        case (KEY_FROLL):
+            //GUI_MenuSwitch();
+            break;        
+    }     
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCprogDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCprogDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+        case(KEY_UP):
+            if(curPLCins>0)
+                curPLCins--;
+            else
+                curPLCins=plcProgCount-1;
+            break;
+        case(KEY_RIGHT):
+        case(KEY_DOWN):
+            curPLCins=(curPLCins+1)%plcProgCount;
+            break;
+        case(KEY_PAGEUP):
+            {
+                U16 index;
+                index=curPLCins-(curPLCins%PLC_INS_PRE_SCREEN);
+                if(index>=PLC_INS_PRE_SCREEN)
+                    curPLCins=index-PLC_INS_PRE_SCREEN;
+                else
+                    curPLCins=plcProgCount-plcProgCount%PLC_INS_PRE_SCREEN;              
+            }
+            break;        
+        case(KEY_PAGEDOWN):
+            {
+                U16 index;
+                index=curPLCins-(curPLCins%PLC_INS_PRE_SCREEN);
+                if((index+PLC_INS_PRE_SCREEN)<plcProgCount)
+                {
+                    curPLCins=index+PLC_INS_PRE_SCREEN;
+                }else{
+                    curPLCins=0;
+                }                
+            }
+            break;    
+    }    
+    #endif
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCxyDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCladderDirKeyHandle(U8 key)
+{
+#if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+			
+		if(curPLCTCol>0)
+                curPLCTCol--;
+            else
+                curPLCTCol=PLC_MAXCOL-1;
+		break;
+        case(KEY_UP):
+            if(curPLCTLine>0)
+                curPLCTLine--;
+            else
+                curPLCTLine=plcTProgLine-1;
+            break;
+        case(KEY_RIGHT):
+			 curPLCTCol=(curPLCTCol+1)%PLC_MAXCOL;
+			break;
+        case(KEY_DOWN):
+            curPLCTLine=(curPLCTLine+1)%(plcTProgLine);
+            break;
+        case(KEY_PAGEUP):
+            {
+                U16 index;
+				
+			 
+                if(StartPLCRow>=PLC_T_INS_PRE_SCREEN)
+					
+                 curPLCTLine=StartPLCRow-PLC_T_INS_PRE_SCREEN;
+                else
+                	{
+                		if(plcTProgLine<PLC_T_INS_PRE_SCREEN)
+					curPLCTLine = 0;
+				else if(((plcTProgLine)%PLC_T_INS_PRE_SCREEN)==0)
+					 curPLCTLine= (plcTProgLine)-PLC_T_INS_PRE_SCREEN+1;
+				else
+                    			curPLCTLine= (plcTProgLine)- (plcTProgLine)%PLC_T_INS_PRE_SCREEN;   
+                	}
+            }
+            break;        
+        case(KEY_PAGEDOWN):
+            {
+                U16 index;
+				
+			
+            //    index=curPLCTLine-(curPLCTLine%PLC_T_INS_PRE_SCREEN);
+                if((StartPLCRow+PLC_T_INS_PRE_SCREEN)< (plcTProgLine))
+                {
+               	 if((StartPLCRow+2*PLC_T_INS_PRE_SCREEN-1)<plcTProgLine)
+                    		curPLCTLine=StartPLCRow+2*PLC_T_INS_PRE_SCREEN-1;
+			else 
+				curPLCTLine = plcTProgLine-1;
+			
+                }
+		else{
+                    curPLCTLine=0;
+                } 
+		/* index=curPLCTLine-(curPLCTLine%PLC_T_INS_PRE_SCREEN);
+                if((index+PLC_T_INS_PRE_SCREEN)< plcTProgLine)
+                {
+                    curPLCTLine=index+PLC_T_INS_PRE_SCREEN;
+			
+                }else{
+                    curPLCTLine=0;
+                } */
+                
+            }
+            break;    
+    }  
+    #endif
+}
+
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCxyDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+/*
+void guiPLCxyDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+        case(KEY_UP):
+        case(KEY_PAGEUP):
+            if(curPLCxy>0)
+                curPLCxy--;
+            else
+                curPLCxy=PLC_RES_X_MAX-1;
+            break;
+        case(KEY_RIGHT):
+        case(KEY_DOWN):        
+        case(KEY_PAGEDOWN):
+            if(curPLCxy>=PLC_RES_X_MAX-1)
+                curPLCxy=0;
+            else
+                curPLCxy++;
+            break;    
+    }     
+}*/
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCxDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+* /
+void guiPLCxDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCx>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCx-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCx=MAX_X_POINT-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCx%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCx=(curPLCx+(PLC_VAR_PRE_SCREEN/2))%(MAX_X_POINT);        
+            break;
+        case(KEY_UP):
+            if(curPLCx>0)
+                curPLCx--;
+            else
+                curPLCx=(MAX_X_POINT-1);
+            break;
+        case(KEY_DOWN):
+            if(curPLCx<(MAX_X_POINT-1))
+                curPLCx++;
+            else
+                curPLCx=0;
+            break;
+        case(KEY_PAGEUP):
+            if(curPLCx>=PLC_VAR_PRE_SCREEN)
+                curPLCx-=PLC_VAR_PRE_SCREEN;
+            else
+                curPLCx=MAX_X_POINT-PLC_VAR_PRE_SCREEN
+                    +curPLCx%PLC_VAR_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            curPLCx=(curPLCx+PLC_VAR_PRE_SCREEN)%(MAX_X_POINT);
+            break;            
+    }     
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCctDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCctDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+        case(KEY_UP):
+            if(curPLCc>0)
+                curPLCc--;
+            else 
+                curPLCc=PLC_RES_CT_MAX-1;
+            break;
+        case(KEY_RIGHT):
+        case(KEY_DOWN):
+            curPLCc=(curPLCc+1)%PLC_RES_CT_MAX;
+            break;
+        case(KEY_PAGEUP):
+            {
+                U16 index;
+                index=curPLCc-(curPLCc%PLC_CT_PRE_SCREEN);
+                if(index>=PLC_CT_PRE_SCREEN)
+                    curPLCc=index-PLC_CT_PRE_SCREEN;
+                else
+                    curPLCt=PLC_RES_CT_MAX-PLC_CT_PRE_SCREEN
+                        +curPLCt%PLC_CT_PRE_SCREEN;                 
+            }
+            break;        
+        case(KEY_PAGEDOWN):
+            curPLCc=(curPLCc+PLC_CT_PRE_SCREEN)%PLC_RES_CT_MAX;
+            break; 
+    }
+    #endif
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCctDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCtmDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+        case(KEY_UP):
+            if(curPLCt>0)
+                curPLCt--;
+            else 
+                curPLCt=PLC_RES_TM_MAX-1;
+            break;
+        case(KEY_RIGHT):
+        case(KEY_DOWN):
+            curPLCt=(curPLCt+1)%PLC_RES_TM_MAX;
+            break;
+        case(KEY_PAGEUP):
+            {
+                U16 index;
+                index=curPLCt-(curPLCt%PLC_TM_PRE_SCREEN);
+                if(index>=PLC_TM_PRE_SCREEN)
+                    curPLCt=index-PLC_TM_PRE_SCREEN;
+                else
+                    curPLCt=PLC_RES_TM_MAX-PLC_TM_PRE_SCREEN
+                        +curPLCt%PLC_TM_PRE_SCREEN;              
+            }
+            break;        
+        case(KEY_PAGEDOWN):
+            curPLCt=(curPLCt+PLC_TM_PRE_SCREEN)%PLC_RES_TM_MAX;
+            break; 
+    }    
+    #endif
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCfDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCfDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCf>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCf-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCf=PLC_RES_F_MAX-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCf%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCf=(curPLCf+(PLC_VAR_PRE_SCREEN/2))%PLC_RES_F_MAX; 
+            break;
+        case(KEY_UP):
+            if(curPLCf>0)
+                curPLCf--;
+            else 
+                curPLCf=PLC_RES_F_MAX-1;
+            break;
+        case(KEY_DOWN):
+            curPLCf=(curPLCf+1)%PLC_RES_F_MAX;
+            break;
+        case(KEY_PAGEUP):
+            {
+                U16 index;
+                index=curPLCf-(curPLCf%PLC_VAR_PRE_SCREEN);
+                if(index>=PLC_VAR_PRE_SCREEN)
+                    curPLCf=index-PLC_VAR_PRE_SCREEN;
+                else
+                    curPLCf=PLC_RES_F_MAX-PLC_VAR_PRE_SCREEN
+                    +curPLCf%PLC_VAR_PRE_SCREEN;             
+            }
+            break;        
+        case(KEY_PAGEDOWN):
+            curPLCf=(curPLCf+PLC_VAR_PRE_SCREEN)%PLC_RES_F_MAX;            
+            break; 
+    }    
+    #endif
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCgDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCgDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCg>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCg-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCg=PLC_RES_G_MAX-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCg%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCg=(curPLCg+(PLC_VAR_PRE_SCREEN/2))%PLC_RES_G_MAX; 
+            break;
+        case(KEY_UP):
+            if(curPLCg>0)
+                curPLCg--;
+            else 
+                curPLCg=PLC_RES_G_MAX-1;
+            break;
+        case(KEY_DOWN):
+            curPLCg=(curPLCg+1)%PLC_RES_G_MAX;
+            break;
+        case(KEY_PAGEUP):
+            {
+                U16 index;
+                index=curPLCg-(curPLCg%PLC_VAR_PRE_SCREEN);
+                if(index>=PLC_VAR_PRE_SCREEN)
+                    curPLCg=index-PLC_VAR_PRE_SCREEN;
+                else
+                    curPLCg=PLC_RES_G_MAX-PLC_VAR_PRE_SCREEN
+                    +curPLCg%PLC_VAR_PRE_SCREEN;             
+            }
+            break;        
+        case(KEY_PAGEDOWN):
+            curPLCg=(curPLCg+PLC_VAR_PRE_SCREEN)%PLC_RES_G_MAX;            
+            break; 
+    }    
+    #endif
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCrDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCrDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCr>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCr-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCr=PLC_RES_R_MAX-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCr%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCr=(curPLCr+(PLC_VAR_PRE_SCREEN/2))%PLC_RES_R_MAX;        
+            break;
+        case(KEY_UP):
+            if(curPLCr>0)
+                curPLCr--;
+            else
+                curPLCr=(PLC_RES_R_MAX-1);
+            break;
+        case(KEY_DOWN):
+            if(curPLCr<(PLC_RES_R_MAX-1))
+                curPLCr++;
+            else
+                curPLCr=0;
+            break;
+        case(KEY_PAGEUP):
+            if(curPLCr>=PLC_VAR_PRE_SCREEN)
+                curPLCr-=PLC_VAR_PRE_SCREEN;
+            else
+                curPLCr=PLC_RES_R_MAX-PLC_VAR_PRE_SCREEN
+                    +curPLCr%PLC_VAR_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            curPLCr=(curPLCr+PLC_VAR_PRE_SCREEN)%PLC_RES_R_MAX;
+            break;            
+    }    
+    #endif
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCdDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCdDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCd>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCd-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCd=MAX_D_REGISTER-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCd%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCd=(curPLCd+(PLC_VAR_PRE_SCREEN/2))%(MAX_D_REGISTER);        
+            break;
+        case(KEY_UP):
+            if(curPLCd>0)
+                curPLCd--;
+            else
+                curPLCd=(MAX_D_REGISTER-1);
+            break;
+        case(KEY_DOWN):
+            if(curPLCd<(MAX_D_REGISTER-1))
+                curPLCd++;
+            else
+                curPLCd=0;
+            break;
+        case(KEY_PAGEUP):
+            if(curPLCd>=PLC_VAR_PRE_SCREEN)
+                curPLCd-=PLC_VAR_PRE_SCREEN;
+            else
+                curPLCd=MAX_D_REGISTER-PLC_VAR_PRE_SCREEN
+                    +curPLCd%PLC_VAR_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            curPLCd=(curPLCd+PLC_VAR_PRE_SCREEN)%(MAX_D_REGISTER);
+            break;            
+    }    
+    #endif 
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPLCkDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiPLCkDirKeyHandle(U8 key)
+{
+    #if 0
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCk>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCk-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCk=MAX_M_POINT-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCk%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCk=(curPLCk+(PLC_VAR_PRE_SCREEN/2))%(MAX_M_POINT);        
+            break;
+        case(KEY_UP):
+            if(curPLCk>0)
+                curPLCk--;
+            else
+                curPLCk=(MAX_M_POINT-1);
+            break;
+        case(KEY_DOWN):
+            if(curPLCk<(MAX_M_POINT-1))
+                curPLCk++;
+            else
+                curPLCk=0;
+            break;
+        case(KEY_PAGEUP):
+            if(curPLCk>=PLC_VAR_PRE_SCREEN)
+                curPLCk-=PLC_VAR_PRE_SCREEN;
+            else
+                curPLCk=MAX_M_POINT-PLC_VAR_PRE_SCREEN
+                    +curPLCk%PLC_VAR_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            curPLCk=(curPLCk+PLC_VAR_PRE_SCREEN)%(MAX_M_POINT);
+            break;            
+    }    
+    #endif
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiHDDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle direction and page up down key in hd manager gui
+*------------------------------------------------------------------------------
+*/
+void guiHDDirKeyHandle(U8 key)
+{
+   /* switch(key)
+    {
+        case(KEY_LEFT):
+            FileManageLeft();
+            break;
+        case(KEY_RIGHT):
+            FileManageRight();
+            break;
+        case(KEY_UP):
+            FileManageUp();
+            break;
+        case(KEY_DOWN):
+            FileManageDown();
+            break;
+        case(KEY_PAGEUP):
+            FileManagePageUp();
+            break;
+        case(KEY_PAGEDOWN):
+            FileManagePageDown();
+            break;            
+    }*/
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in param interface
+*------------------------------------------------------------------------------
+*/
+void guiParamDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(currentParam>=(PARAM_PRE_SCREEN/2))
+                currentParam-=(PARAM_PRE_SCREEN/2);
+            else
+                currentParam=PARAM_MAX-(PARAM_PRE_SCREEN/2)
+                    +currentParam%(PARAM_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            currentParam=(currentParam+(PARAM_PRE_SCREEN/2))%PARAM_MAX;        
+            //if((currentParam+(PARAM_PRE_SCREEN/2))<PARAM_MAX)
+            //    currentParam+=(PARAM_PRE_SCREEN/2);
+            break;
+        case(KEY_UP):
+            if(currentParam>0)
+                currentParam--;
+            else
+                currentParam=(PARAM_MAX-1);
+            break;
+        case(KEY_DOWN):
+            if(currentParam<(PARAM_MAX-1))
+                currentParam++;
+            else
+                currentParam=0;
+            break;
+        case(KEY_PAGEUP):
+            if(currentParam>=PARAM_PRE_SCREEN)
+                currentParam-=PARAM_PRE_SCREEN;
+            else
+                currentParam=PARAM_MAX-PARAM_PRE_SCREEN
+                    +currentParam%PARAM_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            currentParam=(currentParam+PARAM_PRE_SCREEN)%PARAM_MAX;
+            break;            
+    }
+    currentParamGrp=SYSparam[currentParam].group;
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in param interface
+*------------------------------------------------------------------------------
+*/
+void guiToolCPDirKeyHandle(U8 key)
+{
+    U8 prePage;
+    if(useToolWearFlag!=0)
+    {
+        prePage=TCOMP_PRE_SCREEN;
+    }else{
+        prePage=TCOMP_PRE_SCREEN*2;
+    }
+/*    switch(key)
+    {
+        case(KEY_LEFT):
+            if(useToolWearFlag==0)
+            {   //not use wear out
+                currentToolCPxz=(currentToolCPxz+5-1)%5;
+                if((Yavailable==0)&&(currentToolCPxz==TCY||currentToolCPxz==YW))
+                {
+                    currentToolCPxz=(currentToolCPxz+5-1)%5;
+                }
+            }else{  //use wear out
+                currentToolCPxz=(currentToolCPxz+9-1)%9;
+                if((Yavailable==0)&&(currentToolCPxz==TCY||currentToolCPxz==YW))
+                {
+                    currentToolCPxz=(currentToolCPxz+9-1)%9;
+                }
+            }
+            break;
+        case(KEY_RIGHT): 
+            if(useToolWearFlag==0)
+            {
+                currentToolCPxz=(currentToolCPxz+1)%5;
+                if((Yavailable==0)&&(currentToolCPxz==TCY||currentToolCPxz==YW))
+                {
+                    currentToolCPxz=(currentToolCPxz+1)%5;
+                }
+            }else{
+                currentToolCPxz=(currentToolCPxz+1)%9;
+                if((Yavailable==0)&&(currentToolCPxz==TCY||currentToolCPxz==YW))
+                {
+                    currentToolCPxz=(currentToolCPxz+1)%9;
+                }
+            }
+            break;    
+        case(KEY_PAGEUP):
+            currentToolCP=GUI_PAGEUP(currentToolCP,TCOMP_MAX,prePage);
+            break;
+        case(KEY_PAGEDOWN): 
+            currentToolCP=GUI_PAGEDOWN(currentToolCP,TCOMP_MAX,prePage);
+            break;
+        case(KEY_UP):
+            if(useToolWearFlag==0)
+            {  //not use wear out
+                currentToolCP=(currentToolCP+TCOMP_MAX-1)%TCOMP_MAX;
+            }else{
+                switch(currentToolCPxz)
+                {
+                    case TCX:
+                        currentToolCPxz=XW;
+                        currentToolCP=(currentToolCP+TCOMP_MAX-1)%TCOMP_MAX;
+                        break;
+                    case TCZ:
+                        currentToolCPxz=ZW;
+                        currentToolCP=(currentToolCP+TCOMP_MAX-1)%TCOMP_MAX;
+                        break;
+                    case TCR:
+                        currentToolCPxz=RW;
+                        currentToolCP=(currentToolCP+TCOMP_MAX-1)%TCOMP_MAX;
+                        break;
+                    case TCT:
+                        currentToolCP=(currentToolCP+TCOMP_MAX-1)%TCOMP_MAX;
+                        break;
+                    case TCY:
+                        currentToolCPxz=YW;
+                        currentToolCP=(currentToolCP+TCOMP_MAX-1)%TCOMP_MAX;
+                        break;
+                    case XW:
+                        currentToolCPxz=TCX;
+                        break;
+                    case ZW:
+                        currentToolCPxz=TCZ;
+                        break;
+                    case RW:
+                        currentToolCPxz=TCR;
+                        break;
+                    case YW:
+                        currentToolCPxz=TCY;
+                        break;
+                }
+            }
+            break;
+        case(KEY_DOWN):
+            if(useToolWearFlag==0)
+            { //not use wear out
+                currentToolCP=(currentToolCP+1)%TCOMP_MAX;
+            }else{
+                switch(currentToolCPxz)
+                {
+                    case XW:
+                        currentToolCPxz=TCX;
+                        currentToolCP=(currentToolCP+1)%TCOMP_MAX;
+                        break;
+                    case ZW:
+                        currentToolCPxz=TCZ;
+                        currentToolCP=(currentToolCP+1)%TCOMP_MAX;
+                        break;
+                    case RW:
+                        currentToolCPxz=TCR;
+                        currentToolCP=(currentToolCP+1)%TCOMP_MAX;
+                        break;
+                    case TCT:
+                        currentToolCP=(currentToolCP+1)%TCOMP_MAX;
+                        break;
+                    case YW:
+                        currentToolCPxz=TCY;
+                        currentToolCP=(currentToolCP+1)%TCOMP_MAX;
+                        break;
+                    case TCX:
+                        currentToolCPxz=XW;
+                        break;
+                    case TCZ:
+                        currentToolCPxz=ZW;
+                        break;
+                    case TCR:
+                        currentToolCPxz=RW;
+                        break;
+                    case TCY:
+                        currentToolCPxz=YW;
+                        break;
+                }
+            }
+            break;      
+    }*/
+}
+
+/*
+*------------------------------------------------------------------------------
+* function: guiCoorOffsetDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in coord offset interface
+*------------------------------------------------------------------------------
+*/
+void guiCoorRefDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+        case(KEY_PAGEUP):
+        case(KEY_UP):
+            if(currentRef>0)
+                currentRef--;
+            break;        
+        case(KEY_RIGHT):
+        case(KEY_PAGEDOWN):
+        case(KEY_DOWN):
+            if(currentRef<REFP_MAX-1)
+                currentRef++;            
+            break;      
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiVarDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in var set interface
+*------------------------------------------------------------------------------
+*/
+void guiVarDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(currentVar>=(VAR_PRE_SCREEN/2))
+                currentVar-=(VAR_PRE_SCREEN/2);
+            else
+                currentVar=GLOBAL_VAR_MAX-(VAR_PRE_SCREEN/2)
+                    +currentVar%(VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            currentVar=(currentVar+(VAR_PRE_SCREEN/2))%GLOBAL_VAR_MAX;        
+            break;
+        case(KEY_UP):
+            if(currentVar>0)
+                currentVar--;
+            else
+                currentVar=(GLOBAL_VAR_MAX-1);
+            break;
+        case(KEY_DOWN):
+            if(currentVar<(GLOBAL_VAR_MAX-1))
+                currentVar++;
+            else
+                currentVar=0;
+            break;
+        case(KEY_PAGEUP):
+            if(currentVar>=VAR_PRE_SCREEN)
+                currentVar-=VAR_PRE_SCREEN;
+            else
+                currentVar=GLOBAL_VAR_MAX-VAR_PRE_SCREEN
+                    +currentVar%VAR_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            currentVar=(currentVar+VAR_PRE_SCREEN)%GLOBAL_VAR_MAX;
+            break;            
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiColorsDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in colors interface
+*------------------------------------------------------------------------------
+*/
+void guiSettingDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+        case(KEY_UP):
+            if(focus==0)
+                focus=6;
+            else
+                focus=(focus-1)%7;
+            break;
+        case(KEY_RIGHT):
+        case(KEY_DOWN):
+            focus=(focus+1)%7;
+            break;
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiPasswordDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in trace screen
+*------------------------------------------------------------------------------
+*/
+void guiPasswordDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT): //to pass
+            if(curPassWord>=SYS_PASS_MAX)
+                curPassWord=0;
+            break;
+        case(KEY_UP):
+            if((curPassWord>0)&&(curPassWord<SYS_PASS_MAX))
+                curPassWord--;
+            else if(curPassWord>(PASSWORD_MAX-3))
+                curPassWord--;
+            break;
+        case(KEY_RIGHT): //to op 
+            if(curPassWord<SYS_PASS_MAX)
+                curPassWord=PASSWORD_MAX-3;
+            break;
+        case(KEY_DOWN):
+            if(curPassWord<(SYS_PASS_MAX-1))
+                curPassWord++;
+            else if(curPassWord<PASSWORD_MAX-1)
+                curPassWord++;
+            break;
+        case(KEY_PAGEUP):
+            if(curPassWord>=PASSWORD_PRE_SECREEN)
+                curPassWord=curPassWord-PASSWORD_PRE_SECREEN;                       
+            break;
+        case(KEY_PAGEDOWN):
+            if(curPassWord<(SYS_PASS_MAX-PASSWORD_PRE_SECREEN))
+                curPassWord=(curPassWord+PASSWORD_PRE_SECREEN)%SYS_PASS_MAX; 
+            break;              
+    }
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiTraceDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in trace screen
+*------------------------------------------------------------------------------
+*/
+#if 0
+void guiTraceDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+        case(KEY_RIGHT):  
+            if(traceDispParam==0)
+                traceDispParam=1;
+            else
+                traceDispParam=0;
+            break;
+        case(KEY_UP):
+            if(focus==0)
+                focus=4;
+            else
+                focus=(focus-1)%5;
+            break;                 
+        case(KEY_DOWN):
+            focus=(focus+1)%5;
+            break;
+    }
+}
+#endif
+/*
+*------------------------------------------------------------------------------
+* function: guiAlarmDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in param interface
+*------------------------------------------------------------------------------
+*/
+void guiAlarmDirKeyHandle(U8 key)
+{
+    /*
+    switch(key)
+    {
+        case(KEY_LEFT):
+            break;
+        case(KEY_RIGHT):
+            break;
+        case(KEY_UP):
+        case(KEY_PAGEUP):
+            if(alarmShow==0)
+            {
+                if(alarmOffset>=8)
+                {
+                    alarmOffset-=8;
+                    alarmRedraw=1;
+                }
+            }else{
+                if(alarmHelpOffset>=8)
+                {
+                    alarmHelpOffset-=8;
+                    alarmRedraw=1;
+                }
+            }
+            break;
+        case(KEY_DOWN):
+        case(KEY_PAGEDOWN):
+            if(alarmShow==0)
+            {
+                if(alarmOffset+8<ALARM_RECORD_MAX)
+                { 
+                    alarmOffset+=8;
+                    alarmRedraw=1;
+                }
+            }else{
+                if((alarmHelpOffset+8)<ALARM_MAX)
+                {
+                    alarmHelpOffset+=8;
+                    alarmRedraw=1;
+                }
+            }
+            break;            
+    }*/
+}
+/*
+*------------------------------------------------------------------------------
+* function: guiAlarmDirKeyHandle
+* parameter: key value
+* return   : void
+* description : handle the direction KEY in font lib test interface
+*------------------------------------------------------------------------------
+*/
+void guiFontTestDirKeyHandle(U8 key)
+{/*
+    switch(key)
+    {
+        case(KEY_LEFT):
+            checkFontStart-=256;//DNG_CHAR_PRE_SCREEN;
+            break;
+        case(KEY_RIGHT):
+            checkFontStart+=256;//DNG_CHAR_PRE_SCREEN;
+            break;
+        case(KEY_UP):
+            checkFontSize=FONT_SIZE16;
+            break;
+        case(KEY_DOWN):
+            checkFontSize=FONT_SIZE24;
+            break;            
+        case(KEY_PAGEUP):
+            
+            checkFontStart-=256;
+            if(checkFontStart<0xa1a0)
+                checkFontStart=0xa1a0;
+            break;
+        case(KEY_PAGEDOWN):
+            checkFontStart+=256;
+             if(checkFontStart>0xf7a0)
+                checkFontStart=0xa1a0;               
+            break;           
+    }    */
+}
+//add ty lxw
+void guiTKeyHandle(U8 key)
+{/*
+    switch(key)
+    {
+        case (KEY_FUP):
+            currentGUI=GUINUM_MAIN;
+            currentMenu=0;
+            break;
+        case (KEY_F1):
+            //currentGUI = GUINUM_PLC_X ;
+            if(sysMode ==SYS_MODE_JOG )
+            {
+                if(!PLC_SIG_DK_ZERO)
+                {
+                    ALARM_GRP3 |= ALM_GRP3_NOTZERO;
+                }
+                else
+                {
+                    mfuncBuf[mbufwptr]=123;
+                    CYCLE_BUF_WINC(mbufwptr, MBUF_MAX);
+                    assistStart=TRUE;
+                    autoAssistenPlcRequest=1;
+                }
+            }
+            break;
+        case (KEY_F2):
+            if(sysMode ==SYS_MODE_JOG)
+            {
+                if(!PLC_SIG_DK_ZERO)
+                {
+                    ALARM_GRP3 |= ALM_GRP3_NOTZERO;
+                } else
+                {
+                    mfuncBuf[mbufwptr]=122;
+                    CYCLE_BUF_WINC(mbufwptr, MBUF_MAX);
+                    assistStart=TRUE;
+                    autoAssistenPlcRequest=1;
+                }
+            }
+            break;
+        case (KEY_F3):
+            if(sysMode ==SYS_MODE_JOG)
+            {
+                mfuncBuf[mbufwptr]=120;
+                CYCLE_BUF_WINC(mbufwptr, MBUF_MAX);
+                assistStart=TRUE;
+                autoAssistenPlcRequest=1;
+            }
+            break;     
+        case (KEY_F4):
+            if(sysMode ==SYS_MODE_JOG)
+            {
+                if(!PLC_SIG_DK_ZERO)
+                {
+                    ALARM_GRP3 |= ALM_GRP3_NOTZERO;
+                } else
+                {
+                    if(shiftKeyState)
+                        mfuncBuf[mbufwptr]=131;
+                    else
+                        mfuncBuf[mbufwptr]=130;
+                    CYCLE_BUF_WINC(mbufwptr, MBUF_MAX);
+                    assistStart=TRUE;
+                    autoAssistenPlcRequest=1;      
+                }
+            }
+            break;
+        case(KEY_F5):
+            break;
+        case(KEY_F6):
+            break;            
+        case (KEY_FROLL):
+            break;
+    }*/
+}
+
+
+void guiPLCxDirKeyHandle(U8 key)
+{/*
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCx>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCx-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCx=MAX_X_POINT-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCx%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCx=(curPLCx+(PLC_VAR_PRE_SCREEN/2))%(MAX_X_POINT);        
+            break;
+        case(KEY_UP):
+            if(curPLCx>0)
+                curPLCx--;
+            else
+                curPLCx=(MAX_X_POINT-1);
+            break;
+        case(KEY_DOWN):
+            if(curPLCx<(MAX_X_POINT-1))
+                curPLCx++;
+            else
+                curPLCx=0;
+            break;
+        case(KEY_PAGEUP):
+            if(curPLCx>=PLC_VAR_PRE_SCREEN)
+                curPLCx-=PLC_VAR_PRE_SCREEN;
+            else
+                curPLCx=MAX_X_POINT-PLC_VAR_PRE_SCREEN
+                    +curPLCx%PLC_VAR_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            curPLCx=(curPLCx+PLC_VAR_PRE_SCREEN)%(MAX_X_POINT);
+            break;            
+    }    */
+}
+
+void guiPLCyDirKeyHandle(U8 key)
+{/*
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(curPLCy>=(PLC_VAR_PRE_SCREEN/2))
+                curPLCy-=(PLC_VAR_PRE_SCREEN/2);
+            else
+                curPLCy=MAX_Y_POINT-(PLC_VAR_PRE_SCREEN/2)
+                    +curPLCy%(PLC_VAR_PRE_SCREEN/2);
+            break;
+        case(KEY_RIGHT):
+            curPLCy=(curPLCy+(PLC_VAR_PRE_SCREEN/2))%(MAX_Y_POINT);        
+            break;
+        case(KEY_UP):
+            if(curPLCy>0)
+                curPLCy--;
+            else
+                curPLCy=(MAX_Y_POINT-1);
+            break;
+        case(KEY_DOWN):
+            if(curPLCy<(MAX_Y_POINT-1))
+                curPLCy++;
+            else
+                curPLCy=0;
+            break;
+        case(KEY_PAGEUP):
+            if(curPLCy>=PLC_VAR_PRE_SCREEN)
+                curPLCy-=PLC_VAR_PRE_SCREEN;
+            else
+                curPLCy=MAX_Y_POINT-PLC_VAR_PRE_SCREEN
+                    +curPLCy%PLC_VAR_PRE_SCREEN;
+            break;
+        case(KEY_PAGEDOWN):
+            curPLCy=(curPLCy+PLC_VAR_PRE_SCREEN)%(MAX_Y_POINT);
+            break;            
+    }    */
+}
+void guiColourKeyHandle(U8 key)
+{
+    switch(key)
+    {
+    case(KEY_LEFT):
+    
+        if(curColourMainSel==0)
+        {
+            curColourMainSel=1;
+        }
+        else
+        {
+            curColourMainSel=0;
+        }
+        break;
+    case(KEY_RIGHT):
+    
+        if(curColourMainSel==1)
+        {
+            curColourMainSel=0;
+        }
+        else
+        {
+            curColourMainSel=1;
+        }
+        break;
+       
+    case(KEY_UP):
+        if(curColourMainSel==0)
+        {
+            
+            if(curColourSelMenu==0)
+            {
+                curColourSelMenu = 7;
+            }
+            else
+            {
+                curColourSelMenu--;
+            }
+        }else if(curColourMainSel==1)
+        {
+            if(curColourSelCol==0)
+            {
+                curColourSelCol = COLOUR_NUM-1;
+            }
+            else
+            {
+                curColourSelCol--;
+            }
+            
+        }   
+        
+        break;
+    case(KEY_DOWN):
+        if(curColourMainSel==0)
+        {       
+            if(curColourSelMenu==7)
+            {
+                curColourSelMenu = 0;
+            }
+            else
+            {
+                curColourSelMenu++;
+            }
+        } else if(curColourMainSel==1)
+        {
+            if(curColourSelCol==COLOUR_NUM-1)
+            {
+                curColourSelCol = 0;
+            }
+            else
+            {
+                curColourSelCol++;
+            }
+            
+        }/*else if(curColourMainSel==2)
+        {
+           
+            if(curColourSelSetOrSave==1)
+            {
+                curColourSelSetOrSave=0;
+            }else
+            {
+                curColourSelSetOrSave=1;
+            }
+            
+        }*/
+        
+        break;            
+    case(KEY_PAGEUP):
+        if(curColourMainSel==0)
+        {
+            curColourMainSel=1;
+        }else{
+            curColourMainSel--;
+        }
+        break;
+    case(KEY_PAGEDOWN):
+        if(curColourMainSel==1)
+        {
+            curColourMainSel=0;
+        }else{
+            curColourMainSel++;
+        }
+        break;     
+    }    
+}
+
+void guiParamGroupKeyHandle(U8 key)
+{
+    U16 index;
+    U16 maxindex=PGcount[SYSparam[currentParam].group]-1;
+    switch(key)
+    {
+        case(KEY_LEFT):   
+            if(currentParamGrp>1)
+            {
+                currentParamGrp--;
+                currentParam=PGroup[currentParamGrp][0];
+            }else{
+                currentParamGrp=SYS_PARAM_GROUP_MAX-1;
+                currentParam=PGroup[currentParamGrp][0];
+            }                     
+            break;
+        case(KEY_RIGHT):   
+            if(currentParamGrp<(SYS_PARAM_GROUP_MAX-1))
+            {
+                currentParamGrp++;
+                currentParam=PGroup[currentParamGrp][0];
+            }else{
+                currentParamGrp=1;
+                currentParam=1;
+            }         
+            break;
+        case(KEY_UP):
+            index=SYSparam[currentParam].grpIndex;
+            if(index>0)
+            {
+                currentParam=PGroup[currentParamGrp][index-1];
+            }else{
+                currentParam=PGroup[currentParamGrp][maxindex];
+            }
+            break;
+        case(KEY_DOWN):  
+            index=SYSparam[currentParam].grpIndex;
+            if(index<maxindex)
+            {
+                currentParam=PGroup[currentParamGrp][index+1];
+            }else{
+                currentParam=PGroup[currentParamGrp][0];
+            }
+            break;            
+        case(KEY_PAGEUP):
+            index=SYSparam[currentParam].grpIndex;
+            if(index>=PARAM_GRP_PRE_SCREEN)
+            {
+                currentParam=PGroup[currentParamGrp][index-PARAM_GRP_PRE_SCREEN];
+            }else{
+                U16 lastpageindex=maxindex%PARAM_GRP_PRE_SCREEN;
+                if(index<=lastpageindex)
+                {
+                    currentParam=PGroup[currentParamGrp][(maxindex-lastpageindex+index)];
+                }else{
+                    currentParam=PGroup[currentParamGrp][maxindex];
+                }
+            }
+            break;
+        case(KEY_PAGEDOWN): 
+            index=SYSparam[currentParam].grpIndex;
+            if(index<=maxindex-PARAM_GRP_PRE_SCREEN)
+            {
+                currentParam=PGroup[currentParamGrp][index+PARAM_GRP_PRE_SCREEN];
+            }else{
+                U16 lastpageindex=maxindex%PARAM_GRP_PRE_SCREEN;
+                if(maxindex-index<=lastpageindex)
+                {
+                    currentParam=PGroup[currentParamGrp][(index+PARAM_GRP_PRE_SCREEN)%PARAM_GRP_PRE_SCREEN];
+                }else{
+                    currentParam=PGroup[currentParamGrp][maxindex];
+                }
+            }
+            break;
+        default: break;            
+    }
+}
+
+void guiG5XDirKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+            currentG5xcol=(currentG5xcol+2)%3;
+            if((Yavailable==0)&&(currentG5xcol==2))
+            {
+                currentG5xcol=(currentG5xcol+2)%3;
+            }
+            break;
+        case(KEY_RIGHT):
+            currentG5xcol=(currentG5xcol+1)%3;
+            if(Yavailable==0&&currentG5xcol==2)
+            {
+                currentG5xcol=(currentG5xcol+1)%3;
+            }
+            break;
+        case(KEY_UP):
+            currentG5xrow=(currentG5xrow+G5X_MAX-1)%G5X_MAX;
+            break;
+        case(KEY_DOWN):
+            currentG5xrow=(currentG5xrow+1)%G5X_MAX;
+            break;            
+        case(KEY_PAGEUP):
+            currentG5xrow=GUI_PAGEUP(currentG5xrow,G5X_MAX,G5X_SCREEN);
+            break;
+        case(KEY_PAGEDOWN):
+            currentG5xrow=GUI_PAGEDOWN(currentG5xrow,G5X_MAX,G5X_SCREEN);
+            break;     
+    }    
+}
+U16 GUI_PAGEUP(U16 curnum,U16 maxnum,U16 screennum)
+{
+    if(curnum>=screennum)
+    {
+        curnum=curnum-screennum;
+    }else{
+        U16 lastscreennum=maxnum%screennum;
+        if(lastscreennum==0)
+        {
+            curnum=(curnum+maxnum-screennum)%maxnum;
+        }else if(curnum<lastscreennum)
+        {
+            curnum=maxnum-lastscreennum+curnum;
+        }else{
+            curnum=maxnum-1;
+        }
+    }
+    return curnum;
+}
+U16 GUI_PAGEDOWN(U16 curnum,U16 maxnum,U16 screennum)
+{
+    if(curnum<(maxnum-screennum))
+    {
+        curnum=curnum+screennum;
+    }else{
+        U16 lastscreennum=maxnum%screennum;
+        if((lastscreennum==0)||(maxnum-curnum)<=lastscreennum)
+        {
+            curnum=(curnum+screennum)%screennum;
+        }else{
+            curnum=maxnum-1;
+        }
+    }
+    return curnum;
+}
+void guiSimTraceKeyHandle(U8 key)
+{
+    switch(key)
+    {
+        case(KEY_LEFT):
+            if(trace_zoom_on)
+            {
+                if(Trace_GetZ(trace_cursor_z-trace_scale*TRACE_MOVE_MIN)-trace_zoom_square_length*TRACE_GWIDTH/TRACE_GHEIGHT/2<=0)
+                {
+                    trace_cen_z-=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else{
+                    trace_cursor_z-=trace_scale*TRACE_MOVE_MIN;
+                }
+            }else if(trace_move_on){
+                trace_cen_z-=trace_scale*TRACE_SMALL_GRID;
+                Trace_Re_Print();
+            }else if(trace_menu==0){
+                if(trace_menu0_sel==2)
+                {//左右上下移动一次移10格
+                    trace_cen_x-=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else if(trace_menu0_sel==3){
+                    trace_cen_z-=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else if((trace_menu0_sel==4)||(trace_menu0_sel==5)){
+                    trace_scale=Trace_Zoom_Out(trace_scale);    
+                    Trace_Re_Print();                    
+                }
+            }else if(trace_menu==1){
+                if(trace_menu1_sel==0)
+                {
+                    trace_cursor_x-=trace_scale;
+                }else if(trace_menu1_sel==1){            
+                    trace_cursor_z-=trace_scale;
+                }else if(trace_menu1_sel==2){    
+                    trace_cursor2_x-=trace_scale;
+                }else if(trace_menu1_sel==3){            
+                    trace_cursor2_z-=trace_scale;
+                }
+            }else if(trace_menu==2){
+                do
+                {//左右改变颜色,跳过当前背景色,坐标系不用跳
+                    trace_colour_select[trace_menu2_sel]=(trace_colour_select[trace_menu2_sel]+TRACE_COLOUR_MAX-1)%TRACE_COLOUR_MAX;
+                } while((trace_menu2_sel<5)&&(trace_colour_select[trace_menu2_sel]==trace_colour_select[5]));
+                if(trace_menu2_sel==0||trace_menu2_sel==5||trace_menu2_sel==6||trace_menu2_sel==7)
+                {
+                    Trace_Re_Print();
+                    trace_real_clear=0;
+                }
+            }   
+            break;
+        case(KEY_RIGHT):            
+            if(trace_zoom_on)
+            {
+                if(Trace_GetZ(trace_cursor_z+trace_scale*TRACE_MOVE_MIN)+trace_zoom_square_length*TRACE_GWIDTH/TRACE_GHEIGHT/2>=TRACE_GWIDTH)
+                {
+                    trace_cen_z+=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else{
+                    trace_cursor_z+=trace_scale*TRACE_MOVE_MIN;
+                }
+            }else if(trace_move_on){
+                trace_cen_z+=trace_scale*TRACE_SMALL_GRID;
+                Trace_Re_Print();
+            }else if(trace_menu==0)
+            {
+                if(trace_menu0_sel==2)
+                {
+                    trace_cen_x+=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else if(trace_menu0_sel==3){
+                    trace_cen_z+=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else if((trace_menu0_sel==4)||(trace_menu0_sel==5)){
+                    trace_scale=Trace_Zoom_In(trace_scale);
+                    Trace_Re_Print();
+                }
+            }else if(trace_menu==1){
+                if(trace_menu1_sel==0)
+                {
+                    trace_cursor_x+=trace_scale;
+                }else if(trace_menu1_sel==1){            
+                    trace_cursor_z+=trace_scale;
+                }else if(trace_menu1_sel==2){            
+                    trace_cursor2_x+=trace_scale;
+                }else if(trace_menu1_sel==3){            
+                    trace_cursor2_z+=trace_scale;
+                }
+            }else if(trace_menu==2){
+                do
+                {//左右改变颜色,跳过当前背景色,坐标系不用跳
+                    trace_colour_select[trace_menu2_sel]=(trace_colour_select[trace_menu2_sel]+1)%TRACE_COLOUR_MAX;
+                } while((trace_menu2_sel<5)&&(trace_colour_select[trace_menu2_sel]==trace_colour_select[5]));
+                if(trace_menu2_sel==0||trace_menu2_sel==5||trace_menu2_sel==6||trace_menu2_sel==7)
+                {
+                    Trace_Re_Print();
+                    trace_real_clear=0;
+                }
+            }            
+            break;
+        case(KEY_UP):
+            if(trace_zoom_on)
+            {
+                if(Trace_GetX(trace_cursor_x-trace_scale*TRACE_MOVE_MIN)-trace_zoom_square_length/2<=0)
+                {
+                    trace_cen_x-=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else{
+                    trace_cursor_x-=trace_scale*TRACE_MOVE_MIN;
+                }
+            }else if(trace_move_on){
+                trace_cen_x-=trace_scale*TRACE_SMALL_GRID;
+                Trace_Re_Print();
+            }else if(trace_menu==0)
+            {
+                trace_menu0_sel=(trace_menu0_sel+TRACE_MENU0_MAX-1)%TRACE_MENU0_MAX;
+            }else if(trace_menu==1){
+                trace_menu1_sel=(trace_menu1_sel+TRACE_MENU1_MAX-1)%TRACE_MENU1_MAX;
+            }else if(trace_menu==2){
+                trace_menu2_sel=(trace_menu2_sel+TRACE_MENU3_MAX-1)%TRACE_MENU3_MAX;
+            }
+            break;
+        case(KEY_DOWN):
+            if(trace_zoom_on)
+            {
+                if(Trace_GetX(trace_cursor_x+trace_scale*TRACE_MOVE_MIN)+trace_zoom_square_length/2>=TRACE_GHEIGHT)
+                {
+                    trace_cen_x+=trace_scale*TRACE_MOVE_MIN;
+                    Trace_Re_Print();
+                }else{
+                    trace_cursor_x+=trace_scale*TRACE_MOVE_MIN;
+                }
+            }else if(trace_move_on){
+                trace_cen_x+=trace_scale*TRACE_SMALL_GRID;
+                Trace_Re_Print();
+            }else if(trace_menu==0)
+            {
+                trace_menu0_sel=(trace_menu0_sel+1)%TRACE_MENU0_MAX;
+            }else if(trace_menu==1){
+                trace_menu1_sel=(trace_menu1_sel+1)%TRACE_MENU1_MAX;
+            }else if(trace_menu==2){
+                trace_menu2_sel=(trace_menu2_sel+1)%TRACE_MENU3_MAX;
+            }
+            break;            
+        case(KEY_PAGEUP):
+            if(trace_zoom_on)
+            {
+                S32 temp,temp2;
+                temp2=temp=trace_scale*trace_zoom_square_length/TRACE_GHEIGHT;
+                do
+                {
+                    if(temp2<TRACE_MIN_SCALE)
+                    {
+                        break;
+                    }
+                    temp2/=1.2;
+                    temp=Trace_Fix_Scale(temp2)*TRACE_GHEIGHT/trace_scale;
+                } while(temp==trace_zoom_square_length);
+                trace_zoom_square_length=temp;
+                if(trace_zoom_square_length<10)
+                {
+                    trace_zoom_square_length=10;    
+                }
+            }else if(trace_move_on){
+                trace_scale=Trace_Zoom_Out(trace_scale);    
+                Trace_Re_Print();
+            }else{
+                trace_menu=(trace_menu+1)%TRACE_MENU_MAX;
+            }
+            break;
+        case(KEY_PAGEDOWN):
+            if(trace_zoom_on)
+            {
+                S32 temp,temp2;
+                temp2=temp=trace_scale*trace_zoom_square_length/TRACE_GHEIGHT;
+                do
+                {
+                    if(temp2<10)
+                    {
+                        temp2*=2;
+                    }else{
+                        temp2*=1.2;
+                    }
+                    temp=Trace_Fix_Scale(temp2)*TRACE_GHEIGHT/trace_scale;
+                } while(temp==trace_zoom_square_length);
+                if((Trace_GetX(trace_cursor_x)+temp/2>=TRACE_GHEIGHT)||
+                   (Trace_GetX(trace_cursor_x)-temp/2<=0)||
+                   (Trace_GetZ(trace_cursor_z)+temp*TRACE_GWIDTH/TRACE_GHEIGHT/2>=TRACE_GWIDTH)||
+                   (Trace_GetZ(trace_cursor_z)-temp*TRACE_GWIDTH/TRACE_GHEIGHT/2<=0))
+                {
+                    trace_scale=Trace_Zoom_In(trace_scale);
+                    Trace_Re_Print();
+                }else{
+                    trace_zoom_square_length=temp;
+                }
+            }else if(trace_move_on){
+                trace_scale=Trace_Zoom_In(trace_scale);    
+                Trace_Re_Print();
+            }else{
+                trace_menu=(trace_menu+TRACE_MENU_MAX-1)%TRACE_MENU_MAX;
+            }
+            break;     
+    }    
+}

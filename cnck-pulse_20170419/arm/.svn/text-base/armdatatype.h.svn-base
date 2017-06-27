@@ -1,0 +1,497 @@
+#ifndef __ARMDATATYPE_H_
+#define __ARMDATATYPE_H_
+//data type define for system 
+//
+//include the base data type def
+#include "def.h"
+
+
+
+
+#define	PI	3.1415926535897932384626433832795
+#define ARC2ANGLE(arc)      ((double)arc*180.0/PI)
+#define ANGLE2ARC(angle)    ((double)angle*PI/180.0)
+#define UNIT_ND(angle,unit) ((double)angle*unit/1000000.0)
+//*********************************************************************
+#define LEDON  (1)
+#define LEDOFF (0)
+
+//************************************************************************
+#define AXISX  (0)
+#define AXISY  (1)
+#define AXISZ  (2)
+#define AXISA4 (3)
+#define AXISA5 (4)
+
+#define AXISWX (10)  //wear out of x in tool compensation
+#define AXISWY (11)
+#define AXISWZ (11)  //wear out of Z in tool compensation
+//************************************************************************
+//system info defination
+#define SYS_AXIS                (5)
+#define COMP_MAX                (280)
+#define TCOMP_MAX               (30)
+#define TOOL_MAX                (30)
+#define TOOL_CHANGE_TIME_LIMIT  (200)  // tool change max time 200 ms
+#define SPIN_RUN_TIME_LIMIT     (1000)
+//************************************************************************
+#define FILEOP_RECORD_MAX       (10)
+
+//************************************************************************
+// system buffer defination
+#define ARMDSP_BUF_SIZE  (4096)
+//************************************************************************
+// system mode 
+#define SYS_MODE_EDIT   (0)
+#define SYS_MODE_AUTO   (1)
+#define SYS_MODE_MDI    (2)
+#define SYS_MODE_WHEEL  (3)
+#define SYS_MODE_JOG    (4)
+#define SYS_MODE_REF    (5)
+#define SYS_MODE_ZERO   (6)
+// system state machine 
+#define SYS_STATE_RST            (0)
+#define SYS_STATE_INIT1          (1)   //SYS PARAM
+#define SYS_STATE_INIT2          (2)   //X COMPENSATION
+#define SYS_STATE_INIT3          (3)   //Y COMPENSATION
+#define SYS_STATE_INIT4          (4)   //Z COMPENSATION
+#define SYS_STATE_INIT5          (5)   //A4 COMPENSATION
+#define SYS_STATE_INIT6          (6)   //A5 COMPENSATION
+#define SYS_STATE_INIT7          (7)   //S COMPENSATION
+
+#define SYS_STATE_REF           (50)   //START FIND REF ,FINDNG LIMITZ
+#define SYS_STATE_REF1          (51)   //FIND REF STATE 2 FINDING LIMIT XY
+#define SYS_STATE_REF10         (60)   //FIND REF STATE 2 FINDING LIMIT XY
+#define SYS_STATE_REF2          (52)   //WAIT POS FIND CODE FINISH
+#define SYS_STATE_REF3          (53)   //SEND XYZ NEG FIND SIGN
+#define SYS_STATE_REF4          (54)   //SEND XYZ NEG FIND CODE
+#define SYS_STATE_REF5          (55)   //wait NEG CODE FINISH    
+#define SYS_STATE_REF6          (56)   //ref had found ,re init spc mode, to get BIT_LOCA_OVER state
+#define SYS_STATE_REF7          (57)  //wait BIT_LOCA_OVER of dsp state,
+#define SYS_STATE_REF8          (58)  //LOCA_OVER, abs coord is set,go to mach zero
+#define SYS_STATE_REF9          (59)  //wait the code done
+#define SYS_STATE_REF11         (60)
+//the normal states while mach work, =SYS_MODE+100
+#define SYS_STATE_EDIT   (100)
+#define SYS_STATE_AUTO   (101)
+#define SYS_STATE_MDI    (102)
+#define SYS_STATE_WHEEL  (103)
+#define SYS_STATE_JOG    (104)
+#define SYS_STATE_ZERO   (105)  //GO ZERO MODE
+
+#define SYS_STATE_ALARM        (200)
+//************************************************************************
+/*
+**************************************************************************
+* events sent between tasks
+*/
+#define EVENT_STATE_DONE    (0)
+#define EVENT_STATE_REQ     (1)
+#define EVENT_STATE_SEND    (2)
+#define EVENT_STATE_ACKED   (3)
+#define EVENT_STATE_ERROR   (10)
+
+#define TEVENT_NONE           (0)
+#define TEVENT_MOD_AUTO       (1)
+#define TEVENT_MOD_JOG        (2)
+#define TEVENT_MOD_WHELL      (3)
+#define TEVENT_MOD_MDI        (4)
+#define TEVENT_MOD_ZERO       (9)
+
+#define TEVENT_SENT_JOGCODE   (5)
+#define TEVENT_SENT_BATCODE   (6)
+#define TEVENT_COORDOFFSET    (7) //SET OFFSET
+#define TEVENT_COORDORGSET    (8) //SET ORGIN
+
+#define TEVENT_FIND_REF         (50)
+
+#define TEVENT_SEND_SYSPARAM    (201)
+#define TEVENT_SEND_COMPX       (202)
+#define TEVENT_SEND_COMPY       (203)
+#define TEVENT_SEND_COMPZ       (204)
+#define TEVENT_SEND_COMPA4      (205)
+#define TEVENT_SEND_COMPA5      (206)
+#define TEVENT_SEND_COMPS       (207)
+
+#define TEVENT_IDLE             (255)
+//------------------------------------------------------------
+// g code NUM that use in both in before and after tool compensation
+#define GCODE_00        (0X0000)
+#define GCODE_01        (0X0001)
+#define GCODE_02        (0X0002)
+#define GCODE_03        (0X0003)
+#define GCODE_04        (0X0004)
+
+#define GCODE_20        (20)
+#define GCODE_21        (21)
+
+#define GCODE_40  (40)
+#define GCODE_41  (41)
+#define GCODE_42  (42)
+
+//this G45 G46 use to tel toolcompensation model to stop 
+// or recover g41 g42 state when g7x or screw code is gived
+#define GCODE_45  (45)   //temp stop g41 g42
+#define GCODE_46  (46)   //recover g41  g42
+
+#define GCODE_50  (50)
+
+#define GCODE_54  (54)
+#define GCODE_55  (55)
+#define GCODE_56  (56)
+#define GCODE_57  (57)
+#define GCODE_58  (58)
+#define GCODE_59  (59)
+
+#define GCODE_65  (65)
+
+#define GCODE_70  (70)
+#define GCODE_71  (71)
+#define GCODE_72  (72)
+#define GCODE_73  (73)
+#define GCODE_74  (74)
+#define GCODE_75  (75)
+#define GCODE_76  (76)
+
+#define GCODE_96  (96)
+#define GCODE_97  (97)
+#define GCODE_98  (98)
+#define GCODE_99  (99)
+
+#define GCODE_F             (0X0464)
+#define GCODE_S             (0X0564)
+#define GCODE_SCREW         (0X0664)
+#define GCODE_T             (0x0f65)
+#define GCODE_LOCATE        (0x1065)
+
+#define GCODE_M00           (0X0065)
+#define GCODE_M03           (0x0365)
+#define GCODE_M04           (0x0465)
+#define GCODE_M05           (0x0565)
+#define GCODE_M06           (0x0665)
+#define GCODE_M07           (0x0765)
+#define GCODE_M08           (0x0865)
+#define GCODE_M09           (0x0965)
+#define GCODE_M10           (0x0A65) //TAIL STOP
+#define GCODE_M11           (0x0B65)
+#define GCODE_M12           (0x0C65) //chuck
+#define GCODE_M13           (0x0D65)
+#define GCODE_M15           (0x7365) //0xf65 is set to T code use 115 instead
+#define GCODE_M19           (0x1365) //spindle locate
+
+#define GCODE_M19           (0x1365) //spindle locate
+
+#define GCODE_M20           (0x1465)
+#define GCODE_M30           (0x1E65)
+#define GCODE_M31           (0X1F65) //for tool compent use 
+#define GCODE_M32           (0X2065) //SMOTH OPEN
+#define GCODE_M33           (0X2165) //SMOTH CLOSE
+
+#define GCODE_M41           ((41<<8)|0x65)
+#define GCODE_M42           ((42<<8)|0x65)
+#define GCODE_M43           ((43<<8)|0x65)
+#define GCODE_M44           ((44<<8)|0x65)
+
+#define GCODE_M50           (0X3265)
+#define GCODE_M65           ((65<<8)|0x65)
+#define GCODE_M91           ((91<<8)|0x65)
+#define GCODE_M98           ((98<<8)|0x65)
+#define GCODE_M99           ((99<<8)|0x65)
+
+#define GCODE_M253          (0xFD65)
+#define GCODE_M254          (0xFE65)
+#define GCODE_M255          (0xFF65)
+
+//h code 
+#define GCODE_H01           (0X0170)
+#define GCODE_H02           (0X0270)
+#define GCODE_H03           (0X0370)
+#define GCODE_H04           (0X0470)
+#define GCODE_H05           (0X0570)
+
+#define GCODE_H11           ((11<<8)|0X70)
+#define GCODE_H12           ((12<<8)|0x70)
+#define GCODE_H13           ((13<<8)|0X70)
+
+#define GCODE_H21           ((21<<8)|0X70)
+#define GCODE_H22           ((22<<8)|0X70)
+#define GCODE_H23           ((23<<8)|0X70)
+#define GCODE_H24           ((24<<8)|0X70)
+#define GCODE_H25           ((25<<8)|0X70)
+#define GCODE_H26           ((26<<8)|0X70)
+#define GCODE_H27           ((27<<8)|0X70)
+
+#define GCODE_H31           ((31<<8)|0X70)
+#define GCODE_H32           ((32<<8)|0X70)
+#define GCODE_H33           ((33<<8)|0X70)
+#define GCODE_H34           ((34<<8)|0X70)
+
+#define GCODE_H80           ((80<<8)|0X70)
+#define GCODE_H81           ((81<<8)|0X70)
+#define GCODE_H82           ((82<<8)|0X70)
+#define GCODE_H83           ((83<<8)|0X70)
+#define GCODE_H84           ((84<<8)|0X70)
+#define GCODE_H85           ((85<<8)|0X70)
+#define GCODE_H86           ((86<<8)|0X70)
+
+#define GCODE_H99           ((99<<8)|0X70)
+//------------------------------------------------------------
+//buf after gcode exec, prepare for tool compensation
+// The kind of buf name as TCG ,it mean tool compent gcode
+// 
+typedef struct __TCoord
+{
+   S32 x;
+   S32 y;
+   S32 z;
+}TCoord,*PCoord;
+typedef struct __TCGline
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index
+    S32 x;
+    S32 y;
+    S32 z;
+    
+} TTCGline,*PTCGline;
+typedef struct __TCGarc
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;     
+    U32 srcCode;     //compiled gcode index
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 i;
+    S32 k;
+    S32 r;
+    S32 senagle;
+    S32 eenagle;
+} TTCGarc,*PTCGarc;
+typedef struct __TCGfst
+{
+    U16 gnum;
+    U32 sendCount; 
+    U32 srcLine;
+    U32 srcCode;     //compiled gcode index
+    U32 value;
+     
+    S32 coordx;   //to record the new x z coord for tool compensation
+    S32 coordy;
+    S32 coordz;
+} TTCGfst,*PTCGfst;
+typedef struct __TCGmcode
+{
+    U16 gnum;
+    U32 sendCount;
+    U32 srcLine;
+    U32 srcCode;     //compiled gcode index
+} TTCGmcode,*PTCGmcode;
+//------------------------------------------------------------------
+typedef struct __DGline
+{
+    U32 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 a4;
+    S32 a5;
+    U32 realSendCount;
+    U32 sendCount;   
+    //U8  pkgtail;
+}TDGline,*PDGline;
+typedef struct __DGBline
+{
+    U32 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 a4;
+    S32 a5;
+    U32 realSendCount;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index    
+}TDGBline,*PDGBline;
+
+typedef struct __DGarc
+{
+    U32 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 i;
+    S32 j;
+    S32 k;
+    U32 r;
+    S32 a4;
+    S32 a5;
+    S32 senagle;
+    S32 eenagle;
+    U32 realSendCount;
+    U32 sendCount;
+}TDGarc,*PDGarc;
+typedef struct{
+    U32 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 i;
+    S32 j;
+    S32 k;
+    U32 r;
+    S32 a4;
+    S32 a5;
+    S32 senagle;
+    S32 eenagle;
+    U32 realSendCount;
+    U32 sendCount;    
+    U32 srcLine;     
+    U32 srcCode;      
+}TGcodeArc;
+typedef struct 
+{
+
+    U32 gnum;
+    S32 x;
+    S32 y;
+    S32 z;
+    S32 i;
+    S32 j;
+    S32 k;
+    U32 r;
+    S32 a4;
+    S32 a5;
+    S32 s;
+    S32 enagle;
+    U32 realSendCount;
+    U32 sendCount;    
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index   
+}TDGBarc,*PDGBarc;
+
+typedef struct __DGmfst
+{
+    U32 gnum;
+    U32 value;
+    U32 realSendCount;
+    U32 sendCount;  
+}TDGmfst,*PDGmfst;
+typedef struct __DGBmfst
+{
+    U32 gnum;
+    U32 value;
+    U32 realSendCount;
+    U32 sendCount;
+    U32 srcLine;     //soure line in gcode file
+    U32 srcCode;     //compiled gcode index    
+}TDGBmfst,*PDGBmfst;
+//---------------------------------------------
+/*
+typedef __packed struct
+{
+    U32 coordx;
+    U32 coordy;
+    U32 coordz;
+    U32 coorda4;
+    U32 coorda5;
+    U32 coorda6;
+    U32 sangle;
+    U32 f;
+    U8  info[12];
+    U32 spcSendCount;    
+}TJogCode,*PJogCode; 
+*/
+typedef struct
+{
+    U32 coordx;
+    U32 coordy;
+    U32 coordz;
+    U32 coorda4;
+    U32 coorda5;
+    U32 coorda6;
+    U32 sangle;
+    U32 f;
+    U32 spcSendCount;    
+}Tjogcode,*Pjogcode; 
+//-------------------------------------------------
+typedef  struct
+{
+    U32 xcoordOrig;
+    U32 ycoordOrig;
+    U32 zcoordOrig;
+    U32 a4coordOrig;
+    U32 a5coordOrig;
+    U32 a6coordOrig;
+    U32 xcoordShift;
+    U32 ycoordShift;
+    U32 zcoordShift;
+    U32 a4coordShift;
+    U32 a5coordShift;
+    U32 a6coordShift;
+    U32 safez;
+    U32 compentcoordz;
+    U8   g0f;
+    U8   g1f;
+    U8   spindlegrade;
+    U8   dspcmd;
+    U8   infoBit[20];   
+
+}Tarm2dspInfo,*Parm2dspInfo; 
+typedef struct
+{
+    U32 stdRunCount;
+    U32 spcRunCount;
+    U32 realf;
+    U32 reals;
+    U32 coordx;
+    U32 coordy;
+    U32 coordz;
+    U32 coorda4;
+    U32 coorda5;
+    U32 coorda6;
+    U32 sencoderval;
+    U8  infoBit[15];
+    U8  alarmBit[8];
+
+}Tdsp2armInfo,*Pdsp2armInfo; 
+
+
+//define package len
+
+#define DSP_PARAM_BYTE_COUNT  (120)
+#define DSP_PARAM_DWORD_COUNT (120)
+#define DSP_PARAM_MAX       (DSP_PARAM_BYTE_COUNT+DSP_PARAM_DWORD_COUNT)
+typedef struct 
+{
+    S8  sysbyte[DSP_PARAM_BYTE_COUNT];
+    S32 sysdword[DSP_PARAM_DWORD_COUNT];
+    //U32 magicNumber; //add this magic number to tell dsp is had been inited.
+}TDSPparam,*PDSPparam;
+
+
+
+typedef  struct
+{
+    TCoord coordWork;
+    TCoord coordMach;
+    TCoord coordRemain;
+    TCoord coordRelate;
+    U8   guinum;
+    U8   mode;
+    U8   unit;
+    U8   state;
+    U8   g0f;
+    U8   g0grade;
+    U8   g1f;
+    U8   g1grade;
+    U8   s;
+    U8   infoBit[20];
+    U8   inputBuf[80];
+} Tarm2guiMsg,*Parm2guiMsg;
+
+
+#endif

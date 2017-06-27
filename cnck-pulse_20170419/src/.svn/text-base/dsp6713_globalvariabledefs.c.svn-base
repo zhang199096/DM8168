@@ -1,0 +1,42 @@
+/* 
+由于IRAM 空间有限，DATA 数据部分实时性要求不高的放到SDRAM_USER中；
+对于实时性要求高的数据放入IRAM_H 中。
+此段定义 SDRAM_USER                                      
+Designed by: David Sen  200804
+*/
+
+
+#include "..\\include\\dec6713_main.h"     // DSP671x Headerfile Include File
+
+//#pragma DATA_SECTION(GCodeBuffer,"SDRAM_UserFile");
+tsGCODE	GCodeBuffer[STDGCODE_MOD];			//G-code 结构缓冲数组
+
+//#pragma DATA_SECTION(NCAreaGCodeBuffer,"SDRAM_UserFile");
+tsGCODE	NCAreaGCodeBuffer[STDGCODE_MOD];	//区域计算公共代码缓冲数组
+
+//#pragma DATA_SECTION(GetDataBuffer,"SDRAM_UserFile");
+INT32S GetDataBuffer[1000];					//截取数据缓冲区
+
+//for test
+//#pragma DATA_SECTION(MonitorBuffer1,"SDRAM_UserFile");
+INT32S MonitorBuffer1[1024];					//截取数据缓冲区
+
+//#pragma DATA_SECTION(MonitorBuffer2,"SDRAM_UserFile");
+INT32S MonitorBuffer2[1024];					//截取数据缓冲区
+
+//#pragma DATA_SECTION(MonitorBuffer3,"SDRAM_UserFile");
+INT32S MonitorBuffer3[1024];					//截取数据缓冲区
+
+//#pragma DATA_SECTION(MonitorBuffer4,"SDRAM_UserFile");
+INT32S MonitorBuffer4[1024];					//截取数据缓冲区
+
+//#pragma DATA_SECTION(RealRunGCode,"SDRAM_UserFile");
+tsGCODE	RealRunGCode;
+
+//#pragma DATA_SECTION(TestsBufferCnt,"SDRAM_UserFile");
+INT32U TestsBufferCnt;	
+
+//#pragma DATA_SECTION(TestsBuffer,"SDRAM_UserFile");
+INT32S	TestsBuffer[TestBufferMax][10];	
+
+

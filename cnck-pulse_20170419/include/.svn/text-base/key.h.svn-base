@@ -1,0 +1,175 @@
+/*-------------------------------------------------------------------
+/ FILE : key.h
+/ DESCRIPTION: key board read header file
+/ AUTHOR : vinge
+/ DATA:    20080716
+/ VERSION: 20080716 V 0.0 
+/--------------------------------------------------------------------
+*/
+#ifndef __KEY_H__
+#define __KEY_H__
+#include "datatype.h"
+
+extern INT16U keyBoardVersion;
+//extern INT8U hasKey; // a flag the we receive a key; shall set to 0 after handle it;
+extern INT8U shiftKeyState;
+extern INT8U keywaiting;
+#define KEY_SAVE_MAX (6)
+extern INT8U prevKey[KEY_SAVE_MAX];
+extern INT16U prevJogKey;
+extern INT8U prevKeyPtr;
+
+// this vars is for statistic,
+extern INT32U keyStatisSend;
+extern INT32U keyStatisRecv;
+extern INT32U keyStatisError;
+extern INT32U keyStatisRetrans;
+typedef struct __attribute__((__packed__))
+{	
+	//INT8U Fix;
+	INT8U Head;
+	INT16U Len;
+	INT8U Address;		//功能码
+	INT8U Type;		//控制命令
+	INT8U Command;
+	INT8U Keynum;
+	INT16U LED1;
+	INT16U LED2;
+	INT16U LED3;
+	INT16U Seq;
+	INT16U CRC;
+	INT8U Check;
+}tsKEY_PACKETOUT;
+typedef struct __attribute__((__packed__))
+{	
+	//INT8U Fix;
+	INT8U Head;
+	INT16U Len;
+	INT8U Address;		//功能码
+	INT8U Type;		//控制命令
+	INT8U Command;
+	INT8U Keynum;
+	INT16U Multikey;
+	INT8U GradeG0;
+	INT8U GradeG1;
+	INT8U GradeS;
+	INT8U shortedKey;
+	INT16U Seq;
+	INT16U CRC;
+	INT8U Check;
+}tsKEY_PACKETIN;
+extern tsKEY_PACKETIN tsKeyPacketIn;
+
+
+void key_com(void);
+INT8U updateLight(INT32U lednum, BOOL onoff);
+//key value list of L system keyboard
+
+
+#define KEY_MULT_PX (0X0002)
+#define KEY_MULT_NX (0X0001)
+#define KEY_MULT_PY (0X0020)
+#define KEY_MULT_NY (0X0010)
+#define KEY_MULT_PZ (0X0008)
+#define KEY_MULT_NZ (0X0004)
+//--------------------------------------------------------------------------
+//--------------------------------------------------------------------------
+// NEW KEY VAL FOR KEYBOARD VERSION B
+#define KEY_EOB  (10)
+//ALL FUNCTION IS CODE FROM 128-255;
+#define KEY_FUP   (130)
+#define KEY_FMAIN (130)
+#define KEY_F1   (131)
+#define KEY_F2   (132)
+#define KEY_F3   (133)
+#define KEY_F4   (134)
+#define KEY_F5   (135)
+#define KEY_F6   (136)
+#define KEY_F7   (137)
+#define KEY_F8   (138)
+#define KEY_F9   (139)
+#define KEY_F10  (140)
+#define KEY_FROLL  (140)
+
+#define KEY_EDIT         (141)
+#define KEY_AUTO         (142)
+#define KEY_MDI          (143)
+#define KEY_REF          (144)
+#define KEY_WHEEL        (145)
+#define KEY_JOG          (146)
+
+#define KEY_SINGLE       (147)
+#define KEY_JUMPSEG      (148)
+#define KEY_MACHLOCK     (149)
+#define KEY_FALSERUN     (150)
+#define KEY_WHELLRUN     (158)    //this is an added key
+#define KEY_STARTP       (151)
+
+#define KEY_RATE1        (152)
+#define KEY_RATE10       (153)
+#define KEY_RATE100      (154)
+#define KEY_AXISX        (155)
+#define KEY_AXISY        (156)
+#define KEY_AXISZ        (157)
+
+#define KEY_JOG_GRADE   (159)
+/*
+#define KEY_AXISXNZN     (158)
+#define KEY_AXISXN       (159)
+#define KEY_AXISXNZP     (160)
+#define KEY_AXISZN       (161)
+#define KEY_AXISWRUN     (162)
+#define KEY_AXISZP       (163)
+#define KEY_AXISXPZN     (164)
+#define KEY_AXISXP       (165)
+#define KEY_AXISXPZP     (167)
+*/
+#define KEY_SPIN_CW          (168)
+#define KEY_SPIN_CCW         (169)
+#define KEY_SPIN_STOP        (170)
+
+#define KEY_COOL             (171)
+#define KEY_OIL              (172)
+#define KEY_TOOL             (173)
+
+#define KEY_SPIN_AC          (174)
+#define KEY_SPIN_DC          (175)
+#define KEY_RAPID_AC         (176)
+#define KEY_RAPID_DC         (177)
+#define KEY_FEED_AC          (178)
+#define KEY_FEED_DC          (179)
+
+#define KEY_RUN              (180)
+#define KEY_PAUSE            (181)               
+
+#define KEY_RST              (182)
+
+#define KEY_PAGEUP           (183)
+#define KEY_PAGEDOWN         (184)
+#define KEY_SPACE2           (185)
+#define KEY_LEFT             (186)
+#define KEY_UP               (187)
+#define KEY_DOWN             (188)
+#define KEY_RIGHT            (189)
+
+#define KEY_POSITION          (190)
+#define KEY_PROGRAM           (191)
+#define KEY_COMPENS           (192)
+#define KEY_ALARM             (193)
+#define KEY_PARAM             (194)
+#define KEY_DGN               (195)
+#define KEY_SIMTRACE          (196)
+#define KEY_TOOLTOWER
+
+#define KEY_ENTER             (200)
+#define KEY_CANCLE            (201)
+
+#define KEY_SYS_RST           (210)
+
+#define KEY_SPIN_SPOT         (220)
+
+#define KEY_VERSION           (254)
+#define KEY_KEYRST             (255)
+//chars 
+
+#endif

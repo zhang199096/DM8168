@@ -1,0 +1,893 @@
+/**********************************************************************
+* file: gcompile.h
+* author: vinge
+* data: 20090302
+* description:
+*    header file for the g code compiler;it define all types,structs
+*  and functions statement of the compiler;
+*  the command line compiler include this header,and use some of the
+* functions here too.
+*
+* version log:
+*    20090302 :v 0.01: init version,
+************************************************************************
+*/
+
+#ifndef __GCOMPILE_H__
+#define __GCOMPILE_H__
+#include "taskglobal.h"
+//#define TEST_COMPILE_IN_PC
+#define CMD_G  (199) // a fait g code num that use in command line compile
+//**********************************************************************
+#define GERR_OK                   (0)
+#define GERR_STR_END              (1)
+
+#define GERR_WANT_CMD             (2)  //no keyword was given
+#define GERR_WANT_VAL             (3)  //no value given for keyword
+#define GERR_WORD_UNKNOW          (4)   //unknow key word
+#define GERR_GCMD_UNKNOW          (5)   //unsupport g code
+#define GERR_MCMD_UNKNOW          (6)   //not support m code
+#define GERR_HCMD_UNKNOW          (7)  //unsupport g code
+
+#define GERR_VALUE_INVALID        (8)  //incorrect value
+#define GERR_NUM_TOOLONG          (9)  //digit  number too long
+
+
+#define GERR_VAR_SIGN             (10) //#sign appear in wrong place
+#define GERR_CANTBE_VAR           (11) //it can't be var here
+#define GERR_NOSUCH_VAR           (12) //no such var in system
+
+#define GERR_FEED_VAL             (13)
+#define GERR_S_VAL                (14)
+#define GERR_T_VAL                (15)
+
+#define GERR_X_APPEAR             (20)// wrong palce to put a X key word
+#define GERR_Y_APPEAR             (21)
+#define GERR_Z_APPEAR             (22)
+#define GERR_U_APPEAR             (23)
+#define GERR_V_APPEAR             (24)
+#define GERR_W_APPEAR             (25)
+#define GERR_I_APPEAR             (26)
+#define GERR_J_APPEAR             (27)
+#define GERR_K_APPEAR             (28)
+#define GERR_R_APPEAR             (29)
+#define GERR_P_APPEAR             (30)
+#define GERR_Q_APPEAR             (31)
+#define GERR_A_APPEAR             (32)
+#define GERR_C_APPEAR             (33)
+
+#define GERR_G_APPEAR             (40)
+#define GERR_H_APPEAR             (41) //wrong place to put a keyword
+#define GERR_M_APPEAR             (42)
+#define GERR_F_APPEAR             (43)
+#define GERR_S_APPEAR             (44)
+#define GERR_T_APPEAR             (45)
+
+#define GERR_G0001_MISS_XZ        (46)
+#define GERR_G0203_MISS_IJR       (47)
+#define GERR_G04_MISS_XP          (48)
+#define GERR_G32_MISS_XZ          (49)
+
+#define GERR_G32_MISS_FI          (50)
+#define GERR_G90_MISS_XZ          (51)                   
+#define GERR_G50_MISS_XZ          (52)
+#define GERR_G94_MISS_XZ          (53)
+#define GERR_M98_MISS_P           (54)
+
+#define GERR_G30_ERRPVAL          (55)
+#define GERR_G7X_MISS_PQ          (56)
+#define GERR_S_REVERSE            (57)  // SPINDLE reverse turning before sotp
+#define GERR_G_MIX                (58)  // some gcode can't be put at one line
+#define GERR_CANT_MFST             (59)  //g70 can't has mfst
+
+#define GERR_SRUN_IN_TLOSE           (60) //spindle run when chuck lose
+#define GERR_TLOSE_IN_SRUN           (61) //chuck lose when spindle runing
+#define GERR_NOSS_M0304           (62) //M 0304 before spindle speed seted 
+#define GERR_NOFEED_G1            (63) //run INTP with NO given feed rate
+#define GERR_ARC_RERR             (64) //ARC with wront r or ik
+
+#define GERR_SCREW_NOS            (65) //screw with spindle stoped
+#define GERR_PARAM_VALERR         (66)
+#define GERR_STATE_NORESUM        (67) //spindle state change without resum
+#define GERR_M65PERR              (68)  //p value miss or not correct in m65
+#define GERR_M80PERR              (69)
+//FORM 70 on there is h macro compile err
+#define GERR_H_MIX                (70)  //HCODE mix with other gcode
+#define GERR_H_REDPARAM           (71)  //redumence param not use by this h code
+#define GERR_H_NEEDPARAM          (72)  // hcode need more param
+#define GERR_H_PISVALUE           (73)  // P parma should not be a value
+#define GERR_H_PNOTEXICT          (74)  //P param value that is a program pointer is not exict
+ 
+#define GERR_H_UNKNOWN            (75)  //UNKONW HCODE
+#define GERR_O_TOOBIG             (76)
+#define GERR_N_TOOBIG             (77)
+#define GERR_N_APPEAR             (78)
+#define GERR_O_APPEAR             (79)
+
+#define GERR_G1SPEED              (80)  //G1 SPEED EXCIT LIMIT
+#define GERR_SPINSPEED            (81)  //SPINDLE SPEED EXICT LIMIT
+#define GERR_G7XSTARTERR          (82)  //G71 G72 START CODE is not g01 or have xz
+#define GERR_ALINE_NOCROSS        (83) // LINE with A can be construct
+#define GERR_CHAMFER_TOOBIG       (84) //倒角长大于原直线
+
+#define GERR_NO_SUB               (85)  //not such sub program of open fail
+#define GERR_H_EXEC               (86)  //hcode exec error
+#define GERR_MULTI_G              (87)  //two g code not alow in same line
+#define GERR_G_UNKOWN             (88)
+#define GERR_G2021                (89)
+
+#define GERR_NO_TAG               (90)  // given N tag is not found
+#define GERR_STACK_OVF            (91)   //sub program call deep over folw
+#define GERR_DUPL_NNUM            (92)  //duplicated N number for tag
+#define GERR_DUPL_ONUM            (93)  //duplicated O number for program
+#define GERR_TOOMANY              (94)  //too many gcode to store
+
+
+#define GERR_ANNOTATE             (95)  //imcompleter annotate
+#define GERR_CMD_UNKNOW           (96)
+#define GERR_CMD_NOTEXEC          (97)
+#define GERR_UNKNOWN              (98)
+#define GERR_CODE_DONE            (99)  //this mean we had get a new gcode
+#define GERR_PARAM_SET_START      (100)  //100-110 IS FOR PARAM VALUE SET ERR
+#define GERR_REFUSE_SCREW         (105)
+#define GERR_REFUSE_G28           (106)
+#define GERR_REFUSE_M4X           (107)
+#define GERR_CANNOT_FIND_FILE     (108) //cannot find file in cur dir
+//below define error form command line
+#define GERR_UNSUPPORT_OPERATION  (170) 
+#define GERR_NEED_OPERAND         (171) 
+#define GERR_IF_OVERSTEP          (172) 
+#define GERR_IF_LACK_IF           (173) 
+#define GERR_LOOP_OVER            (174)
+#define GERR_LOOP_LACK_START      (175)  
+#define GERR_FOR_LACK_TO          (176)  
+#define GERR_LACK_LEFT_BRACKET    (177)  
+#define GERR_LACK_RIGHT_BRACKET   (178)  
+#define GERR_LACK_COMMA           (179) 
+#define GERR_IF_LACK_END          (180)  
+#define GERR_LOOP_LACK_END        (181)  
+
+
+#define GERR_SPARE_OPERAND        (174) 
+
+//**********************************************************************
+typedef struct __GCODE
+{
+    U8 name;
+    U8 (*func)(void);
+}Tgcode,*Pgcode;
+
+//sturct that save a  keyword and his param value
+typedef  struct __keyWrodBuf
+{
+    U8 name;  //name in gkeyword
+    U8 index;  //index in gkeyword
+    U8 digitlen;
+    S8 taillen;
+    U8 type;   //value type be '#' or 0
+    U8 valindex;
+    S32 value; //value
+}TkeyWordBuf,*PkeyWordBuf;
+
+//struct stroe all scaned param info of a g code
+typedef struct __gParamBuf
+{
+    U32 GHMFST;
+    U32 paramType;
+    U16 N;  // N number of the n param
+    U16 O;  // 0 number of gcode;
+    //U8 gname; //can be g m F,S T
+    U8 gnum;
+    U8 mnum;
+    U8 hnum;
+    U8 gindex;  //index of the gnum in gcode array;
+    U8 mindex;
+    U8 hindex;
+    S32 p; // for command just a value and h comand
+    S32 q;
+    S32 xu;   //x value, canbe a direct value or param index
+    S32 yv;   //yvalue
+    S32 zw;  //z value
+    S32 i;
+    //S32 j;
+    S32 k;
+    S32 r;
+    S32 f;  //feed rate
+    S32 s;  //spindle speed
+    U32 m;  //mcode param
+    U16 t;  //tool param
+}TgParamBuf,*PgParamBuf;
+
+
+//**********************************************************************
+//**********************************************************************
+// the param type  of a key work 
+#define GP_TYPE_VALUE  (1) //give as direct value
+#define GP_TYPE_PARAM  (2) //give out as direct param number
+#define GP_TYPE_HIRE   (4) //not given out by this gcode, hire in prev gcode value
+//#define GP_TYPE_HIREP  (4) //not given out by this gcode,hire as prev gcode parameter
+
+//**********************************************************************
+#define GXU_IS_VALUE    (0X00000001) //give out as value
+#define GXU_IS_PARAM    (0X00000002) //give out is PARAM
+#define GXU_IS_HIRE     (0X00000004) //not give out, hire as prev coord
+#define GXU_IS_INC      (0X00000008) //0,give as x, abs coord,1, give as u, increase coord
+#define GXU_IS_SETED    (0X00000003)  // code given
+
+#define GYV_IS_VALUE    (0X00000010) //give out as value
+#define GYV_IS_PARAM    (0X00000020) //give out is PARAM
+#define GYV_IS_HIRE     (0X00000040) //not give out, hire as prev coord
+#define GYV_IS_INC      (0X00000080)  //0give as x, 1 give as u
+#define GYV_IS_SETED    (0X00000030)
+
+#define GZW_IS_VALUE    (0X00000100) //give out as value
+#define GZW_IS_PARAM    (0X00000200) //give out is PARAM
+#define GZW_IS_HIRE     (0X00000400) //not give out, hire as prev coord
+#define GZW_IS_INC      (0X00000800)  //0give as x, 1 give as u
+#define GZW_IS_SETED    (0X00000300)
+
+#define GI_IS_VALUE     (0X00001000) //give out as value
+#define GI_IS_PARAM     (0X00002000) //give out is PARAM
+#define GI_IS_HIRE      (0X00004000) //not give out, hire as prev coord
+#define GI_IS_INC       (0X00008000)  //0give as x, 1 give as u
+#define GI_IS_SETED     (0X00003000)
+// A USE THE SAME BIT AS I ,SINCE it use only in line 
+#define GA_IS_VALUE     GI_IS_VALUE //give out as value
+#define GA_IS_PARAM     GI_IS_PARAM //give out is PARAM
+#define GA_IS_HIRE      GI_IS_HIRE //not give out, hire as prev coord
+//#define GA_IS_INC       GI_IS_INC  //0give as x, 1 give as u
+#define GA_IS_SETED     GI_IS_SETED
+
+#define GJ_IS_VALUE     (0X00010000) //give out as value
+#define GJ_IS_PARAM     (0X00020000) //give out is PARAM
+#define GJ_IS_HIRE      (0X00040000) //not give out, hire as prev coord
+#define GJ_IS_INC       (0X00080000)  //0give as x, 1 give as u
+#define GJ_IS_SETED     (0X00030000)
+
+#define GK_IS_VALUE     (0X00100000) //give out as value
+#define GK_IS_PARAM     (0X00200000) //give out is PARAM
+#define GK_IS_HIRE      (0X00400000) //not give out, hire as prev coord
+#define GK_IS_INC       (0X00800000)  //0give as x, 1 give as u
+#define GK_IS_SETED     (0X00300000)
+// C use the same bit as j since it use only in line 
+#define GC_IS_VALUE     GK_IS_VALUE //give out as value
+#define GC_IS_PARAM     GK_IS_PARAM //give out is PARAM
+#define GC_IS_HIRE      GK_IS_HIRE //not give out, hire as prev coord
+//#define GC_IS_INC       GJ_IS_INC  //0give as x, 1 give as u
+#define GC_IS_SETED     GK_IS_SETED
+
+#define GR_IS_VALUE     (0X01000000) //give out as value
+#define GR_IS_PARAM     (0X02000000) //give out is PARAM
+#define GR_IS_HIRE      (0X04000000) //not give out, hire as prev coord
+#define GR_IS_INC       (0X08000000)  //0give as x, 1 give as u
+#define GR_IS_SETED     (0X03000000)
+// the gf is add just for g76 f(i), no use even in g32 g92,
+#define GF_IS_VALUE     (0X10000000) //give out as value
+#define GF_IS_PARAM     (0X20000000) //give out is PARAM
+#define GF_IS_HIRE      (0X40000000) //not give out, hire as prev coord
+#define GF_IS_INC       (0X80000000) //give out as I, if not set as f
+#define GF_IS_SETED     (0X30000000)
+//for g32  p is store in gr, for m98 p is stroe in val fst
+//**********************************************************************
+//fot the GHMFST field
+
+#define PV_IS_SETED       (0X01000000) //PURE VALUE OF CMD ,NOT USE IN G FILE
+
+#define GHMFST_SETED      (0XE0000333)
+
+#define G_IS_SETED        (0X80000000)
+#define M_IS_SETED        (0X40000000)
+#define H_IS_SETED        (0X20000000)
+#define N_IS_SETED        (0X10000000)
+
+#define O_IS_SETED        (0X08000000)
+
+#define F_IS_VALUE        (0X00000100)
+#define F_IS_PARAM        (0X00000200)
+#define F_IS_HIRE         (0X00000400)
+#define F_IS_SETED        (0X00000300)
+
+#define S_IS_VALUE        (0X00000010)
+#define S_IS_PARAM        (0X00000020)
+#define S_IS_HIRE         (0X00000040)
+#define S_IS_SETED        (0X00000030)
+
+#define T_IS_VALUE        (0X00000001)
+#define T_IS_PARAM        (0X00000002)
+#define T_IS_HIRE         (0X00000004)
+#define T_IS_SETED        (0X00000003)
+
+#define MFST_IS_SETED  (M_IS_SETED|F_IS_SETED|S_IS_SETED|T_IS_SETED)
+#define MST_IS_SETED  (M_IS_SETED|S_IS_SETED|T_IS_SETED)
+
+#define P_IS_VALUE     (0X00001000) //give out as value
+#define P_IS_PARAM     (0X00002000) //give out is PARAM
+#define P_IS_HIRE      (0X00004000) //not give out, hire as prev coord
+#define P_IS_SETED     (0X00003000)
+
+#define Q_IS_VALUE     (0X00010000) //give out as value
+#define Q_IS_PARAM     (0X00020000) //give out is PARAM
+#define Q_IS_HIRE      (0X00040000) //not give out, hire as prev coord
+#define Q_IS_SETED     (0X00030000)
+
+#define R_IS_VALUE     (0X00100000) //give out as value
+#define R_IS_PARAM     (0X00200000) //give out is PARAM
+#define R_IS_HIRE      (0X00400000) //not give out, hire as prev coord
+#define R_IS_SETED     (0X00300000)
+
+//**********************************************************************
+
+//**********************************************************************
+typedef  struct __compiledG01
+{
+    U32 gtype;
+    U16 srcJump; // the / jump sign if 1 this gcode should be jump over
+    U16 srcline;
+    U32 paramType;
+    S32 xu;
+    S32 zw;
+    S32 yv;
+    S32 a;
+    S32 c;
+    S32 r;
+}TcompiledG01,*PcompiledG01;
+typedef  struct __compiledG23 
+{
+    U32 gtype;
+    U16 srcJump; // the / jump sign if 1 this gcode should be jump over
+    U16 srcline;
+    U32 paramType;
+    S32 xu;
+    S32 zw;
+    S32 yv;
+    S32 i;
+    S32 k;
+    S32 r;
+    S32 f; //this is not use,just for SCREW with G32 G92 g76 f
+}TcompiledG23,*PcompiledG23;
+//g02g03 g32 is tore as pcompiled compiledG23
+typedef  struct __compiledM
+{
+    U32 gtype;
+    U16 srcJump; // the / jump sign if 1 this gcode should be jump over
+    U16 srcline;
+    U32 value;
+}TcompiledM,*PcompiledM;
+typedef  struct __compiledFST
+{
+    U32 gtype;
+    U16 srcJump; // the / jump sign if 1 this gcode should be jump over
+    U16 srcline;
+    U32 paramType;
+    U32 value;
+}TcompiledFST,*PcompiledFST;
+//**********************************************************************
+// for comound g7x code  flag of pq is i,k, 
+//use GI_IS_SETED and GK_IS SETED to test the param;
+//
+typedef struct __compiledG7x
+{
+    U32 gtype;
+    U16 srcJump; // the / jump sign if 1 this gcode should be jump over
+    U16 srcline;
+    U32 paramType;
+    S32 u;
+    S32 w;
+    S32 p;
+    S32 q;  
+    S32 r;
+    S32 f; //just for g76 screw f or i ,not use in other gcode
+}TcompiledG7x,*PcompiledG7x;
+//**********************************************************************
+#define MAX_DIGIT_LEN  (12) //control max long number string
+//#define DIGIT_TAIL_BIT (3) //control how long the decimal part valide
+
+#define GKEYWORD_COUNT (22)
+#define GCODE_COUNT    (39)
+#define MCODE_COUNT    (32)
+#define HCODE_COUNT    (27)
+//**********************************************************************
+/*
+extern Tgcode gkeyword[GKEYWORD_COUNT];
+extern Tgcode gkeywordVal[GKEYWORD_COUNT];
+extern Tgcode gkeywordCheck[GKEYWORD_COUNT];
+extern Tgcode gkeywordStore[GKEYWORD_COUNT];
+
+extern Tgcode gcode[];
+extern Tgcode mcode[];
+extern Tgcode hcode[];
+*/
+//**********************************************************************
+//the string pointer to explain
+//#define REF_POINT_MAX 5
+#define SUB_PROG_MAX  512 //1024*8
+#define SUB_PROG_LENMAX 1024*4 //512
+//#define SUB_LEN_MAX   4096
+// this buf hold all the compiled gcode include main and sub program
+#define COMPILE_BUF_MAX 65536  
+#define PREDEF_PROG_CODE_START  60000 //从代码数组的60000起保存o9000
+extern TcompiledG23 compiledGbuf[COMPILE_BUF_MAX]; //for g code form file
+//extern U32 subGbuf[SUB_PROG_MAX][SUB_LEN_MAX];
+extern U32 gsrc2compiled[COMPILE_BUF_MAX];
+extern U32 subCount;
+//extern Tgstate gCompileState,gWorkState;    //g code state
+extern U8 subProgramBuf[SUB_PROG_MAX][SUB_PROG_LENMAX];
+extern U32 subProgramBufPtr; //index prt of not used sub program buf
+extern U8 cmdlineGBuf[256];  //for g code input form cmd line
+
+//extern TgParamBuf gParamBuf,prevgParamBuf;
+//extern TkeyWordBuf gKeyWrod;
+//extern TkeyWordBuf gparam;
+//extern prevGcode,curGcode;
+//extern char* streamPtr;
+
+typedef struct
+{
+     U32 index;   //o program number
+     U32 address; //start address in compiled g code buffer
+     U32 bufIndex; //0 main file 1 -10 sub program buf
+     //U32 sourceBufAddress; // if is 0 ,in the main file, not it will be in subprogram buf
+}TgProgramAddress;
+
+typedef struct 
+{
+    U32 prog;  //whitch program it belong , the o number
+    U32 tag;   //what segment it belong to , the n number,if 0 it is the o numer tag
+               //so N number user give out must not be zero
+    U32 address;  // the compiled gcode next to the tag in gcode source 
+}TgJumpPointAddress; //macro address of the gcode
+typedef struct
+{
+    U16 program;
+    U16 tag;
+}Tjumpreq;
+typedef struct
+{
+    U16 caller;   // caller program number
+    U16 program;  //sub program number
+    U16 isFile;  //  sub program is given in main program 0 or is a outer file 1
+    U32 address; //the sub program address,after compile it's filled
+}Tm98req;
+
+typedef struct
+{
+    U16 subProgram; //which subProgram it blong
+    U32 addressTag; //which address tag it ask for
+}Tm99req;
+
+typedef struct
+{
+    U16 callerProg;
+    U16 beCallProg;
+    U32 callTimes;    //how many times this m98 specify
+    //U32 jumpPointIndex; //
+    U32 startAddress;
+    U32 returnPtr;   //default return pointer if m99 with no param
+}TgcallStack;
+#define PROG_MAX       200
+#define PREDEF_PROG_START 9000
+#define PREDEF_PROG_MAX  20 //16个保留内部定义子程序
+
+#define JUMP_POINT_MAX 4000
+#define CALL_DEEP_MAX  110
+
+extern TgProgramAddress programList[PROG_MAX];
+extern U8 programCount;
+extern U8 O9XXXcount;
+
+extern TgJumpPointAddress jumpPointList[JUMP_POINT_MAX];
+extern U16 jumpPointCount;
+extern Tjumpreq jumpList[JUMP_POINT_MAX];  //h8x jump macro calls
+extern U16 jumpCount; 
+extern Tm98req m98Request[JUMP_POINT_MAX]; //this may be a battle nat of gcode compiler
+extern U16 m98Count; //all m98 call 
+extern Tm99req m99Request[JUMP_POINT_MAX];
+extern U16 m99Count;  //this include only the m99 specify return address,not all m99
+extern TgcallStack gcallStack[CALL_DEEP_MAX];
+extern U8 callDeep;
+//**********************************************************************
+// vars for g7x compound g code compile
+extern U16 compoundGcode; //if execing compand g code g7x 1, else 0,
+extern U32 cpdStart,cpdEnd; //start N and end N index in jumpPointlist;
+extern U32 cpdPtr; //compound gcode runing pointer
+extern PcompiledG23 cpdGptr;
+extern S32 di,dk; //x go back move distance, z go back move distace
+extern S32 du,dw;// left for actual cuting 
+extern S32 d;
+extern S32 stepx,stepz;
+extern S32 g73orgx,g73orgz;
+
+extern U32 m15cycleTime;
+//**********************************************************************
+U8 passAnnotate(U8** strptr);
+U8 scanParam(void);
+U8 scanParamName(void);
+U8 scanGMHnum(void);
+U8 scanCHR(void);
+U8 scanDigit(void);//any type of number;
+U8 scanIndex(void);//index is a positive number without dot
+U8 scanVal(void);
+U8 scanSVal(void);
+U8 scanValP(void);//a positive value
+//**********************************************************************
+U8 checkGnum(void);
+U8 checkMnum(void);
+U8 checkHnum(void);
+U8 checkVar(void);
+U8 checkCoordVal(void);
+U8 checkAVal(void);
+U8 checkRVal(void);
+U8 checkFVal(void);
+U8 checkSVal(void);
+U8 checkTVal(void);
+U8 checkPVal(void);
+U8 checkQVal(void);
+U8 checkNVal(void);
+U8 checkOVal(void);
+U8 checkKeyWrod(TkeyWordBuf keyword);
+
+//***********************************************************************
+U8 storeG(void);
+U8 storeM(void);
+U8 storeH(void);
+U8 storeX(void);
+U8 storeY(void);
+U8 storeZ(void);
+U8 storeA(void);
+U8 storeC(void);
+U8 storeI(void);
+U8 storeJ(void);
+U8 storeK(void);
+U8 storeR(void);
+U8 storeF(void);
+U8 storeS(void);
+U8 storeU(void);
+U8 storeV(void);
+U8 storeW(void);
+U8 storeP(void);
+U8 storeQ(void);
+U8 storeT(void);
+U8 storeN(void);
+U8 storeO(void);
+//*********************************************************************
+S32 unit2Meter4Digit(S32 val);
+double unit2Meter4DigitFloat(double val);
+S32 unit2um(S32 val);
+double unit2umFloat(double val);
+U8 generalGcodeSaveCheck(void);
+U8 gCodeSaveCheckO(void);
+U8 gCodeSaveCheckN(void);
+U8 gCodeSaveCheckMFST(void);
+U8 gCodeSaveCheck01(void);
+U8 gCodeSaveCheck23(void);
+U8 gCodeSaveCheck04(void);
+U8 gCodeSaveCheck2021(void);
+U8 gCodeSaveCheck28(void);
+U8 gCodeSaveCheck30(void);
+U8 gCodeSaveCheck32(void);
+U8 gCodeSaveCheck33(void);
+U8 gCodeSaveCheck404142(void);
+U8 gCodeSaveCheck50(void);
+U8 gCodeSaveCheck5x(void);
+U8 gCodeSaveCheck65(void);
+U8 gcodeSaveCheck70(void);
+U8 gcodeSaveCheck71(void);
+U8 gcodeSaveCheck72(void);
+U8 gcodeSaveCheck73(void);
+U8 gcodeSaveCheck7475(void);
+U8 gcodeSaveCheck76(void);
+U8 gCodeSaveCheck90(void);
+U8 gCodeSaveCheck92(void);
+U8 gCodeSaveCheck94(void);
+U8 gCodeSaveCheck96(void);
+U8 gCodeSaveCheck97(void);
+U8 gCodeSaveCheck98(void);
+U8 gCodeSaveCheck99(void);
+U8 generalMcodeSaveCheck(void);
+U8 generalHcodeSaveCheck(void);
+U8 checkJumpCall(void);
+U8 checkM98Call(void);
+U8 checkM99Return(void);
+//*****************************************************************
+//hcode check and save
+U8 hCodeSaveCheck1OP(void);
+U8 hCodeSaveCheck2OP(void);
+U8 hCodeSaveCheck3OP(void);
+
+U8 SaveAndCheck(void); //
+//***********************************************************************
+void initCodeBuf(void);
+U8 reinitCodeBuf(void);
+U8 processG(char*);
+U8 Gcompiler(U8* str,PcompiledG23 gcodeBuf);
+U8 execGcode(void);
+
+//***********************************************************************
+//for cmmand line
+U8 processCMD(S8* str);
+U8 CMDcompiler(S8* str);
+U8 execCMD(void);
+//***********************************************************************
+#ifdef TEST_COMPILE_IN_PC
+void GcompileError(U8 err);
+void GcompileOutput(U8* ptr);
+void CMDcompileError(U8 err);
+void CMDcompileOutput();
+#endif 
+
+
+U8 gCompiled2TCG(TcompiledG23* cpdGcode,U8 comp);
+U8 gMcode2TCG(void);
+U8 M302TCG(void);
+U8 gFST2TCG(void);
+U8 gT2TCG(void);
+U8 gLine2TCG(void);
+U8 gLineA2TCG(void);
+U8 gLineCChamfer(PcompiledG01 pcline, PTCGline ptcgline, U32 c);
+U8 gLineRChamfer(PcompiledG01 pcline, PTCGline ptcgline, U32 r);
+U8 gArc2TCG(void);
+U8 gREF2TCG(void);
+U8 gSETP2TCG(void);
+U8 gScrew2TCG(void);
+U8 g33Screw2TCG(void);
+U8 gToolOpt2TCG(void);
+U8 gPause2TCG(void);
+U8 g2X2TCG(void);
+U8 g502TCG(void);
+void g909294infoClear(void);
+U8 g90942TCG(void);
+U8 g922TCG(void);
+U8 g96972TCG(void);
+U8 g98992TCG(void);
+U8 g702TCG(void);         
+U8 g5x2TCG(void);
+U8 g70GetVar(void);
+void g70CheckEnd(void);
+
+U8 g712TCG(void);
+U8 g71SetVar(void);
+U8 g71GetVar(void);
+U8 g7xparambuffill(void);
+void g71linecross(S32 X,S32 Z);
+S32 g711inecrossX(S32 X);
+S32 g71arccrossX(S32 X);
+U8 g722TCG(void);
+U8 g72SetVar(void);
+U8 g72GetVar(void);
+void g72linecross(S32 X,S32 Z);
+S32 g721inecrossZ(S32 Z);
+S32 g72arccrossZ(S32 Z);
+U8 g7172Line(void);
+U8 g7172Arc(void);
+U8 g7172Pause(void);
+void g7172CheckEnd(void);
+
+U8 g732TCG(void);
+U8 g73SetVar(void);
+U8 g73GetVar(void);
+U8 g73Line(void);
+U8 g73Arc(void);
+U8 g73Pause(void);
+U8 g73M(void);
+void g73CheckEnd(void);
+U8 g74752TCG(void);
+U8 g7475SetVar(void);
+U8 g7475GetVar(void);
+U8 g7475cycle(void);
+U8 g762TCG(void);
+U8 g76SetVar(void);
+U8 g76GetVar(void);
+U8 g76Cycle(void);
+U8 g65Call(void);
+double getVarValueF(S32 index);
+S32 getVarValue(S32 index);
+S32 getVarValuePQ(S32 index);
+U8 hcodeCheckOP1(S32* val);
+U8  hcodeExec(U16 gnum,S16* adj);
+void hcodeGetOP23Value(PcompiledG23 phcode,F64* opq,F64* opr);
+U8 hcodeNormalCal(void);
+U8 hcodeLogicCal(void);
+U8 hcodeMathCal(void);
+U8 hcodeSingleOPCal(void);
+U8 hcodeTriangleCal(void);
+U8 hcodeJump(void);
+U8 hcodeAlarm(void);
+U8 hcodeJumpTo(U16 jumpPointTag);
+U8 Mcode20WorkCT(void);
+U8 M91return(void);
+U8 M98Call(void);
+U8 M99return(void);
+U8 M15cycle(void);
+void pushTCGbyFaitG01(void);
+void pushTCGbyFait_MDI(void);
+U8 waitBufClear(void);
+void toolCompent(void );
+void autoRunStart(void);
+double Cal_langle(S32 x1,S32 z1,S32 x2,S32 z2);  
+U8 Scan_Macro_Special(void);
+S16 Scan_Macro_Cmd(void);
+U8 Macro_Create_Code(S32 result,S32 val1,S32 val2,U8 cmd);
+U8 Macro_Changeinto_Param(S32 param,S32 val);
+U8 Macro_Scan_Paren(U8 layer);
+U8  Macro_Exec(U16 gnum,S16* adj);
+void valAddTail(void);
+U8 Scan_G65(void);
+#define MACRO_VAR_START 2000
+#define MACRO_VAR_END   3000
+extern double macro_val[MACRO_VAR_END-MACRO_VAR_START];
+extern S32 macro_use_param_num;
+#define  MACRO_IF_LAYER_MAX (10)
+typedef struct _macro_end_stack
+{
+    U32 thisct;
+    U32 nextct;
+}MACRO_END_STACK;
+extern MACRO_END_STACK macro_if_stack[MACRO_IF_LAYER_MAX][MACRO_IF_LAYER_MAX];
+extern U8 macro_if_stack_index; 
+extern U8 macro_if_stack_index_temp[MACRO_IF_LAYER_MAX]; 
+extern S32 macro_if_layer;
+extern MACRO_END_STACK macro_while_stack[MACRO_IF_LAYER_MAX];
+extern U8  macro_while_layer;
+extern U32 macro_exit_buf[MACRO_IF_LAYER_MAX];
+extern U8  macro_exit_index;
+#define  MACRO_LOCAL_VAR_MAX    (50)
+extern double macro_local_val[MACRO_IF_LAYER_MAX][MACRO_LOCAL_VAR_MAX];
+extern U8  macro_calldeep_record[MACRO_IF_LAYER_MAX];
+extern U8  macro_calldeep_record_index;
+#define  MACRO_ASSIGN           (1)
+#define  MACRO_IS_DYADIC_OPERATOR(cmd) (((cmd>=MACRO_DYADIC_OPERATOR_1)&&(cmd<=MACRO_DYADIC_OPERATOR_2))) 
+#define  MACRO_DYADIC_OPERATOR_1 (2)
+#define  MACRO_PLUS             (2)
+#define  MACRO_MINUS            (3)
+#define  MACRO_MULTIPLY         (4)
+#define  MACRO_DIVIDE           (5)
+#define  MACRO_MOD              (6)
+#define  MACRO_POW              (7)
+#define  MACRO_LESSTHAN         (10)
+#define  MACRO_LESSOREQUAL      (11)
+#define  MACRO_GREATERTHAN      (12)
+#define  MACRO_GREATEROREQUAL   (13)
+#define  MACRO_EQUAL            (14)
+#define  MACRO_NOTEQUAL         (15)
+#define  MACRO_BIT_AND          (16)
+#define  MACRO_BIT_XOR          (17)
+#define  MACRO_BIT_OR           (18)
+#define  MACRO_AND              (19)
+#define  MACRO_OR               (20)
+#define  MACRO_MAX              (21)
+#define  MACRO_MIN              (22)
+#define  MACRO_DYADIC_OPERATOR_2 (40)
+#define  MACRO_IS_UNARY_OPERATOR(cmd) (((cmd>=MACRO_UNARY_OPERATOR_1)&&(cmd<=MACRO_UNARY_OPERATOR_2))) 
+#define  MACRO_UNARY_OPERATOR_1 (60) 
+#define  MACRO_SQRT             (61)
+#define  MACRO_ABS              (62)
+#define  MACRO_ROUND            (63)
+#define  MACRO_FIX              (64)
+#define  MACRO_FUP              (65)
+#define  MACRO_LN               (66)
+#define  MACRO_EXP              (67)
+#define  MACRO_SIGN             (69)
+#define  MACRO_BIT_NOT          (70)
+#define  MACRO_SIN              (71)
+#define  MACRO_ASIN             (72)
+#define  MACRO_COS              (73)
+#define  MACRO_ACOS             (74)
+#define  MACRO_TAN              (75)
+#define  MACRO_ATAN             (76)
+#define  MACRO_NOT              (77)
+#define  MACRO_CEIL             (78)
+#define  MACRO_FLOOR            (79)
+#define  MACRO_UNARY_OPERATOR_2 (100) 
+#define  MACRO_SPECIAL          (120)
+#define  MACRO_GOTO             (122)
+#define  MACRO_ALARM            (123)
+#define  MACRO_WAIT             (124)
+#define  MACRO_COMMA            (125)
+#define  MACRO_IF_GOTO          (126)
+
+#define  MACRO_IF               (141)
+#define  MACRO_ELSEIF           (142)
+#define  MACRO_ELSE             (143)
+#define  MACRO_ENDIF            (144)
+#define  MACRO_IF_FORCETRUE     (145)
+#define  MACRO_WHILE_START      (147)
+#define  MACRO_WHILE_END        (148)
+#define  MACRO_REPEAT           (149)
+#define  MACRO_UNTIL            (150)
+#define  MACRO_FOR              (151)
+#define  MACRO_TO               (152)
+#define  MACRO_BY               (153)
+#define  MACRO_EXIT             (154)
+#define  MACRO_NOP              (160)
+#define  MACRO_JUMP             (161)
+#define  MACRO_JUDGE_JUMP       (162)
+
+/////////////////////////////////////////////////////////////////////
+//平面几何计算用的定义和方法
+/* 点 */
+typedef struct //point
+{
+	double x;
+	double y;
+}Point;
+
+/* 向量 */
+typedef Point Vector;
+
+/* 线段AB */
+typedef struct segment
+{
+	Point A;
+	Point B;
+}Segment;
+
+/* 直线
+ *	直线方程一般式：Ax+By+C=0
+ */
+typedef struct line
+{
+	double A;
+	double B;
+	double C;
+}Line;
+/* 圆 */
+typedef struct circle
+{
+	Point centre;
+	double radius;
+}Circle;
+/* 两点之间的距离，线段的长度 */
+extern double DistanceOfPoints(Point A, Point B);
+
+/* 点到直线的距离 */
+extern double DistanceOfPointToLine(Point P, Line l);
+
+/* 向量的模，即向量的长度 */
+extern double VectorLength(Vector v);
+
+/*
+ * 由两个点构造一个向量
+ */
+extern Vector VectorConstruct(Point A, Point B);
+
+/* 点是否在线段上: 距离判断 */
+extern int PointIsOnSegment(Point P, Point A, Point B);
+/*知道直线上一点的一轴坐标，求另外一轴坐标*/
+extern double PointOfLine(Line l, double xy, int isx);
+/*已知线段两点 求其上一点到p2距离为len*/
+extern Point Point3(Point p1,Point p2, double len,U8* flag);
+/*两点构造一条直线*/
+extern Line LineMake(Point A, Point B);
+/*点和斜率构造直线，为适应G代码输入，用的角度输入*/
+extern Line LineMakeAngle(Point A, double angle);
+/*求直线交点*/
+extern Point LinesIntersection(Line m, Line n, U8 *flag);
+/* 两直线的夹角，返回弧度值 */
+extern double IncludedAngle(Line m, Line n);
+
+//计算直线交点到垂足的距离
+extern double crossLen(double r,Point p1,Point p2,Point p3);
+
+//计算直线倒角圆心
+extern Point len2point(double len, Line l,Point p1,Point p2);
+//判断顺弧逆弧
+U8 arcDir(Point p1, Point p2, Point p3);
+//计算c倒角的倒角点
+U8 gLineChamferCal(double c,Point startPoint,Point endPoint,Point endPoint2);
+//计算r倒角的倒角点和圆心
+U8 gLineRchamferCal(double r,Point startPoint,Point endPoint,Point endPoint2);
+Point findLineEndPoint(PcompiledG01 gline ,Point startPoint,U8* flag);
+
+
+Point VerticalPoint(Point p, Line l);
+Point calArcCenter(Point StartPoint,Point EndPoint, double radius,int dir);
+double calLineAngle(Point Start_Point,Point End_Point) ;
+U8 judgeMoveSide(Point p1,Point p2,Point p3,int dir);
+Point calCenterPoint(Point p1,Point p2,Point p3,
+    double radius,double radius2,int arcDir,int cutdir);
+Point calArcIntersectionPoint(Point center1,Point center2,double radius);    
+S32 pointInArc(Point sp,Point ep,Point cp, Point mp,U8 arcdir);
+int myround(double indata);
+U8 gLineRChamfer(PcompiledG01 pcline, PTCGline ptcgline,U32 r);
+S32 LineArcRChamfer(PcompiledG01 pcline, PTCGline ptcgline,U32 r);
+#endif

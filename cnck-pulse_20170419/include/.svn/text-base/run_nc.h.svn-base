@@ -1,0 +1,57 @@
+#ifndef DSP6713_RUN_NC_H
+#define DSP6713_RUN_NC_H
+
+//通用变量和标志
+extern tsSYSTEM			System;				//系统参数结构对象
+extern tsERROR			Error;				//报警结构对象
+extern tsOVERALLSIGN	OverallSign;		// 总体标志
+extern tsGCODE			GCodeBuffer[STDGCODE_MOD];	// G-code 结构缓冲数组
+extern tsGCODE			SPCGCodeBuffer[SPCGCODE_MOD];	//SPC G-code 结构缓冲数组
+extern tsGCODE			AddLineGCodeBuffer[ADDGCODE_MOD];			//单段增加5条G代码
+extern tsGCODE			DividedTwoGCodeBuffer[Three_GCODE_MOD];		//分成两段
+extern tsGCODE			NCAreaGCodeBuffer[STDGCODE_MOD];	//区域计算代码缓冲数组
+
+extern tsNC_RUN_SIGN		STDNCSign;			//NC代码运行标志和变量
+extern tsNC_RUN_SIGN		NCRunSign;			//区域代码各组群状态和通讯状态结构对象
+extern tsNC_RUN_SIGN 	AddLineNCSign;		//用于单段加代码;
+extern tsNC_RUN_SIGN		SPCNCSign;			//NC代码运行标志和变量
+
+extern UINT16AXIS LastPrecalMoveSign;						// 以前的移动方向
+extern UINT16AXIS NowPrecalMoveSign;						// 现在的移动方向
+
+//用于主轴
+extern tsSPINDLE S_Spindle;	 // 主轴
+
+extern union tsSPINDLE_OUT_REG SpindleOutSignal;			//输出控制信号
+
+//参考点搜索
+extern tsREFERENCE	Reference;		
+
+//自动对刀功能	CH0506
+extern tsAUTOADJUSTTOOL 	AutoAdjustTool;
+
+//非线性补偿   CH0701
+extern AxisCompensation	AxisCompBuffer[COMPBUFFERLENGTH];
+
+
+// 根据反馈坐标动态修正发送脉冲数--直线处理方式
+
+// 错误判断程序开始区
+extern void NCRun_CheckTrackOver(void);		//判断轨迹是否偏离位置  
+
+
+//攻阳头减速箱主轴运行
+extern void NCRun_SpinGongYang(void);	//攻阳头减速箱主轴运行
+//总线式VT 控制方式
+extern void NCRun_SpinVT(void);		//总线式主轴控制功能
+//参考点搜索开始区
+extern void NCRun_SPCRef(void);
+//自动对刀功能	
+extern void NCRun_ATC(void);
+
+extern void NCRun_Gcode(void);	//运行代码
+
+
+#endif  // end of DSP6713_RUN_NC_H definition
+
+

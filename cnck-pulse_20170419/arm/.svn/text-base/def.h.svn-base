@@ -1,0 +1,147 @@
+#ifndef __DEF_H__
+#define __DEF_H__
+/*
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <time.h>
+#include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <math.h>
+#include <sys/mman.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/msg.h>
+#include <pthread.h>
+#include <sys/socket.h>   
+#include <arpa/inet.h>   
+#include <netinet/in.h>
+*/
+/* xdctools header files */
+#include <xdc/std.h>
+#include <xdc/runtime/Assert.h>
+#include <xdc/runtime/Diags.h>
+#include <xdc/runtime/Error.h>
+#include <xdc/runtime/Log.h>
+#include <xdc/runtime/System.h>
+#include <xdc/runtime/Registry.h>
+/* package header files */
+#include <ti/ipc/Ipc.h>
+#include <ti/ipc/MultiProc.h>
+#include <ti/ipc/Notify.h>
+#include <ti/ipc/SharedRegion.h>
+
+#include <ti/sysbios/BIOS.h>
+#include <ti/sysbios/hal/Timer.h>
+#include <ti/sysbios/family/c64p/Hwi.h>
+#include <ti/sysbios/knl/Swi.h>
+#include <ti/sysbios/knl/Clock.h>
+#include <ti/sysbios/knl/Task.h>
+#include <ti/sysbios/knl/Semaphore.h>
+
+#include <ti/mathlib/mathlib.h>
+
+#include "../include/datatype.h"
+typedef unsigned int    U32; 
+typedef unsigned short   U16; 
+typedef signed int       S32;
+typedef signed short int S16;
+typedef unsigned char    U8;
+typedef signed char      S8;
+typedef float            F32;
+typedef double           F64;
+
+typedef int IntXX;
+typedef unsigned long   UintXX;
+/*
+typedef unsigned long   Uint32;
+typedef unsigned short  Uint16;
+typedef unsigned char   Uint8;
+typedef int             Int32;
+typedef short int       Int16;
+typedef signed char     Int8; 
+*/
+//typedef float           	float32;
+//typedef double	     	FLOAT64;
+typedef unsigned char  BOOL;
+typedef unsigned long 	bool;
+typedef float			FLOAT32;
+typedef double 			FLOAT64;
+#if 0
+typedef unsigned char	INT8U;                    /* Unsigned  8 bit quantity                           */
+typedef signed   char	INT8;                    /* Signed    8 bit quantity                           */
+typedef signed char INT8S;
+typedef unsigned short	INT16U;                   /* Unsigned 16 bit quantity                           */
+typedef signed   short	INT16;                   /* Signed   16 bit quantity                           */
+typedef unsigned int	INT32U;                   /* Unsigned 32 bit quantity                           */
+typedef signed   int	INT32;                   /* Signed   32 bit quantity                           */
+typedef signed   int	INT32S;
+typedef unsigned long long  INT64U;
+typedef signed long long     INT64;
+
+#endif
+
+
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
+
+#define TRUE 	1   
+#define FALSE 	0
+
+
+
+#define ASSERT(X)  if((X)==0){\
+    U8 o=1; \
+    Log_info2("halt:%s,%d\n",__FILE__,__LINE__);\
+    myExceptionHandler(EXCEPTION_ASSERT);\
+    }
+#define DBASSERT(X)  if((X)==0){\
+    U8 o=1;\
+    Log_info2("halt: %s,%d\n",__FILE__,__LINE__);\
+    while(o){o++;o--;}\
+    }
+
+#ifdef DEBUG
+//#define DBMSG printf
+#define DBMSG(...)
+#else
+#define DBMSG(...)
+#endif
+//we have 8 bit to select 8 different source
+
+#if 0
+#define DEBUGMSG(level,...)  if(level&SYSparam[70].val){\
+                   snprintf(dbMSG[dbMSGwptr],DBMSG_LEN,__VA_ARGS__);\
+                   CYCLE_BUF_WINC(dbMSGwptr, DBMSG_MAX);\
+               };
+#else
+#define DEBUGMSG(...)
+#endif
+
+
+#define BIT(bit) (1<<bit)
+#define GETBIT(var,bit)  ((var>>bit)&1)
+#define SETBIT(var,bit)  {var=var|(1<<bit);}
+#define CLRBIT(var,bit)  {var=var&(~(1<<bit));}
+#define WRITEBIT(var,bit,val)  {var=(var&(~(1<<bit)))|((val&1)<<bit);}
+#define WRITEBITS(var,mask,val){var=(var&(~mask))|val;}
+
+
+#define CHAR(addr) *(volatile unsigned char*)(addr)
+#define SHORT(addr) *(volatile unsigned short*)(addr)
+#define INT(addr) *(volatile unsigned int*)(addr)
+#define LONG(addr) *(volatile unsigned long int*)(addr)
+
+extern char shutdownsig;
+
+#define TEST_REACH_HERE(msg) //{printf("run pass:%s:%d:%s\n",__FILE__,__LINE__,msg);}
+#define HALT_HERE(msg) //{printf("halt at:%s:%d because:%s\n",\
+    //__FILE__,__LINE__,msg);exit(-1);}
+
+#endif /*__DEF_H__*/

@@ -1,0 +1,783 @@
+/*
+******************************************************************************
+*   file name: task3.c
+*   author : vinge
+*   create date: 20080819
+*   description:definatiion of user interface display  functions;
+*   version: 0 :20081123--init version,  ;
+******************************************************************************
+*/
+
+#ifndef __GUI_H__
+#define __GUI_H__
+#include "taskglobal.h"
+
+
+
+/*
+#define COOR_VAL_FORMAT_LEN   (11)  // 1 sign,5 INT 1 dot 5 tail
+#define COOR_VAL_FORMAT_TAIL3  (3)  //5 INT 1 dot 3 tail
+#define COOR_VAL_FORMAT_TAIL4  (4)  //5 INT 1 dot 4 tail
+#define COOR_VAL_FORMAT_TAIL5  (5)  //5 INT 1 dot 5 tail
+*/
+
+
+//**************************************************************************
+//below define the coordinate value of message showing in user interface 
+//|8.5I|5.5O|9.5N|8.5M|8T
+#define TOP_MSG_16Y       (8)
+#define TOP_MSG_24Y       (4)
+
+#define TOP_MSG_I       (100)  //FOR CURRENT INTERFACE
+#define TOP_MSG_IX      (TOP_MSG_I+2)
+#define TOP_MSG_O       (TOP_MSG_I+FONT_SIZE24*4+4)   //98+100=198     
+#define TOP_MSG_OX      (TOP_MSG_O+2)
+
+#define TOP_MSG_N       (TOP_MSG_O+FONT_SIZE_ASCII*12+4)//198+84=282
+#define TOP_MSG_NX      (TOP_MSG_N+8)
+ 
+#define TOP_MSG_R       (TOP_MSG_N+FONT_SIZE_ASCII*7+4)//282+84=366  //FOR UNIT INCH AND MM
+#define TOP_MSG_RX      (TOP_MSG_R+3)
+#define TOP_MSG_U       (TOP_MSG_R+FONT_SIZE_ASCII+6)  //FOR UNIT INCH AND MM
+#define TOP_MSG_UX      (TOP_MSG_U+3)
+#define TOP_MSG_A       (TOP_MSG_U+FONT_SIZE_ASCII+6)
+#define TOP_MSG_AX      (TOP_MSG_A+3) 
+
+#define TOP_MSG_M       (TOP_MSG_A+FONT_SIZE_ASCII+6)
+#define TOP_MSG_MX      (TOP_MSG_M+4)
+#define TOP_MSG_T       (LCD_XSIZE-8*10-4)
+#define TOP_MSG_TX      (TOP_MSG_T+2)
+#define TOP_AREA_BOTY (36) 
+//**************************************************************************
+//define main area display const
+#define MAIN_AREA_STARTY (TOP_AREA_BOTY+1)
+//exception disp const
+#define EXCEPT_INFOY (90) 
+//message display const
+#define CMD_AREA_Y   (LCD_YSIZE-LINE_HEIGHT*2-2)
+#define CMD_CHAR_X   (4)
+#define CMD_CHAR_CT_X   (LCD_XSIZE-FONT_SIZE_ASCII*3-2)
+#define CMD_CHAR_Y   (CMD_AREA_Y+1)
+#define CMD_CURSOR_Y (CMD_CHAR_Y+1)
+
+#define MSG_AREA_Y   (CMD_AREA_Y-LINE_HEIGHT)
+#define MSG_CHAR_X   (4)
+#define MSG_CHAR_Y   (MSG_AREA_Y+2)
+#define MSG_ERR_X    (MSG_CHAR_X+FONT_SIZE_ASCII*8) //there's "ERR 3digit:" before
+
+#define MSG_ALARM_X      (LCD_XSIZE-FONT_SIZE_ASCII*20-4)
+#define MSG_ALARM_CHARX  (MSG_ALARM_X+2)
+#define MSG_NOALARM_X      (LCD_XSIZE-FONT_SIZE_ASCII*10-4)
+#define MSG_NOALARM_CHARX  (MSG_NOALARM_X+2)
+#define MSG_ALARM_VALX      (MSG_ALARM_X+FONT_SIZE_ASCII*9+2)
+//debug message display area const
+//#define DBMSG_CHAR_X (MSG_ALARM_X
+//#define DBMSG_CHAR_Y (MSG_CHAR_Y)
+//****************************************************************************
+//menu display const
+#define MAX_MENU         (6)
+#define MENU_COUNT      (7)    // 6  real menu ,0 page updown menu
+#define MENU_WIDTH      (100) 
+#define MENU_CHAR_SHIFT (2)
+#define MENU_AREA_Y     (LCD_YSIZE-LINE_HEIGHT)
+#define MENU_CHAR_Y     (LCD_YSIZE-LINE_HEIGHT+2)
+#define MENU_CHAR_SX    (20)
+#define MENU_LEAD_X     (4)
+/*
+//coordinate display const 
+#define POS_HINT_X   (2)
+#define POS_HINT_Y   (2)
+
+#define PROG_NAME_X  (160)
+#define PROG_NAME_Y  (0)
+#define PROG_LINE_X  (240)
+#define PROG_LINE_Y  (240)
+*/
+
+#define INFO_CLOUM1_Y  (MSG_AREA_Y-LINE_HEIGHT*2)
+#define INFO_CLOUM2_Y  (MSG_AREA_Y-LINE_HEIGHT)
+#define INFO_CLOUM1_CHARY  (MSG_AREA_Y-LINE_HEIGHT*2+2)
+#define INFO_CLOUM2_CHARY  (MSG_AREA_Y-LINE_HEIGHT+2)
+#define INFO_FS_X      (0)
+#define INFO_FS_VALX   (FONT_SIZE_ASCII*2+8)
+#define INFO_FR_X      (INFO_FS_VALX+FONT_SIZE_ASCII*5+7)
+#define INFO_FR_VALX   (INFO_FR_X+FONT_SIZE_ASCII*2+7)
+#define INFO_SS_X      (INFO_FR_VALX+FONT_SIZE_ASCII*5+7)
+#define INFO_SS_VALX   (INFO_SS_X+FONT_SIZE_ASCII*2+7)
+#define INFO_SR_X      (INFO_SS_VALX+FONT_SIZE_ASCII*5+7) 
+#define INFO_SR_VALX   (INFO_SR_X+FONT_SIZE_ASCII*2+7)
+#define INFO_SL_X      (INFO_SR_VALX+FONT_SIZE_ASCII*5+7) 
+#define INFO_SL_VALX   (INFO_SL_X+FONT_SIZE_ASCII*2+7)
+#define INFO_T_X       (INFO_SL_VALX+FONT_SIZE_ASCII*10+14)
+#define INFO_T_VALX    (INFO_T_X+FONT_SIZE_ASCII*1+7)
+
+#define INFO_GRADE_F_X        (0)
+#define INFO_GRADE_F_VALX     (FONT_SIZE_ASCII*8+6)
+#define INFO_GRADE_R_X        (INFO_GRADE_F_VALX+FONT_SIZE_ASCII*4+6)
+#define INFO_GRADE_R_VALX     (INFO_GRADE_R_X+FONT_SIZE_ASCII*8+6)
+#define INFO_GRADE_S_X        (INFO_GRADE_R_VALX+FONT_SIZE_ASCII*4+6)
+#define INFO_GRADE_S_VALX     (INFO_GRADE_S_X+FONT_SIZE_ASCII*8+8)
+#define INFO_GRADE_W_X        (INFO_GRADE_S_VALX+FONT_SIZE_ASCII*4+6)
+#define INFO_GRADE_W_VALX     (INFO_GRADE_W_X+FONT_SIZE_ASCII*8+6)
+#define INFO_CHAR_SHIFT       (3)
+
+#define INFO_X                (0)
+#define INFO_G_HINTX          (INFO_X+2)
+#define INFO_G_VALX           (INFO_G_HINTX+FONT_SIZE_ASCII*4+4)
+#define INFO_G_Y              (INFO_CLOUM1_Y-LINE_HEIGHT*5-10)
+#define INFO_M_Y              (INFO_G_Y+LINE_HEIGHT+2)
+#define INFO_WPCT_Y           (INFO_M_Y+LINE_HEIGHT+2)
+#define INFO_WPCT_VALX        (INFO_G_HINTX+FONT_SIZE_DEFAULT*6+4)
+#define INFO_SCCT_Y           (INFO_WPCT_Y+LINE_HEIGHT+2)
+#define INFO_SCCT_VALX        (INFO_WPCT_VALX)
+#define INFO_TCCT_Y           (INFO_SCCT_Y+LINE_HEIGHT+2)
+#define INFO_TCCT_VALX        (INFO_WPCT_VALX)
+//---------------------------------------------------------------------
+#define COOR_GRADE_NAME_X    (4)
+#define COOR_GRADE_NAME_X2   (COOR_GRADE_NAME_X+9*FONT_SIZE_ASCII)
+#define COOR_GRADE_VAL_X     (COOR_GRADE_NAME_X2+FONT_SIZE_ASCII)
+#define COOR_GRADE_VAL_X2    (COOR_GRADE_VAL_X+2)
+#define COOR_GRADE_VAL_X3    (COOR_GRADE_NAME_X+9*FONT_SIZE_ASCII)
+
+#define COOR_GRADE_F_Y      (200)
+#define COOR_GRADE_FEED_Y   (COOR_GRADE_F_Y+LINE_HEIGHT)
+#define COOR_GRADE_RAPID_Y  (COOR_GRADE_FEED_Y+LINE_HEIGHT)
+#define COOR_GRADE_WHELL_Y  (COOR_GRADE_RAPID_Y+LINE_HEIGHT)
+#define COOR_GRADE_TOOL_Y   (COOR_GRADE_WHELL_Y+LINE_HEIGHT)
+#define COOR_GRADE_SLOAD_Y  (COOR_GRADE_TOOL_Y+LINE_HEIGHT)  //功率显示
+
+#define COOR_INFO_NAME_X     (LCD_XSIZE/2)
+#define COOR_INFO_VAL_X      (COOR_INFO_NAME_X+9*8)
+
+
+//-----------------------------------------
+#define COOR_ALE_NAME_X   (2)
+#define COOR_ALE_NAME_Y   (MAIN_AREA_STARTY+8)
+#define COOR_ALE_XVAL_X   (COOR_ALE_NAME_X)
+#define COOR_ALE_XVAL_Y   (COOR_ALE_NAME_Y+LINE_HEIGHT)
+#define COOR_ALE_YVAL_X   (COOR_ALE_NAME_X+(FONT_SIZE43H-FONT_SIZE_ASCII)*10-4)
+#define COOR_ALE_YVAL_Y   (COOR_ALE_ZVAL_Y+LINE_HEIGHT43)
+#define COOR_ALE_ZVAL_X   (COOR_ALE_NAME_X)
+#define COOR_ALE_ZVAL_Y   (COOR_ALE_XVAL_Y+LINE_HEIGHT43)
+
+#define COOR_ABS_NAME_X   (LCD_XSIZE/2)
+#define COOR_ABS_NAME_Y   (COOR_ALE_NAME_Y)
+#define COOR_ABS_XVAL_X   (COOR_ABS_NAME_X)
+#define COOR_ABS_XVAL_Y   (COOR_ALE_XVAL_Y)
+#define COOR_ABS_YVAL_X   (COOR_ABS_NAME_X+(FONT_SIZE43H-FONT_SIZE_ASCII)*10-4)
+#define COOR_ABS_YVAL_Y   (COOR_ALE_YVAL_Y)
+#define COOR_ABS_ZVAL_X   (COOR_ABS_NAME_X)
+#define COOR_ABS_ZVAL_Y   (COOR_ALE_ZVAL_Y)
+
+#define COOR_MACH_NAME_X  (COOR_ALE_NAME_X)
+#define COOR_MACH_NAME_Y  (INFO_G_Y+8)
+#define COOR_MACH_XVAL_X  (COOR_MACH_NAME_X)
+#define COOR_MACH_XVAL_Y  (COOR_MACH_NAME_Y+LINE_HEIGHT)
+#define COOR_MACH_YVAL_X  (COOR_MACH_NAME_X+(FONT_SIZE43H-FONT_SIZE_ASCII)*10-4)
+#define COOR_MACH_YVAL_Y  (COOR_MACH_ZVAL_Y+LINE_HEIGHT43)
+#define COOR_MACH_ZVAL_X  (COOR_MACH_NAME_X)
+#define COOR_MACH_ZVAL_Y  (COOR_MACH_XVAL_Y+LINE_HEIGHT43)
+
+#define COOR_LEFT_NAME_X  COOR_ABS_NAME_X
+#define COOR_LEFT_NAME_Y  COOR_MACH_NAME_Y
+#define COOR_LEFT_XVAL_X  COOR_ABS_XVAL_X
+#define COOR_LEFT_XVAL_Y  COOR_MACH_XVAL_Y
+#define COOR_LEFT_ZVAL_X  COOR_ABS_ZVAL_X
+#define COOR_LEFT_ZVAL_Y  COOR_MACH_ZVAL_Y
+#define COOR_LEFT_YVAL_X  COOR_ABS_YVAL_X
+#define COOR_LEFT_YVAL_Y  COOR_MACH_YVAL_Y
+//--------------------------------------------------------
+//source list gui
+#define SRC_ALE_X   (2)
+#define SRC_ABS_X   (SRC_ALE_X+FONT_SIZE_ASCII*13+4)
+#define SRC_MACH_X   (SRC_ABS_X+FONT_SIZE_ASCII*13+4)
+#define SRC_LEFT_X   (SRC_MACH_X+FONT_SIZE_ASCII*13+4)
+
+#define SRC_ALE_Y_X  (SRC_ALE_X+10*(FONT_SIZE_ASCII-FONT_SIZE_ASCII16)-4)
+#define SRC_ABS_Y_X  (SRC_ABS_X+10*(FONT_SIZE_ASCII-FONT_SIZE_ASCII16)-4)
+#define SRC_MACH_Y_X  (SRC_MACH_X+10*(FONT_SIZE_ASCII-FONT_SIZE_ASCII16)-4)
+#define SRC_LEFT_Y_X  (SRC_LEFT_X+10*(FONT_SIZE_ASCII-FONT_SIZE_ASCII16)-4)
+
+#define SRC_NAME_Y   (MAIN_AREA_STARTY+16)
+#define SRC_XVAL_Y   (SRC_NAME_Y+LINE_HEIGHT+2)
+#define SRC_ZVAL_Y   (SRC_XVAL_Y+LINE_HEIGHT+4)
+#define SRC_YVAL_Y   (SRC_ZVAL_Y+LINE_HEIGHT+4)
+
+#define SRC_MAX_CHAR (22)
+
+#define SRC_START_Y  (INFO_CLOUM1_Y-(LINE_HEIGHT+2)*5)
+//#define SRC_INDEX_X (LCD_XSIZE/2+4)
+#define SRC_INDEX_X (INFO_SR_VALX)
+#define SRC_START_X  (SRC_INDEX_X+FONT_SIZE_ASCII*3+8)
+//----------------------------------------------------
+#define TRACE_CSTART_X (LCD_XSIZE-FONT_SIZE24*5.5)
+#define TRACE_CVAL_X   (TRACE_CSTART_X+16)
+#define TRACE_CSTART_Y (MAIN_AREA_STARTY+4)
+#define TRACE_CABSX_Y  (TRACE_CSTART_Y+LINE_HEIGHT)
+#define TRACE_CABSZ_Y  (TRACE_CABSX_Y+LINE_HEIGHT)
+
+#define TRACE_CREL_Y   (TRACE_CABSZ_Y+LINE_HEIGHT)
+#define TRACE_CRELX_Y  (TRACE_CREL_Y+LINE_HEIGHT)
+#define TRACE_CRELZ_Y  (TRACE_CRELX_Y+LINE_HEIGHT)
+
+#define TRACE_CMACH_Y   (TRACE_CRELZ_Y+LINE_HEIGHT)
+#define TRACE_CMACHX_Y  (TRACE_CMACH_Y+LINE_HEIGHT)
+#define TRACE_CMACHZ_Y  (TRACE_CMACHX_Y+LINE_HEIGHT)
+
+#define TRACE_GSTARTY  (TOP_AREA_BOTY)
+#define TRACE_GSTARTX  (0)
+
+#define TRACE_Z_INDEX_X (TRACE_GSTARTX+2)
+#define TRACE_X_INDEX_X (TRACE_GSTARTX+50-FONT_SIZE16/4)
+
+#define TRACE_MENU_X  (TRACE_CSTART_X)
+#define TRACE_MENU_Y  (TRACE_CSTART_Y)
+//-----------------------------------------------------
+#define COORDW_HINTX      (10)
+
+#define COORSW_HINTY      (MAIN_AREA_STARTY+4) 
+#define COORDW_VALX       (34)
+#define COORSW_VALXY      (COORSW_HINTY+43+10)
+#define COORSW_VALZY      (COORSW_VALXY+43+10)
+//------------------------------------------------------
+
+#define S_X    (200)
+#define S_Y    (102)
+#define SF_SPLIT_X  (256)
+#define F_X    (264)
+#define F_Y    (102)
+
+#define MODE_X  (180)
+#define MODE_Y  (160)
+
+#define PROG_IN_COOR_X  (20)
+#define PROG_IN_COOR_Y  (80) 
+#define PROG_IN_COOR_EY (198)
+//****************************************************************************
+// disk mange gui const
+#define FILE_LIST_DISPY   (19)
+
+#define FILE_NAME_DISPX   (0)     //MAX 19 CHAR
+#define FILE_TYPE_DISPX    (160)  // 1 CHAR
+#define FILE_SIZE_DISPX     (176)  //MAX 10 NUMBER
+#define FILE_DATE_DISPX    (256)  //8 CHAR  
+
+//***************************************************************************
+//#define EDIT_FINFO_AREAY   (LCD_YSIZE-LINE_HEIGHT*4-2)
+#define EDIT_FINFO_DISPY   (LCD_YSIZE-LINE_HEIGHT*4-2)
+#define EDIT_FINFO_FNUM_DISPX (2)       //5 CHAR
+#define EDIT_FINFO_LINEHINT_DISPX (FONT_SIZE_ASCII*14)  // 4  C HAR
+#define EDIT_FINFO_LINE_DISPX    (EDIT_FINFO_LINEHINT_DISPX+FONT_SIZE_ASCII*4+4)   // 8 CHAR
+#define EDIT_FINFO_COLHINT_DISPX (EDIT_FINFO_LINE_DISPX+FONT_SIZE_ASCII*8+4)  // 4     CHAR
+#define EDIT_FINFO_COL_DISPX (EDIT_FINFO_COLHINT_DISPX+FONT_SIZE_ASCII*4+4)      // 4    CHAR
+#define EDIT_FINFO_TOTALHINT_DISPX  (EDIT_FINFO_COL_DISPX+FONT_SIZE_ASCII*3+4)  //6 CHAR
+#define EDIT_FINFO_TOTAL_DISPX  (EDIT_FINFO_TOTALHINT_DISPX+FONT_SIZE_ASCII*7+6)     //8 CHAR 
+//****************************************************************************
+//Tool compensation display const
+#define TCOMP_PRE_SCREEN    (5)
+
+#define TCOMP_INDEXX    (4)   // 3 INDEX  1 EMPTY
+
+#define TCOMP_VALINDEX  (TCOMP_INDEXX+FONT_SIZE24-FONT_SIZE_ASCII)    // 3 CHARS+SPACE
+#define TCOMP_VALTYPE   (TCOMP_INDEXX+FONT_SIZE24*2+FONT_SIZE_ASCII)
+#define TCOMP_VALXX     (TCOMP_VALTYPE+FONT_SIZE_ASCII*6)   // 11 CHARS+SPACE
+#define TCOMP_VALYX     (TCOMP_VALXX)  // 11 CHARS+SPACE
+#define TCOMP_VALZX     (TCOMP_VALXX+FONT_SIZE_ASCII*12)  // 11 CHARS+SPACE
+#define TCOMP_VALRX     (TCOMP_VALZX+FONT_SIZE_ASCII*12)  // 9 CHARS+SPACE
+#define TCOMP_VALTX     (TCOMP_VALRX+FONT_SIZE_ASCII*12)   // 2 CHATS
+
+#define TCOMP_HINTX     (TCOMP_VALXX+FONT_SIZE_ASCII*7)  // 10 CHARS
+#define TCOMP_HINTY     (TCOMP_HINTX)  // 10 CHARS
+#define TCOMP_HINTZ     (TCOMP_VALZX+FONT_SIZE_ASCII*4)  // 10 CHARS
+#define TCOMP_HINTR     (TCOMP_VALRX+FONT_SIZE_ASCII*4)  // 10 CHARS
+#define TCOMP_HINTT     (TCOMP_VALTX)   // 2 CHATS
+
+#define TCOMP_HINT_Y     (MAIN_AREA_STARTY+4)   
+#define TCOMP_VALY       (TCOMP_HINT_Y+LINE_HEIGHT)
+#define TCOMP_VAL_FORMAT_LEN   (10)  // 1 sign,4 INT 1 dot 5 tail
+#define TCOMP_VAL_FORMAT_TAIL  (3)  //5 INT 1 dot 3 tail
+
+#define TCOMP_WHELLY    (MSG_AREA_Y-LINE_HEIGHT*4-2)
+
+#define TCOMP_COORDNX     (TCOMP_VALINDEX)
+#define TCOMP_COORDXX     (TCOMP_HINTX) 
+#define TCOMP_COORDZX     (TCOMP_HINTZ) 
+#define TCOMP_COORDYX     (TCOMP_HINTZ+TCOMP_HINTZ-TCOMP_HINTX) 
+
+#define TCOMP_COORDWY     (MSG_AREA_Y-LINE_HEIGHT16*3-4)
+#define TCOMP_COORDRY     (TCOMP_COORDWY+LINE_HEIGHT16)
+#define TCOMP_COORDMY     (TCOMP_COORDRY+LINE_HEIGHT16)
+//****************************************************************************
+//coord offset  display const
+#define REFP_INDEXX    (TCOMP_INDEXX+FONT_SIZE_ASCII)   // 3 INDEX  1 EMPTY
+#define REFP_VALXX     (REFP_INDEXX+FONT_SIZE_ASCII*10)  // 10 CHARS
+#define REFP_VALZX     (REFP_VALXX+FONT_SIZE_ASCII*12)  // 10 CHARS
+#define REFP_VALYX     (REFP_VALZX+FONT_SIZE_ASCII*12)  // 10 CHARS
+
+#define REFP_HINTY     (MAIN_AREA_STARTY+2)   
+#define REFP_VALY       (REFP_HINTY+LINE_HEIGHT)
+#define REFP_VAL_FORMAT_LEN   (10)  // 1 sign,3 INT 1 dot 5 tail
+#define REFP_VAL_FORMAT_TAIL  (3)  //5 INT 1 dot 3 tail
+
+#define REFP_PRE_SCREEN    (8)
+
+//****************************************************************************
+#define G5X_SCREEN    (8)
+#define G5X_INDEX_X   (TCOMP_INDEXX)   // 3 INDEX  1 EMPTY
+#define G5X_X_X       (G5X_INDEX_X+FONT_SIZE24*6+FONT_SIZE_ASCII*2)
+#define G5X_Z_X       (G5X_X_X+FONT_SIZE_ASCII*12)
+#define G5X_Y_X       (G5X_Z_X+FONT_SIZE_ASCII*12)
+#define G5X_Y         (MAIN_AREA_STARTY+4)
+//****************************************************************************
+//var  display const
+#define VAR_INDEX1X   (4)
+#define VAR_INDEX2X   (LCD_XSIZE/2+4)
+#define VAR_INDEXY       (MAIN_AREA_STARTY+4)
+#define VAR_HINT1X     (FONT_SIZE_ASCII*8)
+#define VAR_VAL1X     (FONT_SIZE_ASCII*6)
+#define VAR_HINT2X    (VAR_INDEX2X+FONT_SIZE_ASCII*8)
+#define VAR_VAL2X     (VAR_INDEX2X+FONT_SIZE_ASCII*6)
+#define VAR_VALY         (VAR_INDEXY+LINE_HEIGHT)
+#define VAR_SPITLINEX   (LCD_XSIZE/2)
+
+#define VAR_PRE_SCREEN  (20)
+//****************************************************************************
+//parrameter disp const
+//-----------------------------------------------------------------
+#define PARAM_INDEX1X   (2)
+#define PARAM_INDEX2X   (LCD_XSIZE/2+2)
+#define PARAM_INDEXY    (MAIN_AREA_STARTY+2)
+#define PARAM_HINT1X    (PARAM_INDEX1X+FONT_SIZE_DEFAULT*4)
+#define PARAM_VAL1X     (PARAM_INDEX1X+FONT_SIZE_ASCII*6)
+#define PARAM_HINT2X    (PARAM_INDEX2X+FONT_SIZE_DEFAULT*4)
+#define PARAM_VAL2X     (PARAM_INDEX2X+FONT_SIZE_ASCII*6)
+#define PARAM_VALY      (MAIN_AREA_STARTY+LINE_HEIGHT)
+#define PARAM_SPITLINEX  (LCD_XSIZE/2)
+//LEFT 4 LINE FOR PARAM EXPLAIN
+#define PARAM_INFO_SPITY  (MSG_AREA_Y-LINE_HEIGHT*4-2)
+#define PARAM_INFOY       (MSG_AREA_Y-LINE_HEIGHT*4+1)
+#define PARAM_INFOX       (8)
+
+#define PARAM_PRE_SCREEN  (16)
+#define PASSWORD_PRE_SECREEN (10)
+//-----------------------------------------------------------------
+#define PARAM_GRP_PRE_SCREEN (6)
+#define PARAM_GRP_NAMEX     (200)
+#define PARAM_GRP_NAME2X    (PARAM_GRP_NAMEX+FONT_SIZE_ASCII*6)
+#define PARAM_GRP_NAME3X    (PARAM_GRP_NAMEX+FONT_SIZE_DEFAULT*8)
+#define PARAM_GRP_INDEX1X   (2)
+//#define PARAM_GRP_INDEX2X   (PARAM_GRP_INDEX1X+FONT_SIZE_DEFAULT*4)
+#define PARAM_GRP_VALX      (PARAM_GRP_INDEX1X+FONT_SIZE_DEFAULT*4)
+#define PARAM_GRP_INFOX     (PARAM_GRP_VALX+FONT_SIZE_ASCII*10)
+#define PARAM_GRP_HINTY     (MAIN_AREA_STARTY+LINE_HEIGHT)
+#define PARAM_GRP_VALY      (MAIN_AREA_STARTY+LINE_HEIGHT*2)
+//-----------------------------------------------------------------
+#define PARAMS_NAME1X   (2)
+#define PARAMS_NAME2X   (LCD_XSIZE/2)
+
+#define PARAMS_VAL1X    (2+FONT_SIZE_ASCII*12)
+#define PARAMS_VAL2X    (LCD_XSIZE/2+FONT_SIZE_ASCII*12)
+
+#define PARAMS_LINE1Y   (MAIN_AREA_STARTY+2)
+#define PARAMS_LINE2Y   (PARAMS_LINE1Y+LINE_HEIGHT)
+#define PARAMS_LINE3Y   (PARAMS_LINE2Y+LINE_HEIGHT)
+#define PARAMS_LINE4Y   (PARAMS_LINE3Y+LINE_HEIGHT)
+#define PARAMS_LINE5Y   (PARAMS_LINE4Y+LINE_HEIGHT)
+#define PARAMS_LINE6Y   (PARAMS_LINE5Y+LINE_HEIGHT)
+#define PARAMS_LINE7Y   (PARAMS_LINE6Y+LINE_HEIGHT)
+#define PARAMS_LINE8Y   (PARAMS_LINE7Y+LINE_HEIGHT)
+#define PARAMS_LINE9Y   (PARAMS_LINE8Y+LINE_HEIGHT)
+#define PARAMS_LINE10Y  (PARAMS_LINE9Y+LINE_HEIGHT)
+
+
+//****************************************************************************
+//ssd disp const
+//-----------------------------------------------------------------
+#define HD_FLASH_ICONX  (2)
+#define HD_FLASH_INDEXX (20)
+#define HD_FLASH_NAMEX  (42)
+#define HD_SD_ICONX    (LCD_XSIZE/2+2)
+#define HD_SD_INDEXX    (LCD_XSIZE/2+20)
+#define HD_SD_NAMEX     (LCD_XSIZE/2+42)
+#define HD_HINTY       (MAIN_AREA_STARTY+4)
+#define HD_FLASH_DIRX  (HD_FLASH_INDEXX+6*FONT_SIZE_ASCII+2)
+#define HD_SD_DIRX     (HD_SD_INDEXX+6*FONT_SIZE_ASCII)
+#define HD_NAMEY       (HD_HINTY+LINE_HEIGHT+4)
+#define HD_SPITLINEX   (LCD_XSIZE/2-2)
+//LEFT 4 LINE FOR PARAM EXPLAIN
+#define HD_INFOX       (0)
+#define HD_INFOY       (MSG_AREA_Y-(LINE_HEIGHT-2)*4-4)
+#define HD_INFONAMEX   (FONT_SIZE_DEFAULT*6)
+#define HD_INFONAMEY   (HD_INFOY+1)
+#define HD_INFOSIZEX   (FONT_SIZE_DEFAULT*6)
+#define HD_INFOSIZEY   (HD_INFONAMEY+(LINE_HEIGHT-2))
+#define HD_INFOTIMEX   (FONT_SIZE_DEFAULT*6)
+#define HD_INFOTIMEY   (HD_INFONAMEY+(LINE_HEIGHT-2)*2)
+
+#define HD_DISK_SUMX   (0)
+#define HD_DISK_SPITY  (LCD_YSIZE-LINE_HEIGHT*4-2)
+#define HD_DISK_SUMY   (HD_DISK_SPITY)
+#define HD_DISK_FREEHINTX  (0)
+#define HD_DISK_FREECTX  (FONT_SIZE_DEFAULT*7+7)
+#define HD_DISK_FILEHINTX  (LCD_XSIZE/2)
+#define HD_DISK_FILECTX  (LCD_XSIZE/2+FONT_SIZE_DEFAULT*7+7)
+
+#define HD_FILE_PRE_SCREEN  (8)
+//****************************************************************************
+//ALARM DISP CONST
+#define ALM_PRE_SCREEN    (12)
+
+#define ALM_HINT_Y       (MAIN_AREA_STARTY+2)
+#define ALM_CONT_Y       (MAIN_AREA_STARTY+LINE_HEIGHT+2)
+#define ALM_HINT_INDEXX  48
+#define ALM_CONT_INDEXX  2
+#define ALM_CONT_MSGX    (2+FONT_SIZE_ASCII*4)   //can display 23 chars only
+#define ALM_HINT_MSGX    (ALM_CONT_MSGX+FONT_SIZE_ASCII*8)
+#define ALM_HELP_MSGX    (2+FONT_SIZE_ASCII*5) 
+
+#define ALM_CONT_TIMEX   (LCD_XSIZE-FONT_SIZE_ASCII*16-4)
+#define ALM_HINT_TIMEX   (LCD_XSIZE-FONT_SIZE_ASCII*10-4)
+//****************************************************************************
+//dgn disp const
+//----------------------------------------------------------------
+#define DGN_STARTX        (4)
+#define DGN_VERSION_X     (DGN_STARTX)
+#define DGN_VERSION_VALX  (10*FONT_SIZE_ASCII)
+#define DGN_VERSION_RESX  (DGN_VERSION_VALX+23*FONT_SIZE_ASCII)
+#define DGN_VERSION_Y     (MAIN_AREA_STARTY+2)
+#define DGN_DSP_X         (DGN_STARTX)
+#define DGN_DSP_OKX       (DGN_STARTX)
+#define DGN_DSP_OKVALX    (18*FONT_SIZE_ASCII)
+#define DGN_DSP_OKY       (DGN_VERSION_Y+LINE_HEIGHT)
+#define DGN_DSP_FAILX     (DGN_STARTX)
+#define DGN_DSP_FAILVALX  (18*FONT_SIZE_ASCII)
+#define DGN_DSP_FAILY     (DGN_DSP_OKY+LINE_HEIGHT)
+
+#define DGN_SPIN_OKX       (DGN_STARTX)
+#define DGN_SPIN_OKVALX    (18*FONT_SIZE_ASCII)
+#define DGN_SPIN_OKY       (DGN_DSP_FAILY+LINE_HEIGHT)
+#define DGN_SPIN_FAILX     (DGN_STARTX)
+#define DGN_SPIN_FAILVALX  (18*FONT_SIZE_ASCII)
+#define DGN_SPIN_FAILY     (DGN_SPIN_OKY+LINE_HEIGHT)
+
+#define DGN_KEY_X         (DGN_STARTX)
+#define DGN_KEY_Y         (DGN_SPIN_FAILY+LINE_HEIGHT)
+#define DGN_KEYVAL_X      (DGN_STARTX+FONT_SIZE_ASCII*10)
+#define DGN_KEYVAL_Y      (DGN_KEY_Y+LINE_HEIGHT)
+#define DGN_COMOK_X       (DGN_STARTX)
+#define DGN_COMOK_Y       (DGN_KEYVAL_Y+LINE_HEIGHT)
+#define DGN_COMOKVAL_X    (18*FONT_SIZE_ASCII)
+
+#define DGN_COMFAIL_X     (DGN_STARTX)
+#define DGN_COMFAIL_Y     (DGN_COMOK_Y+LINE_HEIGHT)
+#define DGN_COMFAILVAL_X  (18*FONT_SIZE_ASCII)
+
+#define DGN_WHELL_X        (DGN_STARTX)
+#define DGN_WHELLVAL_X     (18*FONT_SIZE_ASCII)
+#define DGN_WHELL_Y        (DGN_COMFAIL_Y+LINE_HEIGHT)
+#define DGN_DISPXY_OFFSET		(60)
+#define DGN_ANGLE_X        (DGN_STARTX)
+#define DGN_ANGLEVAL_X     (18*FONT_SIZE_ASCII)
+#define DGN_ANGLE_Y        (DGN_WHELL_Y+LINE_HEIGHT)
+//----------------------------------------------------
+#define DGN_FILEOP_NAMEX    (DGN_STARTX)
+#define DGN_FILEOP_COUNTX   (DGN_STARTX+FONT_SIZE_ASCII*33)
+#define DGN_FILEOP_TIMEX    (DGN_FILEOP_COUNTX+FONT_SIZE_ASCII*11)
+#define DGN_FILEOP_Y        (MAIN_AREA_STARTY+1)
+//----------------------------------------------------
+#define DGN_CHAR_LINES   (8)
+#define DGN_CHAR_CLOUM   (16)
+#define DNG_CHAR_PRE_SCREEN (DGN_CHAR_LINES*DGN_CHAR_CLOUM)
+#define DGN_CHAR_X    (DGN_STARTX)
+#define DGN_CHAR_HINT_Y  (MAIN_AREA_STARTY+2)
+#define DGN_CHAR_Y    (MAIN_AREA_STARTY+LINE_HEIGHT+4)
+//----------------------------------------------------
+#define LOGO_STARTX  (150)
+#define LOGO_STARTY  (MAIN_AREA_STARTY+50)
+#define LOGO_NAME_Y  (MSG_AREA_Y-LINE_HEIGHT*4)
+#define LOGO_PONE_Y  (MSG_AREA_Y-LINE_HEIGHT*3)
+#define LOGO_SITE_Y  (MSG_AREA_Y-LINE_HEIGHT*2)
+#define LOGO_LOADING_Y  (MSG_AREA_Y)
+
+//#define DGN_CHARVAL_X  (32)
+//#define DGN_CHARVAL_Y (DGN_CHAR_Y+LINE_HEIGHT)
+//----------------------------------------------------------
+#define PASS_HINT_Y (TOP_AREA_BOTY+16)
+#define PASS_VAL_Y  (PASS_HINT_Y+LINE_HEIGHT)
+#define PASS_NUM_X  (2)
+#define PASS_DATE_X  (PASS_NUM_X+FONT_SIZE_ASCII*6)
+#define PASS_KEY_X   (PASS_DATE_X+FONT_SIZE_ASCII*12)
+#define PASS_OP_KEY_X (PASS_KEY_X+FONT_SIZE_ASCII*12)
+#define PASS_SERNUM_HINT_Y (PASS_HINT_Y)
+#define PASS_SERNUM_Y (PASS_SERNUM_HINT_Y+LINE_HEIGHT)
+#define PASS_INITED_HINT_Y (PASS_SERNUM_Y+LINE_HEIGHT)
+#define PASS_INITED_Y (PASS_INITED_HINT_Y+LINE_HEIGHT)
+#define PASS_OP_KEY_HINT_Y (PASS_INITED_Y+LINE_HEIGHT) 
+#define PASS_OP_KEY_Y (PASS_OP_KEY_HINT_Y+LINE_HEIGHT) 
+#define PASS_OP_CLASS_HINT_Y (PASS_OP_KEY_Y+LINE_HEIGHT) 
+#define PASS_OP_CLASS_Y (PASS_OP_CLASS_HINT_Y+LINE_HEIGHT) 
+//----------------------------------------------------------
+#define PLC_INS_PRE_SCREEN (10)
+
+#define PLC_PROG_INDEX_X (4)
+#define PLC_PROG_INS_X   (PLC_PROG_INDEX_X+FONT_SIZE_ASCII*9)
+#define PLC_PROG_INS_Y   (TOP_AREA_BOTY+16)
+#define PLC_PROG_INFO_Y  (MSG_AREA_Y-LINE_HEIGHT)
+
+#define PLC_PROG_ERR_X (PLC_PROG_INDEX_X+FONT_SIZE_ASCII*8)
+#define PLC_PROG_ERR_Y  (PLC_PROG_INFO_Y)//-LINE_HEIGHT)
+
+#define PLC_PROG_CT_X (2)
+#define PLC_PROG_CTVAL_X (FONT_SIZE_ASCII*8+2)
+#define PLC_PROG_BP_X    (PLC_PROG_CTVAL_X+FONT_SIZE_ASCII*6+2)
+#define PLC_PROG_BPVAL_X (PLC_PROG_BP_X+FONT_SIZE_ASCII*8+2)
+#define PLC_PROG_STK_X   (PLC_PROG_BPVAL_X+FONT_SIZE_ASCII*6+2)
+#define PLC_PROG_STKVAL_X (PLC_PROG_STK_X+FONT_SIZE_ASCII*6+2)
+#define PLC_PROG_FLAG_X   (PLC_PROG_STKVAL_X+FONT_SIZE_ASCII*6+2)
+#define PLC_PROG_FLAGVAL_X (PLC_PROG_FLAG_X+FONT_SIZE_ASCII*5+2)
+
+#define PLC_XY_INDEX_X (2)
+#define PLC_XY_INDEXVAL_X (PLC_XY_INDEX_X+FONT_SIZE_ASCII*2)
+#define PLC_XY_INDEX_Y (TOP_AREA_BOTY+2)
+#define PLC_XY_BITX_Y  (PLC_XY_INDEX_Y+LINE_HEIGHT)
+#define PLC_XY_BITXVAL_Y  (PLC_XY_BITX_Y+LINE_HEIGHT)
+
+#define PLC_XY_INDEXY_Y (PLC_XY_BITXVAL_Y+LINE_HEIGHT+4)
+#define PLC_XY_BITY_Y  (PLC_XY_INDEXY_Y+LINE_HEIGHT)
+#define PLC_XY_BITYVAL_Y  (PLC_XY_BITY_Y+LINE_HEIGHT)
+
+#define PLC_CT_PRE_SCREEN (10)
+#define PLC_TM_PRE_SCREEN (10)
+#define PLC_CT_INDEX_X (2)
+#define PLC_CT_STATE_X (PLC_CT_INDEX_X+FONT_SIZE_ASCII*5)
+#define PLC_CT_SET_X (PLC_CT_STATE_X+FONT_SIZE_ASCII*8)
+#define PLC_CT_CUR_X (PLC_CT_SET_X+FONT_SIZE_ASCII*12)
+#define PLC_CT_HINT_Y (TOP_AREA_BOTY+2)
+#define PLC_CT_VALUE_Y (PLC_CT_HINT_Y+LINE_HEIGHT)
+
+#define PLC_CT_PRESET_X (PLC_XY_INDEX_X+FONT_SIZE_ASCII*2)
+#define PLC_CT_VAL_X (TOP_AREA_BOTY+2)
+
+#define PLC_VAR_PRE_SCREEN (16)//(20)modify by lxw
+
+#define PLC_RDK_INDEX1_X (2)
+#define PLC_RDK_VAL1_X   (PLC_RDK_INDEX1_X+FONT_SIZE_ASCII*5)
+#define PLC_RDK_INDEX2_X (LCD_XSIZE/2+2)
+#define PLC_RDK_VAL2_X   (PLC_RDK_INDEX2_X+FONT_SIZE_ASCII*5)
+#define PLC_RDK_HINT_Y   (TOP_AREA_BOTY+2)
+#define PLC_RDK_VALUE_Y  (PLC_RDK_HINT_Y+LINE_HEIGHT)
+#define PLC_Comment_DIS  (PLC_RDK_VALUE_Y-16)
+
+
+#define COLOUR_POSCANVAS_X    (30)
+#define COLOUR_POSCANVAS_Y    (50)
+#define COLOUR_POSCANVAS_XEND    (COLOUR_POSCANVAS_X+240)
+#define COLOUR_POSCANVAS_YEND    (COLOUR_POSCANVAS_Y+240)
+#define COLOUR_POSBRIGHTNESS_X    (COLOUR_POSCANVAS_XEND+FONT_SIZE_DEFAULT)
+#define COLOUR_POSBRIGHTNESS_Y    (COLOUR_POSCANVAS_Y)
+#define COLOUR_POSBRIGHTNESS_LEN    (10)
+#define COLOUR_POSBRIGHTNESS_XEND    (COLOUR_POSBRIGHTNESS_X+COLOUR_POSBRIGHTNESS_LEN)
+#define COLOUR_POSBRIGHTNESS_YEND    (COLOUR_POSCANVAS_YEND)
+#define COLOUR_POSMENU_X    (4)
+#define COLOUR_POSMENU_Y    (COLOUR_POSCANVAS_Y)
+#define COLOUR_POSCUR_X    (COLOUR_POSBRIGHTNESS_X)
+#define COLOUR_POSCUR_Y    (COLOUR_POSCANVAS_YEND+LINE_HEIGHT/2)
+#define COLOUR_POSCUR_XEND (COLOUR_POSCUR_X+FONT_SIZE_DEFAULT*3)
+#define COLOUR_POSCUR_YEND (COLOUR_POSCUR_Y+FONT_SIZE_DEFAULT*3)
+#define COLOUR_POSHUE_X    (COLOUR_POSCANVAS_X)
+#define COLOUR_POSHUE_Y    (COLOUR_POSCANVAS_YEND+LINE_HEIGHT/2)
+#define COLOUR_POSSAT_X    (COLOUR_POSCANVAS_X)
+#define COLOUR_POSSAT_Y    (COLOUR_POSHUE_Y+LINE_HEIGHT)
+#define COLOUR_POSBRI_X    (COLOUR_POSCANVAS_X)
+#define COLOUR_POSBRI_Y    (COLOUR_POSSAT_Y+LINE_HEIGHT)
+#define COLOUR_POSR_X    (COLOUR_POSHUE_X+FONT_SIZE_DEFAULT*6)
+#define COLOUR_POSR_Y    (COLOUR_POSHUE_Y)
+#define COLOUR_POSG_X    (COLOUR_POSR_X)
+#define COLOUR_POSG_Y    (COLOUR_POSSAT_Y)
+#define COLOUR_POSB_X    (COLOUR_POSR_X)
+#define COLOUR_POSB_Y    (COLOUR_POSBRI_Y)
+
+#define COLOUR_NUM (12)
+#define COLOUR_WHITE_X1 (LCD_XSIZE-FONT_SIZE_DEFAULT*6)
+#define COLOUR_WHITE_Y1 (50)
+#define COLOUR_WHITE_X2 (COLOUR_WHITE_X1+FONT_SIZE_DEFAULT*5)
+#define COLOUR_WHITE_Y2 (COLOUR_WHITE_Y1+LINE_HEIGHT)
+//****************************************************************************
+// the mdi gui
+#define MDI_SPIT_VLINE    (INFO_SS_X)
+#define MDI_SPIT_VLINE2   (INFO_SS_VALX)
+#define MDI_MAX_COL       (3)
+#define MDI_MAX_ROW       (5)
+#define MDI_SRC_MAX_CHAR  (32)
+#define MDI_SRC_INDEX_X   (MDI_SPIT_VLINE+FONT_SIZE_ASCII+4)
+#define MDI_SRC_START_X   (MDI_SPIT_VLINE2+FONT_SIZE_ASCII/2)
+#define MDI_SRC_START_Y   (SRC_START_Y)
+#define MDI_LINE_HEIGHT   (LINE_HEIGHT+2)
+/***********************************************************************/
+/*
+#define DISP_PARAM_GROUP 10 //一屏显示12行参数
+#define GROUP0_MAX 105
+#define GROUP1_MAX 15
+#define GROUP2_MAX 22
+#define GROUP3_MAX 30
+#define GROUP4_MAX 25
+#define GROUP5_MAX 31
+
+#define SYS_PARAM_GROUP_MAX 6
+    
+#define PARAMGROUPX PARAM_INDEX1X
+#define PARAMGROUPY PARAM_INDEXY  */
+/**************************************************************************/
+//#define COLOUR_
+
+//****************************************************************************
+// the gui names 
+#define GUINUM_MAIN      (0)
+#define GUINUM_COORD     (1)
+#define GUINUM_COORDW    (2)  //COORD WORK
+#define GUINUM_COORDR    (3)  // COORD LOCAL
+#define GUINUM_COORDM    (4)  //MACH
+#define GUINUM_COORDL    (5)  //REMAINING 
+#define GUINUM_COORDS    (6)  //SRC AND COORD
+#define GUINUM_SIMTRACE  (7)
+
+#define GUINUM_HD        (8)
+#define GUINUM_EDIT      (9)
+
+#define GUINUM_TCOMP     (10)
+#define GUINUM_REFP      (11)
+
+#define GUINUM_ALARM     (12)
+
+#define GUINUM_PARAM     (13)
+#define GUINUM_VAR       (14)
+#define GUINUM_SETTING   (15)
+#define GUINUM_PASSWORD  (16)
+
+#define GUINUM_DGN       (17)
+#define GUINUM_DGN_FILE  (18)
+#define GUINUM_DGN_FONT  (19)
+
+#define GUINUM_PLC_LADDER (20)
+#define GUINUM_PLC_PROG   (21)
+
+#define GUINUM_PLC_X     (22)//add 20110830
+#define GUINUM_PLC_Y     (23)
+#define GUINUM_PLC_M    (24)
+#define GUINUM_PLC_D     (25)
+#define GUINUM_PLC_R    (26)
+#define GUINUM_PLC_CT    (27)
+#define GUINUM_PLC_TM     (28)
+#define GUINUM_PLC_F    (29)
+#define GUINUM_PLC_G   (30)
+
+#define GUINUM_BANK      (31)
+#define GUINUM_T           (32)
+//#define GUINUM_T_PUSH (33) 
+//#define GUINUM_T_PULL  (34)
+//#define GUINUM_T_ZERO  (35) 
+
+#define GUINUM_G5X       (33)
+#define GUINUM_MDI       (34)
+#define GUINUM_COLOUR    (35)
+#define GUINUM_PARAMGROUP (36)
+#define GUINUM_DGN_AXIS_IO (37)
+
+#define GUI_NUM_MAX      (38)
+
+//#define GUINUM_BANK      (29)
+//#define GUINUM_G5X       (30)
+//#define GUINUM_MDI       (31)
+//#define GUINUM_COLOUR    (32)
+//#define GUINUM_PARAMGROUP (33)
+
+//#define GUI_NUM_MAX      (34)
+
+#define GUI_LAYER0       (0)
+#define GUI_LAYER1       (1)
+//*****************************************************************************
+extern U16 testChar;
+//*****************************************************************************
+typedef void (*tGUI_Handle)(void);
+extern tGUI_Handle GUI_Handles[GUI_NUM_MAX];
+//utiles function 
+void loadRes(void);
+U8 loadUnicodeFont(void);
+U8 loadStrResFromFile(void);
+void loadStrRes(U16* strbuf);
+void setSystemColorPanel(void);
+void GUI_Init(void);
+void GUI_Splash(void);
+void GUI_Part(void);
+void GUI_ClearMainScreen(void);
+U8   GUI_FormatValStr(S32 val, U8* result);
+U8   GUI_FormatValStrShort(S32 val, U8* result);
+void GUI_UpdateCMDline(void);
+void GUI_Update(void);
+void GUI_ShwoTopInfo(void);
+void GUI_ShowCMD(void);
+//void GUI_ShowMenu(RESSTR_TYPE* menu);
+//*****************************************************************************
+//user interface menu sub funcions;
+/*
+void GUI_ClearMenu(void);
+void GUI_MainMenu1(void);
+void GUI_MainMenu2(void);
+void GUI_CoordMenu(void);
+void GUI_HDMenu1(void);
+void GUI_HDMenu2(void);
+void GUI_TCOMPMenu(void);
+void GUI_ParmMenu(void);
+void GUI_DNGMenu(void);
+*/
+void GUI_MenuSwitch(void);
+//*******************************************************************
+// user interface display functions
+void GUI_MainSrcShare(void);
+void CoordAtTop(void);
+void GUI_Main(void);
+void GUI_COORD(void);
+
+void GUI_COORD_Work(void);
+void GUI_COORD_Local(void);
+void GUI_COORD_Mach(void);
+void GUI_COORD_Remain(void);
+void GUI_COORD_SRC(void);
+void GUI_TRACE(void);
+void GUI_SimTrace(void);
+void GUI_HD(void);
+void GUI_Edit(void);
+void GUI_TCOMP(void);
+void GUI_RefPoint(void);
+void GUI_VAR(void);
+void GUI_ALARM(void);
+void GUI_PARAM(void);
+void GUI_SETTING(void);
+void GUI_DGN(void);
+void GUI_DGNfileHistory(void);
+void GUI_DGNchar(void);
+void GUI_DGN_AXIS_IO(void);
+
+void GUI_BANK(void);
+void GUI_Password(void);
+void GUI_COLOUR(void);
+void GUI_G5X(void);
+void GUI_MDI(void);
+void GUI_ParamGroup(void);
+
+void GUI_PLCprog(void);
+void GUI_PLCladder(void);
+void GUI_PLCcounter(void);
+void GUI_PLCtimer(void);
+void GUI_PLCf(void);
+void GUI_PLCg(void);
+void GUI_PLCr(void);
+void GUI_PLCd(void);
+void GUI_PLCm(void);
+void GUI_T(void);
+void GUI_PLCx(void);
+void GUI_PLCy(void);
+//void GUI_TEST(void);
+int LoadBMP(U8* BMPfileName);
+
+#endif

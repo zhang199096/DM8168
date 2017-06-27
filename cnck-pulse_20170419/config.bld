@@ -1,0 +1,102 @@
+/*
+ * Copyright (c) 2012, Texas Instruments Incorporated
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * *  Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * *  Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * *  Neither the name of Texas Instruments Incorporated nor the names of
+ *    its contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
+ *  ======== config.bld ========
+ *
+ */
+
+/*  Memory Map for ti.platforms.evmTI814X
+ *
+ *  8000_0000 - C000_0000  4000_0000  (1024 MB) External Memory
+ *  ------------------------------------------------------------------------
+ *  8000_0000 - 9600_0000  1600_0000  ( 352 MB) Linux
+ *  9600_0000 - 9800_0000   200_0000  (  32 MB) cmem (not used)
+ *  9800_0000 - 9801_0000     1_0000  (  64 KB) SR_0 (ipc)
+ *  9801_0000 - 9900_0000    FF_0000  ( ~16 MB) SR_1 (program shared region)
+ *  9900_0000 - 9A00_0000   100_0000  (  16 MB) DSP_PROG (code, data)
+ *  9A00_0000 - 9A10_0000    10_0000  (   1 MB) dsp heap (not used)
+ */
+ 
+var Build = xdc.useModule('xdc.bld.BuildEnvironment');    
+var SR_0 = {
+        name: "SR_0", space: "data", access: "RWX",
+        base: 0x9F700000, len: 0x200000,
+        comment: "SR#0 Memory (2 MB)"
+    };
+
+var SR_1 = {
+        name: "SR_1", space: "data", access: "RWX",
+        base: 0x98000000, len: 0x1000000,
+        comment: "SR#1 Memory (16 MB)"
+    };
+
+var LoggerSM = {
+        name: "LOGGERSM", space: "data", access: "RWX",
+        base: 0x9E400000, len: 0x200000,
+        comment: "LOGGERSM (2 MB)"
+    };
+
+var DSP_PROG = {
+		name: "DSP_PROG", space: "code/data", access: "RWX",
+                base: 0x99000000, len: 0x1000000,
+                comment: "DSP Program Memory (16 MB)"
+    };
+    
+Build.platformTable["ti.platforms.evmTI816X"] = {
+    externalMemoryMap: [
+        [ SR_0.name, SR_0 ],
+        [ SR_1.name, SR_1 ],
+        [ LoggerSM.name, LoggerSM ],
+        [ DSP_PROG.name, DSP_PROG ],
+    ],
+    codeMemory:  "DSP_PROG",
+    dataMemory:  "DSP_PROG",
+    stackMemory: "DSP_PROG",
+    l1DMode: "32k",
+    l1PMode: "32k",
+    l2Mode: "256k"
+};
+
+/*
+ *  ======== ti.targets.elf.C674 ========
+ */
+var C674 = xdc.useModule('ti.targets.elf.C674');
+C674.platforms = [
+    "ti.platforms.evmTI816X"
+];
+
+/* We remove a few profiles, just to cut down on build time */
+delete C674.profiles["coverage"];
+delete C674.profiles["profile"];
+delete C674.profiles["whole_program"];
+delete C674.profiles["whole_program_debug"];

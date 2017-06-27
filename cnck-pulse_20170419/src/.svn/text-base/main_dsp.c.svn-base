@@ -1,0 +1,452 @@
+/*
+ * Copyright (c) 2012, Texas Instruments Incorporated
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * *  Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * *  Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * *  Neither the name of Texas Instruments Incorporated nor the names of
+ *    its contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
+ *  ======== main_dsp.c ========
+ *
+ */
+
+
+/* local header files */
+#include "..\include\dec6713_main.h"
+
+
+/* private functions */
+/*
+Timer_Handle timer1;
+Timer_Params timer1params;
+void Timer1_Func(UArg arg0);
+Swi_Handle swi0;
+Swi_Params swi0params;
+void Swi0_Func(UArg arg0, UArg arg1);
+Clock_Handle clock0;
+Clock_Params clock0params;
+void Clock0_Func(UArg arg0)         ;
+
+Task_Handle task0;
+Task_Params task0params;
+void Task0_Func(UArg arg0, UArg arg1);
+
+*/
+Hwi_Handle hwi10;
+Hwi_Params hwi10params;
+void Hwi10_Func(UArg arg0);
+Hwi_Handle hwi11;
+Hwi_Params hwi11params;
+void Hwi11_Func(UArg arg0);
+
+Task_Handle task1,task2;
+Task_Params task1params;
+Task_Params task2params;
+void Task1_Func(UArg arg0, UArg arg1);
+extern void ARMmain(UArg arg0, UArg arg1);
+extern void main_cycle(void);
+
+/* private data */
+Error_Block eb;
+
+/*----------------------------------------------------------------------------
+ - Purpose: Writes a single TLB entry into the MMU
+ -
+ - Inputs: entry number
+ - virtual address (as seen from DSP)
+ - physical address (as seen from ARM)
+ -
+ - Notes: Assumes a super section 16 MB size (0x0100_0000)
+ ----------------------------------------------------------------------------*/
+
+Void mmuWriteStaticTlb(int entry, unsigned long va, unsigned long pa) {
+	const int MMU_BASE = 0x08010000;
+	volatile int *mmu_lock = (int *) (MMU_BASE + 0x50);
+	volatile int *mmu_ld_tlb = (int *) (MMU_BASE + 0x54);
+	volatile int *mmu_cam = (int *) (MMU_BASE + 0x58);
+	volatile int *mmu_ram = (int *) (MMU_BASE + 0x5c);
+
+	// configure TLB virtual address , 16 MB super-section, protect, validate
+	*mmu_cam = (va & 0xfff00000) | 0x0000000f;
+
+	// load physical address of the page
+	*mmu_ram = (pa & 0xfff00000);
+
+	// lock from base value 0
+	*mmu_lock = ((entry + 1) << 10) | (entry << 4);
+
+	// load the specified entry in the TLB
+	*mmu_ld_tlb = 0x00000001;
+}
+
+/*----------------------------------------------------------------------------
+ - Purpose: Configures the MMU for all access to external memory
+ -
+ - Notes: Required for access to the GPMC bus
+ - See spprugz8 Figure 1-22 MMU Global Initialization & table 1-50
+ ----------------------------------------------------------------------------*/
+
+Void configureMmu() {
+	const int MMU_BASE = 0x08010000;
+	volatile int *mmu_revision = (int *) (MMU_BASE + 0x00);
+	volatile int *mmu_sysconfig = (int *) (MMU_BASE + 0x10);
+	volatile int *mmu_sysstatus = (int *) (MMU_BASE + 0x14);
+	volatile int *mmu_irqenable = (int *) (MMU_BASE + 0x1c);
+	volatile int *mmu_cntl = (int *) (MMU_BASE + 0x44);
+	int entry = 0;
+
+	Log_info1("Configuring MMU revision = 0x%08x\n", *mmu_revision);
+	//System_flush();
+
+	// execute SW reset
+	*mmu_sysconfig = 0x00000002;
+
+	// wait for reset
+	while ((*mmu_sysstatus & 0x00000001) != 0)
+		;
+
+	// enable power save
+	//*mmu_sysconfig = 0x00000001; crashes with this line
+
+	// configure 16 16-MB segments of DDR for straight through
+	for (entry = 0; entry < 10; entry++) {
+		mmuWriteStaticTlb(entry, (0x96000000 + (entry << 24)),
+				(0x96000000 + (entry << 24)));
+	}
+
+	// registers
+	mmuWriteStaticTlb(entry, 0x40000000, 0x40000000);
+	entry++;
+
+	// GPMC
+	mmuWriteStaticTlb(entry, 0x11000000, 0x01000000);
+	entry++;
+
+	// DDR control (cache control by syslink)
+	mmuWriteStaticTlb(entry, 0x4c000000, 0x4c000000);
+	entry++;
+	mmuWriteStaticTlb(entry, 0x48000000, 0x48000000);
+	entry++;
+	//Log_info0("MMU configured Tlb\n");
+
+	// enable multihit fault and TLB miss
+	*mmu_irqenable = 0x00000011;
+	//Log_info0("MMU configured irqenable\n");
+
+	// enable memory translations (turn it on)
+	*mmu_cntl = 0x00000002;
+	//Log_info0("MMU configured cntl\n");
+
+	// if this prints, at least the DDR mapping is working
+	Log_info0("MMU configured\n");
+	//stem_flush();
+}
+/*
+ *  ======== main ========
+ */
+Int main(Int argc, Char* argv[]) {
+
+	
+
+	//Diags_setMask("xdc.runtime.Main-F");
+	/*
+	 * Diags.EMERGENCY    	level 1 cannot close
+	 * Diags.CRITICAL		level 2 cannot close
+	 * Diags.ERROR			level 3 cannot close
+	 * Diags.INFO           Log_info()
+	 * close info output:Diags_setMask("xdc.runtime.Main-F");
+	 * E           ENTRY           Function entry
+	 * X           EXIT            Function exit
+	 * L           LIFECYCLE       Object life-cycle
+	 * I           INTERNAL        Internal diagnostics
+	 * A           ASSERT          Assert checking
+	 * Z           ANALYSIS        Analysis event
+	 * F           INFO            Informational event
+	 * S           STATUS          Status (error, warning) event
+	 * 1           USER1           User defined diagnostics
+	 * 2           USER2           User defined diagnostics
+	 * 3           USER3           User defined diagnostics
+	 * 4           USER4           User defined diagnostics
+	 * 5           USER5           User defined diagnostics
+	 * 6           USER6           User defined diagnostics
+	 * 7           USER7           User defined diagnostics
+	 * 8           USER8           User defined diagnostics
+	 %c                      Character
+	 %d                      Signed integer
+	 %u                      Unsigned integer
+	 %x                      Unsigned hexadecimal integer
+	 %o                      Unsigned octal integer
+	 %s                      Character string
+	 %p                      Pointer
+	 %f                      Single precision floating point (float)
+	 Log_print2(Diags_USER2, "list[%u] = %s\n", i, (xdc_IArg)list[i]);
+	 */
+	/* must initialize the error block before using it */Error_init(&eb);
+
+	/* create main thread (interrupts not enabled in main on BIOS) */
+
+    Log_info0("-->dsp main");
+
+	Hwi_Params_init(&hwi10params);
+	hwi10params.instance->name = "Hwi10";
+	hwi10params.eventId = 66;
+	hwi10 = Hwi_create(10, Hwi10_Func, &hwi10params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create hwi 10 startup thread");
+	}
+
+	Hwi_Params_init(&hwi11params);
+	hwi11params.instance->name = "Hwi11";
+	hwi11params.eventId = 64;
+	hwi11 = Hwi_create(11, Hwi11_Func, &hwi11params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create hwi 11 startup thread");
+	}
+
+
+	Task_Params_init(&task1params);
+	task1params.instance->name = "DSPTask1";
+	task1params.stackSize = 0x4000;
+	task1params.priority = 3;
+	task1 = Task_create(Task1_Func, &task1params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create application1 startup thread");
+	}
+	Task_Params_init(&task2params);
+	task2params.instance->name = "ARMTask";
+	task2params.stackSize = 0x4000;
+	task2params.priority = 4;
+	task2 = Task_create(ARMmain, &task1params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create application1 startup thread");
+	}
+	/*
+	Swi_Params_init(&swi0params);
+	swi0params.instance->name = "Swi0";
+	swi0 = Swi_create(Swi0_Func, &swi0params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create swi startup thread");
+    } 
+    	Timer_Params_init(&timer1params);
+	timer1params.period = 1000000;    //10s
+	timer1params.runMode = Timer_RunMode_CONTINUOUS;
+	timer1params.startMode = Timer_StartMode_USER;
+	timer1 = Timer_create(Timer_ANY, Timer1_Func, &timer1params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create timer startup thread");
+	}     
+	Clock_Params_init(&clock0params);
+	clock0params.period = 1000;    //ms
+	clock0params.startFlag = TRUE;
+	//clock0 = Clock_create(Clock0_Func, 1000, &clock0params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create clock startup thread");
+	}
+    
+	Task_Params_init(&task0params);
+	task0params.instance->name = "Task0";
+	task0params.stackSize = 0x1000;
+	task0params.priority = 6;
+    task0 = Task_create(Task0_Func, &task0params, &eb);
+	if (Error_check(&eb)) {
+		Log_error0("main: failed to create application0 startup thread");
+    } 
+    //FPGA_DSP(rCTRL) = 0x00ff;
+    //FPGA_DSP(rCTRL) = 0xffff;
+    */ 
+	
+
+	/* start scheduler, this never returns */
+
+    configureMmu();
+    Log_info0("Starting BIOS");
+    BIOS_start();
+
+	/* should never get here */
+    Log_info0("Error leaving main");
+	return (0);
+}
+
+void Hwi10_Func(UArg arg0) {
+    Log_info2("Entering Hwi10 id:%d, time = %d\n",hwi10params.eventId, Clock_getTicks());
+}
+void Hwi11_Func(UArg arg0) {
+	Log_info2("Entering Hwi11 id:%d, time = %d\n",hwi11params.eventId, Clock_getTicks());
+}
+/*
+void Timer1_Func(UArg arg0) {
+	 
+    Log_info2("in1:0x%x,in2:0x%x",in[0],in[1]);
+}
+void Swi0_Func(UArg arg0, UArg arg1) {
+	Log_info1("Entering Swi0., time = %d\n", Clock_getTicks());
+}
+void Clock0_Func(UArg arg0) {
+	//Log_info1("Entering clock0 every 1 sec, time = %d\n", Clock_getTicks());
+
+}*/
+void nopdelay(int period) {
+	int i;
+	for (i = 0; i < period; i++)
+		;
+}
+
+//extern int pawnmain(void *id);
+//extern void Task1_main(void *Id);
+
+Void Task1_Func(UArg arg0, UArg arg1) {
+	Log_info0("task1 start");
+    //test();
+
+    //init485UART();
+    spi_init();
+	initKeyboardCOM();
+    shm_cycBufInitAll();
+	
+
+
+	power_on_initial();
+	system_initial();
+
+    parameter_initial(); //初始化参数
+
+
+	
+
+    Log_info0("Hwi start.\n");
+	IRQ_ENABLE(IRQNUM_PLUSE);
+	IRQ_ENABLE(IRQNUM_MBUS);
+
+	main_cycle();
+}
+/*
+ *  ======== smain ========
+ */
+#if 0
+Void Task0_Func(UArg arg0, UArg arg1) 
+{
+	Int status = 0;
+	UInt16 remoteProcId;
+	Bool running = TRUE;
+
+    Log_print0(Diags_ENTRY | Diags_INFO , "task0 start");
+    Timer_start(timer1);
+    pawnmain(0);
+    return;
+
+	/* initialize modules */
+	Server_init();
+
+	/* turn on Diags_INFO trace */Diags_setMask("Server+EXF");
+
+	/* loop forever */
+	while (running) {
+
+		/* only one thread must call start */
+		do {
+			status = Ipc_start();
+		} while (status == Ipc_E_NOTREADY);
+
+		if (status < 0) {
+			Log_error0("smain: Ipc_start() failed");
+			goto leave;
+		}
+		Log_info0("smain: Ipc_start");
+
+		// attach to the remote processor
+		remoteProcId = MultiProc_getId("HOST");
+		Log_info1("smain: get remoteProcId %d",remoteProcId);
+
+		//connect to remote processor
+		do {
+			status = Ipc_attach(remoteProcId);
+
+			if (status == Ipc_E_NOTREADY) {
+				Task_sleep(100);
+			}
+
+		} while (status == Ipc_E_NOTREADY);
+
+		if (status < 0) {
+			Log_error0("smain: Ipc_attach() failed");
+			goto leave;
+		}
+		Log_info0("smain: Ipc_attach");
+
+		/* BEGIN server phase */
+
+		/* server setup phase */
+		status = Server_create(remoteProcId);
+
+		if (status < 0) {
+			goto leave;
+		}
+
+		/* server execute phase */
+		status = Server_exec();
+
+		if (status < 0) {
+			goto leave;
+		}
+		//task1 = Task_create(Task1_Func, &task1params, &eb);
+		/* server shutdown phase */
+		status = Server_delete();
+
+		if (status < 0) {
+			goto leave;
+		}
+
+		/* END server phase */
+
+		/* disconnect from remote processor */
+		do {
+			status = Ipc_detach(remoteProcId);
+
+			if (status == Ipc_E_NOTREADY) {
+				Task_sleep(100);
+			}
+
+		} while (status == Ipc_E_NOTREADY);
+
+		if (status < 0) {
+			Log_error0("smain: Failed to disconnect from remote process");
+			goto leave;
+		}
+
+		/* only one thread must call stop */
+		Ipc_stop();
+	}
+
+	/* finalize modules */
+	Server_exit();
+
+	leave:
+	Log_print1(Diags_EXIT, "<-- smain: %d", (IArg)status);
+	return;
+}
+#endif

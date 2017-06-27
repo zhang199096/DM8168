@@ -1,0 +1,418 @@
+/**********************************************************************
+*   file name: alarm.c
+*   author : vinge
+*   create date: 20090709
+*   version: 0: 20090709--init version,  ;
+***********************************************************************
+*/
+#include "alarm.h"
+U32 sysalarm[ALARM_GROUP_MAX];
+U32 alarmPrev[ALARM_GROUP_MAX]; //prev alarm check state;
+U32 inAlarm; //all ALARM GROUP' S OR VALUE ,IF NOT ZERO ,WE HAVE ALARM
+
+Talarm alarmInfo[ALARM_RECORD_MAX];
+U8 alarming[ALARM_RECORD_MAX];
+U8 alarmPtr;
+U8 alarmOffset; //alaram show in gui , offset form the current alarmptr
+U8 alarmHelpOffset;
+U8 alarmShow; // if 0,show alarm msg ,if 1 show alarm HELP;
+U8 alarmRedraw;  // alram interface need redraw
+
+U8 alarmDSPclr; //tell dsp to clear alarms
+/*
+*******************************************************************************
+* function: alarmLimitCheck
+* parameter: void
+* return   : void
+* description : draw the alarm and waringin info
+*******************************************************************************
+*/
+void alarmHardLimitCheck(void)
+{
+    //we can decided which servo alarm now.
+    /*
+    if(DSPState&BIT_DSP0ALARM)
+    {
+        ALARM_GRP0|=ALM_GRP0_XMOTOR;
+        ALARM_GRP0|=ALM_GRP0_ZMOTOR;
+    }
+    */
+    if(SYSparam[91].val==0)
+    {//hardlimit enable
+        if(SYS_MODE_REF==sysMode)
+        {
+
+            if((hardLimitPosState&BITX)&&(DSPparam.sysbyte[26]==1))
+            {
+                ALARM_GRP0|=ALM_GRP0_XPOS_HLIMIT;
+            }
+            if((hardLimitPosState&BITZ)&&(DSPparam.sysbyte[28]==1))
+            {
+                ALARM_GRP0|=ALM_GRP0_ZPOS_HLIMIT;
+            }
+            if((hardLimitNegState&BITX)&&(DSPparam.sysbyte[26]==0))
+            {
+                ALARM_GRP0|=ALM_GRP0_XNEG_HLIMIT;
+            }
+            if((hardLimitNegState&BITZ)&&(DSPparam.sysbyte[28]==0))
+            {
+                ALARM_GRP0|=ALM_GRP0_ZNEG_HLIMIT;
+            }
+            if((hardLimitPosState&BITY)&&(DSPparam.sysbyte[27]==1))
+            {
+                ALARM_GRP0|=ALM_GRP0_YPOS_HLIMIT;
+            }
+            if((hardLimitNegState&BITY)&&(DSPparam.sysbyte[27]==0))
+            {
+                ALARM_GRP0|=ALM_GRP0_YNEG_HLIMIT;
+            }
+        }else{
+            if(hardLimitPosState&BITX)
+            {
+                ALARM_GRP0|=ALM_GRP0_XPOS_HLIMIT;
+            }
+            if(hardLimitPosState&BITZ)
+            {
+                ALARM_GRP0|=ALM_GRP0_ZPOS_HLIMIT;
+            }
+            if(hardLimitNegState&BITX)
+            {
+                ALARM_GRP0|=ALM_GRP0_XNEG_HLIMIT;
+            }
+            if(hardLimitNegState&BITZ)
+            {
+                ALARM_GRP0|=ALM_GRP0_ZNEG_HLIMIT;
+            }
+            if(hardLimitPosState&BITY)
+            {
+                ALARM_GRP0|=ALM_GRP0_YPOS_HLIMIT;
+            }
+            if(hardLimitNegState&BITY)
+            {
+                ALARM_GRP0|=ALM_GRP0_YNEG_HLIMIT;
+            }
+        }
+    }
+    //soft limit is not check yet
+}
+/*
+*******************************************************************************
+* function: alarmSoftLimitCheck
+* parameter: void
+* return   : void
+* description : draw the alarm and waringin info
+*******************************************************************************
+*/
+void alarmSoftLimitCheck(void)
+{
+    //if(DSPparam.sysbyte[82]==1) // check soft limit
+    //{
+        if(softLimitPosState&BITX)
+        {
+            ALARM_GRP0|=ALM_GRP0_XPOS_SLIMIT;
+        }
+        if(softLimitNegState&BITX)
+        {
+            ALARM_GRP0|=ALM_GRP0_XNEG_SLIMIT;
+        }
+        if(softLimitPosState&BITZ)
+        {
+            ALARM_GRP0|=ALM_GRP0_ZPOS_SLIMIT;
+        }
+        if(softLimitNegState&BITZ)
+        {
+            ALARM_GRP0|=ALM_GRP0_ZNEG_SLIMIT;
+        }
+        if(softLimitPosState&BITY)
+        {
+            ALARM_GRP0|=ALM_GRP0_YPOS_SLIMIT;
+        }
+        if(softLimitNegState&BITY)
+        {
+            ALARM_GRP0|=ALM_GRP0_YNEG_SLIMIT;
+        }
+        if(softLimitNegState&BITA4)
+        {
+            if(whellGrade==100)
+                whellGrade=10;
+            ALARM_GRP1|=ALM_GRP1_RSAREA;
+        }
+    //}
+}
+/*
+*******************************************************************************
+* function: alarmRecord
+* parameter: void
+* return   : void
+* description : record the new happed  alarm info
+*******************************************************************************
+*/
+void alarmRecord(void)
+{
+    U32 time=0;
+    U16 i,j;
+    U32 k;
+    U32 change;
+    U32 tempAlarm;
+    U8 changeflag=0;
+    //static BOOL prevInAlarm=FALSE;
+    inAlarm=ALARM_GRP0|ALARM_GRP1|ALARM_GRP2|ALARM_GRP3;
+    if(inAlarm)
+    {   //IF servo x and z alarm together its emg stop
+        //新板上的急停报警，通过plc实现
+        if(((SYSparam[69].val==0))&&(machLockFlag==0))
+        {
+            ALARM_GRP0|=ALM_GRP0_EMG_STOP;
+        }
+        //旧的急停报警，在旧系统上有用
+        if((ALARM_GRP0&ALM_GRP0_XSERVO)
+        &&(ALARM_GRP0&ALM_GRP0_ZSERVO))
+        {
+            ALARM_GRP0|=ALM_GRP0_EMG_STOP;
+        }
+        if(sysState!=SYS_STATE_ALARM)
+        {
+            sysState=SYS_STATE_ALARM;
+        }
+        //softReset();
+    }else if(SYS_STATE_ALARM==sysState)
+    {   //recover form alarm state
+        if((sysMode==SYS_MODE_EDIT)||
+            (sysMode==SYS_MODE_WHEEL)||
+            (sysMode==SYS_MODE_JOG))
+        {
+            sysState=sysMode+SYS_STATE_EDIT;
+            if(alarmDSPclr==2) //had clear alarm
+            {
+                sysState=SYS_STATE_MDI;
+                sysMode=SYS_MODE_MDI;
+                alarmDSPclr=0;
+            }
+        }else{
+            sysState=SYS_STATE_MDI;
+            sysMode=SYS_MODE_MDI;
+            if(gexecState>GEXEC_CMPLE)
+            {
+                gexecState=GEXEC_CMPLE;
+                if(alarmDSPclr==2) //had clear alarm
+                {
+                    alarmDSPclr=0;
+                }
+                //PLC_NCSTAT_AUTOSTOP;
+            }
+        }
+        //prevInAlarm=FALSE;
+    }else{
+        //SHM_INT_VALUE(SHM_ALARMINFO_ADDR1) = 0;
+    }
+    //time=Get_Time32BIT();
+    /*
+    if((sysMode==SYS_MODE_WHEEL)&&(prevInAlarm==TRUE))
+    {  //do not record to mem as in whell mode
+        goto RECORD_END;
+    }*/
+    for(i=0;i<ALARM_GROUP_MAX;i++)
+    {
+        tempAlarm=sysalarm[i];
+        if(alarmPrev[i]!=tempAlarm)
+        {
+            changeflag=1;
+            change=alarmPrev[i]^sysalarm[i];
+            for(j=0;j<32;j++)
+            {
+                k=1<<j;
+                if((change&k)&&(sysalarm[i]&k))
+                {
+                    alarmInfo[alarmPtr].alarm=i*32+j;
+                    alarmInfo[alarmPtr].time=time;
+                    alarming[alarmPtr]=1;
+                    //write to iic
+                    IIC_Write(IICADDR_ALARM+8*alarmPtr, &alarmInfo[alarmPtr], 8);
+                    alarmPtr=(alarmPtr+1)%ALARM_RECORD_MAX;
+                    alarmOffset=0;
+                    //SHM_INT_VALUE(SHM_ALARMINFO_ADDR1) = alarmInfo[alarmPtr].alarm;
+                }
+            }
+            alarmPrev[i]=tempAlarm;
+        }
+    }
+    //save the last alarm ptr
+
+    if(changeflag==1)
+        IIC_Write1(IICADDR_ALARMPTR,alarmPtr);
+    //check if we need to write the error info
+    /*if(errdataFlag==1)
+    {
+        if((ALARM_GRP0|(ALM_GRP0_XSERVO|ALM_GRP0_ZSERVO|ALM_GRP0_YSERVO|ALM_GRP0_SSERVO))
+        ||(ALARM_GRP1|ALM_GRP1_DSP_PULSE))
+        {
+            alarmWriteErrorInfo();
+        }
+    }*/
+        /*
+RECORD_END:
+    if((inAlarm)&&(prevInAlarm==FALSE))
+    {
+        prevInAlarm=TRUE;
+    }*/
+}
+/*
+*******************************************************************************
+* function: alarmClear
+* parameter: void
+* return   : void
+* description : try to clear all alarms as much as it can
+*******************************************************************************
+*/
+void alarmClear(void)
+{
+
+    U8 alarmDSPneedClear=0;
+    U8 refreinit=0;
+    //check servo
+    if((ALARM_GRP1&ALM_GRP1_DSP_PULSE)||(ALARM_GRP0&ALM_GRP0_SPIN_COM)
+		||(ALARM_GRP0&ALM_GRP0_XSERVO)||(ALARM_GRP0&ALM_GRP0_ZSERVO)
+		||(ALARM_GRP0&ALM_GRP0_YSERVO)||(ALARM_GRP0&ALM_GRP0_ORT_FAIL)
+		||(ALARM_GRP0&ALM_GRP0_EMG_STOP))
+        alarmDSPneedClear=1;
+    if((ALARM_GRP1&ALM_GRP1_DSP_PULSE)
+		||(ALARM_GRP0&ALM_GRP0_XSERVO)||(ALARM_GRP0&ALM_GRP0_ZSERVO))
+        refreinit=1;
+    ALARM_GRP0=0;
+    ALARM_GRP1=0;
+    ALARM_GRP2=0;
+    ALARM_GRP3=0;
+    memset(alarmPrev,0,ALARM_GROUP_MAX*4);
+    memset(alarming,0,ALARM_RECORD_MAX);//mask all alarmings;
+    //recheck all alarms
+    alarmHardLimitCheck();
+    alarmSoftLimitCheck();
+    //now recheck all alarms
+    alarmRecord();
+    if(alarmDSPneedClear==1)
+    {
+        alarmDSPclr=1;
+        sysState=SYS_STATE_MDI;
+        sysMode=SYS_MODE_MDI;
+    }
+    if((refreinit==1)&&(inAlarm==0))
+    {
+        if(((machLockFlag==1)||(SYSparam[93].val==1)))
+        {
+            refFounded=BITX|BITZ|(Yavailable?BITY:0);
+            //Reference.FindRefSign.X = 1;
+            //Reference.FindRefSign.Z = 1;
+            //if(Yavailable)Reference.FindRefSign.Y = 1;
+        }else if(SYSparam[93].val==2)
+        {
+            if((refFounded&(BITX|BITZ|(Yavailable?BITY:0)))==(BITX|BITZ|(Yavailable?BITY:0)))
+            {
+                //Reference.FindRefSign.X = 1;
+                //Reference.FindRefSign.Z = 1;
+                //if(Yavailable)Reference.FindRefSign.Y = 1;
+            }
+        }
+    }
+}
+
+/*
+*******************************************************************************
+* function: alarmClear
+* parameter: void
+* return   : void
+* description : try to clear all limit alarms, this only use in wheel jog mode
+*******************************************************************************
+*/
+void alarmLimitClear(void)
+{
+
+    U16 i,j;
+    U32 k;
+    U32 change;
+    U32 tempAlarm;
+    U8 changeflag=0;
+    //clear the limits
+    ALARM_GRP0&=~ALM_GRP0_LIMITS;
+    ALARM_GRP1&=~ALM_GRP1_RSAREA;
+    //memset(alarmPrev,0,ALARM_GROUP_MAX*4);
+    //memset(alarming,0,ALARM_RECORD_MAX);//mask all alarmings;
+    //recheck all alarms
+    alarmHardLimitCheck();
+    alarmSoftLimitCheck();
+    //now recheck all alarms
+    //alarmRecord();
+    tempAlarm=sysalarm[0]&ALM_GRP0_LIMITS;
+    if((alarmPrev[0]&ALM_GRP0_LIMITS)!=tempAlarm)
+    {
+        changeflag=1;
+        change=alarmPrev[0]^sysalarm[0];
+        for(j=0;j<32;j++)
+        {
+            k=1<<j;
+            if((change&k)&&(!(sysalarm[i]&k))) //cleared alarm
+            {
+                U16 l,ptr;
+
+                autoAlarmClrFlag=1;
+                for(l=0;l<ALARM_RECORD_MAX;l++)
+                {
+                    ptr=(ALARM_RECORD_MAX-(l-alarmPtr+1))%ALARM_RECORD_MAX;
+                    if((alarmInfo[ptr].alarm)==(i*32+j))
+                    {
+                        alarming[ptr]=0;
+                        break; //get out the loop
+                    }
+                }
+            }
+        }
+        alarmPrev[0]=sysalarm[0];
+        //alarmPrev[i]=tempAlarm;
+    }
+    if((alarmPrev[1]&ALM_GRP1_RSAREA)&&
+    ((softLimitNegState&BITA4)==0))
+    {
+        U16 l,ptr;
+        autoAlarmClrFlag=1;
+        for(l=0;l<ALARM_RECORD_MAX;l++)
+        {
+            if((alarmInfo[l].alarm)==54)
+            {
+                alarming[l]=0;
+                gexecState=GEXEC_RESET;
+                break; //get out the loop
+            }
+        }
+    }
+}
+
+/*
+*******************************************************************************
+* function: alarmWriteErrorInfo
+* parameter: void
+* return   : void
+* description : write error data that gen by dsp side
+*******************************************************************************
+*/
+
+void alarmWriteErrorInfo(void)
+{
+    //extern TerrInfomation ErrorInformation;
+    S32 SSDfile;
+
+    /*if(errdataFlag>1)
+        return;
+    //write error data to file
+
+    //write to file
+    SSDfile = yaffs_open("/LAST_ERROR.DAT",O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+    if(SSDfile<0)
+    {
+        DBMSG("SSD can't open file PARAMBAK.TXT\n");
+        showHint(FERR_OPEN_FAIL,SHOW_TIME_NORMAL);
+        return;
+    }
+    yaffs_write(SSDfile, &ErrorInformation, sizeof(TerrInfomation));
+    yaffs_close(SSDfile);
+    getSSDfileList();
+    errdataFlag=2;*/
+}

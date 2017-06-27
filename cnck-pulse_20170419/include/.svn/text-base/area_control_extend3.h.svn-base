@@ -1,0 +1,59 @@
+#ifndef DSP6713_AREA_CONTROL_EXTEND_H
+#define DSP6713_AREA_CONTROL_EXTEND_H
+
+#endif  // end of DSP6713_AREA_CONTROL_EXTEND_H definition
+/////////////////5次S曲线//////////////////////////////////////////////////////////////////
+extern INT16U   NCArea3_SCurvePreCal();
+extern INT16U   NCArea3_SCurvePreCalStat1();
+extern INT16U   NCArea3_SCurvePreCalStat2();
+extern INT16U   NCArea3_SCurvePreCalStat3();
+extern INT16U	NCArea3_SCurveRun();
+extern INT16U	NCArea3_SCurveRunStat1();
+extern INT16U	NCArea3_SCurveRunStat2();
+extern INT16U	NCArea3_SCurveRunStat3();
+/////////////////////////////////////////////////////////////////////////////////////////////
+extern FLOAT64  NCArea3_CodeAngle(  VECTOR a, VECTOR b  );
+extern FLOAT64  NCArea3_CodeAngle2( INT32S a, INT32S b );
+extern FLOAT64  NCArea3_CodeAngle3( INT32S a, INT32S b );
+extern INT16U   NCArea3_CheckArea( );
+extern INT16U   NCArea3_DealWithTale2( );
+extern INT16U   NCArea3_DealWithTale3( );
+extern VECTOR   NCArea3_CalArcCodeVector( tsGCODE *NowCode , INT8U kind );
+
+extern INT16U   NCArea3_CalSs2();
+extern INT16U   NCArea3_FirstInflexion2();
+extern FLOAT64  NCArea3_CalVsByS( FLOAT32 V_M );
+extern FLOAT64  NCArea3_CalSpecialCodeAcc( INT32U Codecn );
+
+extern FLOAT64  NCArea3_HyperbolaCalVsByS(FLOAT64 vm , FLOAT64 ve , FLOAT64 S );
+extern FLOAT64  NCArea3_HyperbolaCalVByS( FLOAT64 S );
+extern FLOAT64  NCArea3_HyperbolaSpecialCalVByS( FLOAT64 S );
+
+
+extern FLOAT64  NCArea3_QuinticCalVsByS( FLOAT64 vm , FLOAT64 ve , FLOAT64 S );
+extern FLOAT64  NCArea3_QuinticCalVByS( FLOAT64 S );
+extern FLOAT64  NCArea3_QuinticSpecialCalVByS( FLOAT64 S );	
+extern FLOAT64  NCArea3_QuinticCalTByVInSde( FLOAT64 Vm , FLOAT64 V );
+
+extern FLOAT64  NCArea3_SoftExponentCalVsByS(FLOAT64 vm , FLOAT64 ve , FLOAT64 S );
+extern FLOAT64  NCArea3_SoftExponentCalVByS( FLOAT64 S );
+extern FLOAT64  NCArea3_SoftExponentSpecialCalVByS( FLOAT64 S );
+extern FLOAT64  NCArea3_SoftExponentCalTByVInSde( FLOAT64 Vm , FLOAT64 V );
+
+extern FLOAT64  NCArea3_HardExponentCalVByS( FLOAT64 S );
+
+extern FLOAT64  NCArea3_LinerCalVsByS(FLOAT64 vm , FLOAT64 ve , FLOAT64 S );
+extern FLOAT64  NCArea3_LinerCalVByS( FLOAT64 S );
+extern FLOAT64  NCArea3_LinerSpecialCalVByS( FLOAT64 S );	
+//////////////////////////////////////////////////////////////////////////////////////
+
+extern INT16U   NCArea3_VectorInterpolate();
+extern INT16U   NCArea3_VectorInterpolatePreCal();
+extern INT16U   NCArea3_CutGcodeInterpolate();
+
+//////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+

@@ -1,0 +1,356 @@
+/*
+ * spi.c
+ *
+ *  Created on: 2013-9-26
+ *      Author: vinge(vinge.ven@gmail.com)
+ */
+
+#include "../include/spi.h"
+#include <xdc/runtime/Log.h>
+#include <xdc/std.h>
+/* define registers */
+#define CM_ALLOW_SPI          0X48181590
+
+#define MCSPI_BASE_ADDRESS   0X481A2000
+//SPI2 SUPORT REG  0X481A3000
+
+#define MCSPI_HW_IPVESION   (MCSPI_BASE_ADDRESS+0X0)
+#define MCSPI_HW_INFO       (MCSPI_BASE_ADDRESS+0X4)
+#define MCSPI_IP_SYSCONFIG  (MCSPI_BASE_ADDRESS+0X10)
+
+#define SPI_REVESION     (MCSPI_BASE_ADDRESS+0X100)
+#define SPI_SYSCONFIG    (MCSPI_BASE_ADDRESS+0X110)
+#define SPI_SYSSTATUS    (MCSPI_BASE_ADDRESS+0X114)
+#define SPI_IRQSTATUS	 (MCSPI_BASE_ADDRESS+0X118)
+#define SPI_IRQENABLE    (MCSPI_BASE_ADDRESS+0X11C) 
+#define SPI_WAKEUPENABLE (MCSPI_BASE_ADDRESS+0X120)
+#define SPI_SYST 		 (MCSPI_BASE_ADDRESS+0X124)
+#define SPI_MODULCTRL    (MCSPI_BASE_ADDRESS+0X128)
+
+#define SPI_CH1CONF 	 (MCSPI_BASE_ADDRESS+0X140)
+#define SPI_CH1STAT 	 (MCSPI_BASE_ADDRESS+0X144)
+#define SPI_CH1CTRL 	 (MCSPI_BASE_ADDRESS+0X148)
+#define SPI_TX1 		 (MCSPI_BASE_ADDRESS+0X14C)
+#define SPI_RX1 		 (MCSPI_BASE_ADDRESS+0X150)
+
+#define SPI_XFERLEVEL 	 (MCSPI_BASE_ADDRESS+0X17C)
+#define SPI_DAFTX  		 (MCSPI_BASE_ADDRESS+0X180)
+#define SPI_DAFRX 		 (MCSPI_BASE_ADDRESS+0X1A0)
+
+#define READ_REG(reg)          (*(unsigned int*)reg)
+#define WRITE_REG(reg,value)  *(unsigned int*)reg=(value)
+
+
+/* Flash opcodes. */
+#define	OPCODE_WREN		0x06	/* Write enable */
+#define	OPCODE_RDSR		0x05	/* Read status register */
+#define	OPCODE_WRSR		0x01	/* Write status register 1 byte */
+#define	OPCODE_NORM_READ	0x03	/* Read data bytes (low frequency) */
+#define	OPCODE_FAST_READ	0x0b	/* Read data bytes (high frequency) */
+#define	OPCODE_WRITE		0x02	/* Page program (up to 256 bytes) */
+//#define	OPCODE_BE_4K		0x20	/* Erase 4KiB block */
+//#define	OPCODE_BE_32K		0x52	/* Erase 32KiB block */
+//#define	OPCODE_CHIP_ERASE	0xc7	/* Erase whole flash chip */
+//#define	OPCODE_SE		0xd8	/* Sector erase (usually 64KiB) */
+#define	OPCODE_RDID		0x9f	/* Read JEDEC ID */
+#define OPCODE_SNR      0XC3   /* Read S/N */
+
+#define MAX_WAIT_LOP  1000000
+#define FORCE_CHANNEL1_CS(X) WRITE_REG(SPI_CH1CONF,(READ_REG(SPI_CH1CONF)&(~(1<<20)))|(X<<20))
+
+#define START_CHANNEL1  WRITE_REG(SPI_CH1CTRL,READ_REG(SPI_CH1CTRL)|1)
+#define STOP_CHANEL1    WRITE_REG(SPI_CH1CTRL,READ_REG(SPI_CH1CTRL)&0XFFFFFFFE)
+#define RX_IS_FULL      (READ_REG(SPI_CH1STAT)&(1<<6))
+#define RX_IS_EMPTY     (READ_REG(SPI_CH1STAT)&(1<<5))
+#define TX_IS_FULL      (READ_REG(SPI_CH1STAT)&(1<<4))
+#define TX_IS_EMPTY     (READ_REG(SPI_CH1STAT)&(1<<3))
+#define TRANS_ENDED    (READ_REG(SPI_CH1STAT)&(1<<2))
+#define TXS_IS_EMPTY     (READ_REG(SPI_CH1STAT)&(1<<1))
+#define RXS_IS_FULL     (READ_REG(SPI_CH1STAT)&1)
+
+//if ok return 1 ,else return 0
+inline INT32S waitTransEnd()
+{
+	INT32U i,j;
+	for(i=0;i<MAX_WAIT_LOP;i++)
+	{
+		j=READ_REG(SPI_CH1STAT);
+		if((j&0xc)==0xc) return 1; //EOT=1 nad txs=0
+		//if(TRANS_ENDED) return 1;
+	}
+	return 0;
+}
+inline INT32S emptyRX()
+{
+	INT32S i,j;
+	for(i=0;i<64;i++)
+	{
+		j=READ_REG(SPI_RX1);
+		if(!RXS_IS_FULL)
+			return 1;
+	}
+	return 0;
+}
+
+INT32S spi_init()
+{
+	//INT32U regval;
+	INT8U FM25V10ID[10];
+	//Log_info0("spi configuring\n");
+	WRITE_REG(CM_ALLOW_SPI,0X2); //open thee clock source to spi
+	//regval=READ_REG(MCSPI_HW_IPVESION);
+	//Log_info1("Configuring spi IP revision = 0x%08x\n", regval);
+	//regval=READ_REG(MCSPI_HW_INFO);
+	//Log_info1("Configuring spi INFO = 0x%08x\n", regval);
+	WRITE_REG(MCSPI_IP_SYSCONFIG,(1<<2|1));
+	//regval=READ_REG(MCSPI_IP_SYSCONFIG);
+	//Log_info1("Configuring spi IP config = 0x%08x\n", regval);
+	//regval=READ_REG(SPI_REVESION);
+	//Log_info1("Configuring spi revision = 0x%08x\n", regval);
+
+	WRITE_REG(SPI_SYSCONFIG, (3<<8|1<<3|1<<2|1<<1|0));
+	//regval=READ_REG(SPI_SYSCONFIG);
+	//Log_info1("Configuring spi sysconfig = 0x%08x\n", regval);
+	WRITE_REG(SPI_WAKEUPENABLE, 1);
+	WRITE_REG(SPI_MODULCTRL, (0<<8|0<<7|0<<4|0<<3|0<<2|0<<1|1<<0));
+	//regval=READ_REG(SPI_MODULCTRL);
+	//Log_info1("Configuring spi modlule contrl = 0x%08x\n", regval);
+
+	START_CHANNEL1;
+	WRITE_REG(SPI_CH1CONF, (0<<29|1<<28|1<<27|1<<25|1<<16|7<<7|1<<6|1<<2));  //d0 for miso d1 fo mosi 64 div clk
+	//regval=READ_REG(SPI_CH1CONF);
+	//Log_info1("Configuring spi modlule contrl = 0x%08x\n", regval);
+
+	WRITE_REG(SPI_CH1CTRL,0);
+	WRITE_REG(SPI_XFERLEVEL,2<<8|1);
+	FM25V10ID[6]=0;
+	FM25V10ID[7]=0;
+	FM25V10ID[8]=0;
+	if(spi_readID(FM25V10ID)==0) goto ERROR;// fail to read id
+	if((FM25V10ID[6]!=0xc2)||(FM25V10ID[7]!=0x24)||(FM25V10ID[8]!=0x00))
+		goto ERROR;
+	//spi_writeEnable();
+	return 1;
+ERROR:
+	Log_info3("FM25V10 read id fail ID=0x%02x %02x %02x",FM25V10ID[6], FM25V10ID[7], FM25V10ID[8]);
+	return 0;
+}
+/*read status register*/
+INT32S spi_readStatuReg(INT8U *value)
+{
+	INT32U i;
+	WRITE_REG(SPI_XFERLEVEL,2<<16);
+	FORCE_CHANNEL1_CS(1); //case cs low
+	START_CHANNEL1;
+	WRITE_REG( SPI_TX1,OPCODE_RDSR );
+	WRITE_REG( SPI_TX1,0);
+	if(waitTransEnd()==0) goto ERROR;
+	i=READ_REG(SPI_RX1); //ignore the first cmd byte's return
+	*value=READ_REG(SPI_RX1);
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	return 1;
+ERROR:
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	return 0;
+}
+
+INT32S spi_readID(INT8U *value)
+{
+	INT32U i;
+	//if(emptyRX()==0)goto ERROR;
+	WRITE_REG(SPI_XFERLEVEL,10<<16);
+	FORCE_CHANNEL1_CS(1); //case cs low
+	START_CHANNEL1;
+	WRITE_REG( SPI_TX1,OPCODE_RDID );
+	for(i=0;i<9;i++)
+	{
+		WRITE_REG( SPI_TX1,0); //9 dumy byte to receive data
+	}
+	if(waitTransEnd()==0) goto ERROR;
+	i =READ_REG(SPI_RX1); //ignore the first cmd byte's return
+	for(i=0;i<9;i++)
+	{
+		*value++=READ_REG(SPI_RX1);
+	}
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	return 1;
+ERROR:
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	Log_info0("spi time out error read ID \n");
+	return 0;
+}
+INT32S spi_writeStatuReg(INT8U *value)
+{
+	WRITE_REG(SPI_XFERLEVEL,2<<16);
+	FORCE_CHANNEL1_CS(1); //case cs low
+	START_CHANNEL1;
+	WRITE_REG( SPI_TX1,OPCODE_RDID );
+	WRITE_REG( SPI_TX1,*value );
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	return 1;
+}
+INT32S spi_writeEnable()
+{
+	WRITE_REG(SPI_XFERLEVEL,1<<16);
+	FORCE_CHANNEL1_CS(1); //case cs low
+	START_CHANNEL1;
+	WRITE_REG( SPI_TX1,OPCODE_WREN );
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	return 1;
+}
+
+INT32S spi_readArray(INT32U address,INT8U *value,INT32U count)
+{
+	INT32S i,j;
+	if((value==NULL)||(count>28)) return 0;
+	address=address&0x1ffff; //ignore not used address bit
+	//if(emptyRX()==0)goto ERROR;
+	WRITE_REG(SPI_XFERLEVEL,(count+4)<<16);
+	FORCE_CHANNEL1_CS(1); //case cs low
+	START_CHANNEL1;
+	WRITE_REG( SPI_TX1,OPCODE_NORM_READ );
+	WRITE_REG( SPI_TX1,(address>>16)&0xFF );
+	WRITE_REG( SPI_TX1,(address>>8)&0xFF );
+	WRITE_REG( SPI_TX1,(address)&0xFF );
+	for(i=0;i<count;i++)
+	{
+		//if(waitTransEnd()==0)goto ERROR;
+		// wait for transmit may be need if SPI clock is slow
+		WRITE_REG( SPI_TX1,0);
+	}
+	if(waitTransEnd()==0)goto ERROR;
+	//waitTransEnd();
+	//read rx data
+	for(i=0;i<4;i++)
+		j=READ_REG(SPI_RX1);
+	for(i=0;i<count;i++)
+		*value++=READ_REG(SPI_RX1);
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	return 1;
+ERROR:
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	Log_info0("spi time out error read \n");
+	return 0;
+}
+
+INT8U spi_readU8(INT32U address)
+{
+	INT8U value;
+	spi_readArray(address,&value,1);
+	return value;
+}
+INT16U spi_readU16(INT32U address)
+{
+	INT16U value;
+	spi_readArray(address,(INT8U*)&value,2);
+	return value;
+}
+INT32U spi_readU32(INT32U address)
+{
+	INT32U value;
+	spi_readArray(address,(INT8U*)&value,4);
+	return value;
+}
+
+INT32S spi_read(INT32U address,INT8U *value,INT32U count)
+{
+	if(count<28){
+		return spi_readArray(address,value,count);
+	}else{
+		INT32S i=0;
+		INT32S ct=24;
+		do{
+			if(spi_readArray(address+i,value+i,ct)==0)
+				return 0; //error
+			i=i+ct;
+			if((i+ct)>=count){
+				ct=count-i;
+			}
+		}while(ct>0);
+	}
+	return 1;
+}
+
+INT32S spi_writeArray(INT32U address,INT8U *value,INT32U count)
+{
+	INT32U i;
+	if((value==NULL)||(count>28)) return 0;
+	address=address&0x1ffff; //ignore not used address bit
+	spi_writeEnable();
+
+	WRITE_REG(SPI_XFERLEVEL,(count+4)<<16);
+	FORCE_CHANNEL1_CS(1); //case cs low
+	START_CHANNEL1;
+	WRITE_REG( SPI_TX1,OPCODE_WRITE );
+	WRITE_REG( SPI_TX1,(address>>16)&0xFF );
+	WRITE_REG( SPI_TX1,(address>>8)&0xFF );
+	WRITE_REG( SPI_TX1,(address)&0xFF );
+	for(i=0;i<count;i++)
+	{
+		WRITE_REG( SPI_TX1, *value++ );
+	}
+	if(waitTransEnd()==0)goto ERROR;
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	return 1;
+ERROR:
+	STOP_CHANEL1;
+	FORCE_CHANNEL1_CS(0);
+	Log_info0("spi time out error write \n");
+	return 0;
+}
+INT32S spi_writeU8(INT32U address,INT8U value)
+{
+	return spi_writeArray(address,&value,1);
+}
+INT32S spi_writeU16(INT32U address,INT16U value)
+{
+	return spi_writeArray(address,(INT8U*)&value,2);
+}
+INT32S spi_writeU32(INT32U address, INT32U value)
+{
+	return spi_writeArray(address,(INT8U*)&value,4);
+}
+
+INT32S spi_write(INT32U address,INT8U *value,INT32U count)
+{
+	if(count<28){
+		return spi_writeArray(address,value,count);
+	}else{
+		INT32S i=0;
+		INT32S ct=24;
+		do{
+			if(spi_writeArray(address+i,value+i,ct)==0)
+				return 0; //error
+			i=i+ct;
+			if((i+ct)>=count){
+				ct=count-i;
+			}
+		}while(ct>0);
+	}
+	return 1;
+}
+////////////////////////////////////////////////
+void testspi()
+{
+    char temp[256];
+    char temp2[256];
+    int i;
+    for(i=0;i<256;i++)
+    {
+        temp[i]=i;
+        temp2[i]=0;
+    }
+    IIC_Write(10,temp,256);
+    IIC_Read(10,temp2,256);
+}
+
+

@@ -1,0 +1,12 @@
+#ifndef _DSP6713_AREA_CODE_REC_H
+#define _DSP6713_AREA_CODE_REC_H
+
+extern void STD_Deal_DeltaPoint(tsGCODE  *psNowCode);
+extern void STD_Deal_ArcStotal(tsGCODE  *psNowCode);
+extern void STD_Deal_Vveer(tsGCODE *NowCode);
+extern void STD_Rec_All(tsCODE_SUB * psCode);
+extern void STD_Add_Code(void);
+extern void SPC_Deal_Line(tsGCODE * psNowCode);
+extern void SPC_JudgeSoftLimit(tsGCODE *psNowCode);
+
+#endif 

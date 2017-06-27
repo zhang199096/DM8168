@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<!--  This file conforms to the DTD xdc/bld/build.dtd -->
+<package name="xconfig_Dsp" version="" producerId="undefined">
+    <units>
+    </units>
+    <sources>
+        <srcFile name="package/cfg/Dsp_pe674.c"/>
+    </sources>
+    <configscripts>
+        <srcFile name="D:/interactive2/work_program/clone_control/others/cnck-pulse/cnck-pulse/Dsp.cfg"/>
+    </configscripts>
+    <makefiles>
+        <srcFile name="package.mak" src="package.bld"/>
+        <srcFile name="package/package.xdc.dep" src="package.xdc"/>
+        <srcFile name="package/cfg/Dsp_pe674.mak" src="package.bld"/>
+        <srcFile name="package/cfg/Dsp_pe674.oe674.dep" src="package/cfg/Dsp_pe674.c"/>
+        <srcFile name="package/cfg/Dsp_pe674.dep" src="package/cfg/Dsp_pe674.cfg"/>
+        <srcFile name="package/cfg/Dsp.xe674.mak" src="package.bld"/>
+        <srcFile name="package/rel/xconfig_Dsp.tar.dep" src="package/rel/xconfig_Dsp.xdc.inc"/>
+    </makefiles>
+    <targets>
+        <target name="ti.targets.elf.C674"
+            version="ti.targets.elf.C674{1,0,7.4,4"
+            platform="ti.platforms.evmDA830"
+            isa="674"
+            suffix="e674"
+            rootDir="E:/ti/ccsv5/tools/compiler/c6000_7.4.4"
+            os="undefined"
+            rts="ti.targets.rts6000">
+            <model endian="little"
+                codeModel="undefined"
+                dataModel="undefined"/>
+        </target>
+    </targets>
+    <libraries>
+    </libraries>
+    <configurations>
+    <configuration name="Dsp"
+        pname="Dsp.pe674"
+        target="ti.targets.elf.C674"
+        platform="ti.platforms.evmTI816X"
+        profile="release"
+        isPartial="false"
+        xCfgScript="package/cfg/Dsp_pe674.cfg"
+        xCfgPrefix="package/cfg/Dsp_pe674"
+        cfgScript="D:/interactive2/work_program/clone_control/others/cnck-pulse/cnck-pulse/Dsp.cfg"
+        cfgArgs="null"
+        />
+    </configurations>
+    <executables>
+    <executable name="Dsp"
+        pname="Dsp.xe674"
+        target="ti.targets.elf.C674"
+        platform="ti.platforms.evmTI816X"
+        profile="release"
+        xCfgScript="package/cfg/Dsp_pe674.cfg"
+        xCfgPrefix="package/cfg/Dsp_pe674"
+        cfgScript="D:/interactive2/work_program/clone_control/others/cnck-pulse/cnck-pulse/Dsp.cfg"
+        cfgArgs="null"
+        />
+    </executables>
+    <tests>
+    <test exeName="Dsp.xe674"
+        args=""
+        groupName="Dsp.xe674"
+        refOutput="undefined"
+        refExitCode="0"
+        execArgs=""
+        />
+    </tests>
+    <releases relDir="package/rel/">
+    <release name="xconfig_Dsp"
+        pname="xconfig_Dsp.tar"
+        label="default"
+    >
+        <file name="package/package.bld.xml"/>
+        <file name="package/package.ext.xml"/>
+        <file name="package/package.rel.dot"/>
+        <file name="package/build.cfg"/>
+        <file name="package/package.xdc.inc"/>
+    </release>
+    </releases>
+    <repositories>
+    </repositories>
+</package>

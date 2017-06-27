@@ -1,0 +1,244 @@
+/*******************************************************************
+* FILE : LKBUS.h
+* DESCRIPTION: LKBUS header file. Data struct of lokshun bus is define here  
+* AUTHOR : vinge
+* DATA:    20080716
+* VERSION: 20080716 V 0.0 
+*********************************************************************
+*/
+#ifndef __LKBUS_H__
+#define __LKBUS_H__
+
+
+
+/***********************************************************************
+* dsp an arm bus data struct
+*/
+//define commands
+#define LKB_CMD_DSP_ALARM         (0X06)  //command code of IO package
+#define LKB_CMD_DSP_COMDATA    (0XB0)
+#define LKB_CMD_DSP_SYSDATA     (0XB1)
+#define LKB_CMD_DSP_COMPDATA  (0XB2)
+#define LKB_CMD_DSP_BATCODE    (0XB3)
+#define LKB_CMD_DSP_JOGCODE    (0XB4)
+#define LKB_CMD_DSP_DNG      (0XB5)
+#define LKB_CMD_DSP_MOSDNG      (0XB6)
+//#define LKB_CMD_DSP_JOG  (0XB4)
+
+//define address
+#define LKB_ADDR_DSP0     (0xB0)  //address of DSP0  package
+#define LKB_ADDR_DSP1     (0xB1)  //address of DSP1  package
+
+
+//ARM DSP RALARM PACKAGE
+//define package len
+#define LKB_LEN_ARM2DSP_ALARM       (12)
+#define LKB_LEN_ARM2DSP_COMDATA  (76)
+#define LKB_LEN_ARM2DSP_SYSDATA   (609)
+#define LKB_LEN_ARM2DSP_BATCODE   (0)
+#define LKB_LEN_ARM2DSP_JOGCODE   (68)
+#define LKB_LEN_ARM2DSP_COMPENT   (0)
+
+
+#define LKB_LEN_DSP2ARM_ALARM       (92)    //dsp to arm package is static 16 byte len
+#define LKB_LEN_DSP2ARM_COMDATA  (68)
+#define LKB_LEN_DSP2ARM_SYSDATA   (68)
+#define LKB_LEN_DSP2ARM_BATCODE   (12)
+#define LKB_LEN_DSP2ARM_JOGCODE   (0X37)
+#define LKB_LEN_DSP2ARM_DNG           (12)
+typedef  struct
+{
+    U8  head;
+    U16 len;
+    U8  address;
+    U8  type;
+    U8  command;
+    U8  subcommand;
+    
+    U16 seq;
+    U16 crc;
+    U8 tail;
+} Tarm2dspAlarmPkg,*Parm2dspAlarmPkg;  //arm 2 dsp alarm package
+
+typedef  struct
+{
+      U16  servo_50;
+      U16  servo_51;
+      U16  servo_52;
+      U16  servo_53;    
+      U16  servo_54;
+      U16  servo_55;  
+      U16  spindle_70;
+      U16  alramWrod[13];
+      U8    servo_50b;
+      U8    servo_51b;
+      U8    servo_52b;
+      U8    servo_53b;    
+      U8    servo_54b;
+      U8    servo_55b;  
+      U8    alramByte[13];
+      U8    alarmBit[20];
+} Tdsp2armAlarmInfo, *Pdsp2armAlarmInfo;
+
+typedef  struct
+{
+    U8  head;
+    U16 len;
+    U8  address;
+    U8  type;
+    U8  command;
+    U8  subcommand;
+    Tdsp2armAlarmInfo dsp2armAlarmInfo;
+    
+    U16 seq;
+    U16 crc;
+    U8 tail;
+}Tdsp2armAlarmPkg,*Pdsp2armAlarmPkg;    //and dsp to arm alarm pkg info
+
+#define SERVOX_ALARM(ALARMINFO)              (ALARMINFO.alarmBit[0]&0x00000001)  
+#define SERVOY_ALARM(ALARMINFO)              (ALARMINFO.alarmBit[0]&0x00000002)  
+#define SERVOZ_ALARM(ALARMINFO)              (ALARMINFO.alarmBit[0]&0x00000004)  
+#define SERVOA4_ALARM(ALARMINFO)            (ALARMINFO.alarmBit[0]&0x00000008)  
+#define SERVOA5_ALARM(ALARMINFO)            (ALARMINFO.alarmBit[0]&0x00000010)  
+#define SERVOS_ALARM(ALARMINFO)              (ALARMINFO.alarmBit[0]&0x00000020)  
+
+#define ENCODERX_ALARM(ALARMINFO)          (ALARMINFO.alarmBit[1]&0x00000001)  
+#define ENCODERY_ALARM(ALARMINFO)          (ALARMINFO.alarmBit[1]&0x00000002)  
+#define ENCODERZ_ALARM(ALARMINFO)          (ALARMINFO.alarmBit[1]&0x00000004)  
+#define ENCODERA4_ALARM(ALARMINFO)        (ALARMINFO.alarmBit[1]&0x00000008)  
+#define ENCODERA5_ALARM(ALARMINFO)        (ALARMINFO.alarmBit[1]&0x00000010)  
+#define ENCODERS_ALARM(ALARMINFO)          (ALARMINFO.alarmBit[1]&0x00000020) 
+
+#define SSHIFT_ALARM(ALARMINFO)                  (ALARMINFO.alarmBit[2]&0x00000001)  
+#define TOOAIM_LIMIT_ALARM(ALARMINFO)      (ALARMINFO.alarmBit[2]&0x00000002)  
+#define TOOAIM_SPEED_ALARM(ALARMINFO)     (ALARMINFO.alarmBit[2]&0x00000004)  
+#define DSP_INTERRAM_ALARM(ALARMINFO)     (ALARMINFO.alarmBit[2]&0x00000008)  
+#define DSP_SDRAM_ALARM(ALARMINFO)           (ALARMINFO.alarmBit[2]&0x00000010)  
+#define DSP_COMPDATA_ALARM(ALARMINFO)     (ALARMINFO.alarmBit[2]&0x00000020) 
+#define A4A5_ERRORLOCK_ALARM(ALARMINFO)  (ALARMINFO.alarmBit[2]&0x00000040) 
+#define A4A5_ERRORLOSE_ALARM(ALARMINFO)  (ALARMINFO.alarmBit[2]&0x00000080) 
+
+//ARM DSP COMDATA PACKAGE
+//define package len
+
+typedef  struct
+{
+    U32 xcoordOrig;
+    U32 ycoordOrig;
+    U32 zcoordOrig;
+    U32 a4coordOrig;
+    U32 a5coordOrig;
+    U32 a6coordOrig;
+    U32 xcoordShift;
+    U32 ycoordShift;
+    U32 zcoordShift;
+    U32 a4coordShift;
+    U32 a5coordShift;
+    U32 a6coordShift;
+    U32 safez;
+    U32 compentcoordz;
+    U8   g0f;
+    U8   g1f;
+    U8   s;
+    U8   dspcmd;
+    U8   infoBit[20];    
+} Tarm2dspCDInfo,*Parm2dspCDInfo;
+
+typedef  struct
+{
+    U8  head;
+    U16 len;
+    U8  address;
+    U8  type;
+    U8  command;
+    //U8  subcommand;
+    Tarm2dspCDInfo  arm2dspCDInfo ;
+    U16 seq;
+    U16 crc;
+    U8 tail;
+} Tarm2dspCDPkg,*Parm2dspCDPkg;  //arm 2 dsp alarm package
+
+#define SET_CD_INFOBIT(CDINFO,BYTEPOS,BITPOS) \
+    (CDINFO.infoBit[BYTEPOS]|(1<<BITPOS))
+    
+#define CD_RUNSTDNCINIT(INFO)  SET_CD_INFOBIT(INFO,0,0)
+#define CD_ENABLESERVO(INFO)    SET_CD_INFOBIT(INFO,0,1)
+#define CD_GETPOSSIGN(INFO)      SET_CD_INFOBIT(INFO,0,2)
+#define CD_RUNSPCNCINIT(INFO)  SET_CD_INFOBIT(INFO,0,3)
+#define CD_INTOSIG(INFO)             SET_CD_INFOBIT(INFO,0,4)
+#define CD_MODE5(INFO)               SET_CD_INFOBIT(INFO,0,5)
+#define CD_MODE6(INFO)               SET_CD_INFOBIT(INFO,0,6)
+#define CD_SIGNALSIGN(INFO)       SET_CD_INFOBIT(INFO,0,7)
+
+#define CD_SETSERVO(INFO)          SET_CD_INFOBIT(INFO,1,0) 
+#define CD_B0CLRALARM(INFO)      SET_CD_INFOBIT(INFO,1,1)     
+#define CD_B1CLRALARM(INFO)      SET_CD_INFOBIT(INFO,1,2) 
+
+#define CD_SEARCHXREF(INFO)       SET_CD_INFOBIT(INFO,2,0) 
+#define CD_SEARCHYREF(INFO)       SET_CD_INFOBIT(INFO,2,1) 
+#define CD_SEARCHZREF(INFO)       SET_CD_INFOBIT(INFO,2,2) 
+#define CD_SEARCHA4REF(INFO)     SET_CD_INFOBIT(INFO,2,3) 
+#define CD_SEARCHA5REF(INFO)     SET_CD_INFOBIT(INFO,2,4) 
+#define CD_SEARCHA6REF(INFO)     SET_CD_INFOBIT(INFO,2,5) 
+#define CD_SEARCHUREF(INFO)       SET_CD_INFOBIT(INFO,2,6) 
+#define CD_SEARCHBEGIN(INFO)     SET_CD_INFOBIT(INFO,2,7) 
+
+#define CD_SPINC(INFO)                  SET_CD_INFOBIT(INFO,3,0) 
+#define CD_SPINCC(INFO)                SET_CD_INFOBIT(INFO,3,1) 
+#define CD_REPOS(INFO)                 SET_CD_INFOBIT(INFO,3,2) 
+#define CD_PROGSIM(INFO)             SET_CD_INFOBIT(INFO,3,3) 
+#define CD_TOOAIM(INFO)               SET_CD_INFOBIT(INFO,3,4) 
+#define CD_SCRWBACK(INFO)          SET_CD_INFOBIT(INFO,3,5)
+#define CD_INBP(INFO)                    SET_CD_INFOBIT(INFO,3,6)
+#define CD_INTOOLCHANGE(INFO)   SET_CD_INFOBIT(INFO,3,7)
+
+#define CD_SPINDLE_SPEED(INFO, VAL)   {*((U16*)INFO.infoBit[4])=VAL;}
+#define CD_A4BREAKLOCK(INFO)      SET_CD_INFOBIT(INFO,6,0)
+#define CD_A5BREAKLOCK(INFO)      SET_CD_INFOBIT(INFO,6,1)
+
+
+
+
+#define JG_SPOS(INFO)                (INFO.info[0]|0x01)
+#define JG_SCLRSHIFT(INFO)       (INFO.info[0]|0x02)
+#define JG_A4ROTAL(INFO)          (INFO.info[0]|0x04)
+#define JG_A5ROTAL(INFO)          (INFO.info[0]|0x08)
+
+
+
+
+typedef  struct
+{
+    U8  head;
+    U16 len;
+    U8  address;
+    U8  type;
+    U8  command;
+    U8  subcommand;
+  
+    U16 seq;
+    U16 crc;
+    U8 tail;
+} Tarm2dspDNGPkg,*Parm2dspDNGPkg;//arm 2 dsp  DNG  package
+
+
+typedef  struct
+{
+    U8  head;
+    U16 len;
+    U8  address;
+    U8  type;
+    U8  command;
+    U8  subcommand;
+  
+    U16 seq;
+    U16 crc;
+    U8 tail;
+} Tdsp2armDNGPkg,*Pdsp2armDNGPkg;//arm 2 dsp  DNG  package
+//-------------------------------------
+
+
+//-------------------------------------------------------
+U16 halfRvertCRC (U8 *ptr,U16 len);
+#define CALCRC  halfRvertCRC
+#endif
