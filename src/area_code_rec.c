@@ -434,6 +434,7 @@ void STD_Rec_G106(tsCODE_G00 *psCodeG00,GCODE  *GCodeBuffer)
 	GCodeBuffer->StartPoint.Axis15 = psCodeG00->Axis15;
 	GCodeBuffer->StartPoint.Axis16 = psCodeG00->Axis16;
 	GCodeBuffer->StartPoint.Axis17 = psCodeG00->Axis17; //add by zzz
+	GCodeBuffer->StartPoint.Axis18 = psCodeG00->Axis18;//add by zzz
 }
 void STD_Rec_G107(GCODE  *GCodeBuffer)	
 {

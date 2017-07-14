@@ -2187,6 +2187,7 @@ void Write_DA_CONVERT_CONTROL_PC_CAL(Uint8 Cal_Modle_Sel)
 	static int DA_ConvertSatrtValue = 50;
 	DA_ConvertSatrtValue = DA_AD5315_G106.Voltage_Start;
 	static int DA_ConvertCntTotal = 2000;
+	DA_ConvertCntTotal = DA_AD5315_G106.GetDataCount;
 	static int DA_MirrorCycleTotal = 10;
 	DA_MirrorCycleTotal = DA_AD5315_G106.CycleNum;
 	int 		DA_ConvertNowValue;
@@ -2237,6 +2238,7 @@ void Write_DA_CONVERT_CONTROL_PC_CAL(Uint8 Cal_Modle_Sel)
 
 		if(Cal_Modle_Sel == 0)
 		{
+			psDSPPacketOut->Reserved1 = 0xBB;
 			if(DA_CONVERTCnt < divdp(DA_ConvertCntTotal,2))
 			{
 				K_slope = divdp(amplitude*4,DA_ConvertCntTotal);
@@ -2257,6 +2259,7 @@ void Write_DA_CONVERT_CONTROL_PC_CAL(Uint8 Cal_Modle_Sel)
 		}
 		else if(Cal_Modle_Sel == 1)
 		{
+			psDSPPacketOut->Reserved1 = 0xCC;
 			Rad_angle = divdp((2*PI),DA_ConvertCntTotal) * DA_CONVERTCnt;
 			
 			DA_ConvertNowValue = sindp(Rad_angle) * amplitude + (DA_ConvertSatrtValue + amplitude);
@@ -2265,6 +2268,7 @@ void Write_DA_CONVERT_CONTROL_PC_CAL(Uint8 Cal_Modle_Sel)
 		}
 		else if(Cal_Modle_Sel == 2)
 		{
+			psDSPPacketOut->Reserved1 = 0xDD;
 			Rad_angle = divdp((2*PI),DA_ConvertCntTotal) * DA_CONVERTCnt;
 			
 			DA_ConvertNowValue = cosdp(Rad_angle) * amplitude + (DA_ConvertSatrtValue + amplitude);
@@ -2273,11 +2277,13 @@ void Write_DA_CONVERT_CONTROL_PC_CAL(Uint8 Cal_Modle_Sel)
 		}
 		else if(Cal_Modle_Sel == 4)
 		{
-			if(CompensationCnt>=2000)
+			psDSPPacketOut->Reserved1 = 0xEE;
+			if(CompensationCnt>=DA_ConvertCntTotal)
 			{
 				CompensationCnt = 0;
 			}
-			DA_ConvertNowValue = LensCompensationBuffer[CompensationCnt]/3;
+			DA_ConvertNowValue = LensCompensationBuffer[CompensationCnt];
+			DA_ConvertNowValue_Sync = LensCompensationBuffer[2000+CompensationCnt];
 			CompensationCnt++;
 			//Cnt_i++;
 		}
@@ -2289,8 +2295,8 @@ void Write_DA_CONVERT_CONTROL_PC_CAL(Uint8 Cal_Modle_Sel)
 		//DA_ConvertData.DA_ADDR = DA_ADDR;
 		DA_ConvertData.DA_ADDR = DA_AD5315_G106.DA_ADDR | DA_AD5315_G106.DA_ADDR_Sync;
 		DA_ConvertData.PWMHighCount = DA_AD5315_G106.PWMHighCount;
-		DA_ConvertData.PWMLowCount = DA_AD5315_G106.PWMHighCount;
-		DA_ConvertData.PWMPhase = DA_AD5315_G106.PWMHighCount; //?
+		DA_ConvertData.PWMLowCount = DA_AD5315_G106.PWMLowCount;
+		DA_ConvertData.PWMPhase = DA_AD5315_G106.PWMPhase; //
 
 		if(((DA_CONVERTCnt > DA_AD5315_G106.StartOffsetCnt)&&
 			(DA_CONVERTCnt <= (DA_ConvertCntTotal/2-DA_AD5315_G106.EndOffsetCnt)))

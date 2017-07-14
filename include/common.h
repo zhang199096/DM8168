@@ -856,6 +856,7 @@ typedef struct
 	Uint16 PWMLowCount;  //uint:0.1us
 	Uint16 PWMPhase;  //uint:0.1us
 
+	Uint16 GetDataCount; //0-2000;
 }DACONVERT;
 
 #endif  // end of DSP6713_COMMON_H definition

@@ -473,7 +473,7 @@ typedef struct
 	INT32U TrackRunOver;	
 	INT32U InterpolationOver;
 	INT32U CompensationDataCheckError;
-	INT32U Reserved1;
+	INT32U Reserved1; //for Sign B3  Default:0 setVol:AA;triangle:BB;Sin:CC:cos:0xDDcunstom:0xEE
 	
 	INT32U Reserved2;
 	INT32U Reserved3;

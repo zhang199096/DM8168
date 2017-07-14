@@ -2275,6 +2275,7 @@ void STD_run_G106(void)
 	DA_AD5315_G106.Voltage_Start2 = GCodeRIPointer->StartPoint.Axis16;
 	DA_AD5315_G106.WaveSelect = GCodeRIPointer->StartPoint.Axis17;
 	DA_AD5315_G106.CycleNum = GCodeRIPointer->StartPoint.Axis4;
+	DA_AD5315_G106.GetDataCount = GCodeRIPointer->StartPoint.Axis18;
 	if(DA_AD5315_G106.AutoSign != False)
 	{
 
@@ -2344,7 +2345,7 @@ void STD_run_G106(void)
 		DA_AD5315_G106.PWMPhase = 0;
 		DA_AD5315_G106.StartOffsetCnt = 0;
 		DA_AD5315_G106.EndOffsetCnt = 0;
-
+		psDSPPacketOut->Reserved1 = 0xAA; //add by zz
 		switch (CMD1_DA_CH) 
 		{
 			case DA_CH1:
@@ -5608,7 +5609,7 @@ Uint16 NC_Run_Gcode(void)
 		{
 			GCODE *iGcode;
 			iGcode = &GCodeBuffer[(STDNCSign.RealRunCount - 1) % STDGCODE_MOD];
-
+			psDSPPacketOut->Reserved1 = 0x00;
 			switch (iGcode->CMDMain) 
 			{
 

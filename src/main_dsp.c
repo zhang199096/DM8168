@@ -2394,6 +2394,7 @@ void System_Initial(void)
 	psEepromPara_Arm->Macro[1] = 0;
 	psEepromPara_Arm->Macro[2] = 0;
 	psDSPPacketOut->MicroEDataBaseStartCnt = 0;;
+	psDSPPacketOut->Reserved1 = 0;  //add by zzz
 	LensCompensationBufferCnt = 0;
 
 	MonitorBuffer1Cnt = 0;
